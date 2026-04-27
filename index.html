@@ -1,0 +1,1260 @@
+<!DOCTYPE html>
+<html lang="hu">
+<!--
+  ╔══════════════════════════════════════════════════════════════════╗
+  ║  FODEL INGATLAN — Website Mockup                                ║
+  ║  Ready for Claude Code handoff                                  ║
+  ║                                                                  ║
+  ║  BRAND IDENTITY NOTES:                                          ║
+  ║  - Full brand name: FODEL INGATLAN / FODEL REAL ESTATES         ║
+  ║  - Founded: 2013, Almere-Buiten, Flevoland, Netherlands         ║
+  ║  - Tagline: "Problémamentes, diszkrét ingatlanközvetítés"       ║
+  ║  - English: "PROPERTY DIRECT FROM THE OWNER"                    ║
+  ║  - Model: No-exclusivity, 5 languages, 9 countries              ║
+  ║  - Commission: 4% net (min. €2,000) + 21% Dutch VAT             ║
+  ║  - Contact: +31-644-005-550 / +36-70-225-5255 / info@fodel.nl  ║
+  ║  - Hours: Mon–Fri 08:00–18:00                                   ║
+  ║                                                                  ║
+  ║  DESIGN SYSTEM:                                                  ║
+  ║  - Fonts: Cormorant Garamond (headings) + Jost (UI/body)        ║
+  ║  - Cream: #FDFAF5  Linen: #F2EBE0  Ink: #1A1610                ║
+  ║  - Gold accent: #C9A84C  Taupe: #8C7A5E  Border: #DDD4C8       ║
+  ║                                                                  ║
+  ║  PAGES (SPA via React state):                                    ║
+  ║  home → properties → detail → sellers → contact                  ║
+  ║                                                                  ║
+  ║  TO CONTINUE IN CLAUDE CODE:                                    ║
+  ║  - Replace Placeholder SVGs with real <img> tags                ║
+  ║  - Connect to a real backend / CMS for property data            ║
+  ║  - Add real routing (React Router or Next.js)                   ║
+  ║  - Split into component files as needed                         ║
+  ╚══════════════════════════════════════════════════════════════════╝
+-->
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FODEL Ingatlan — Magyar ingatlanok Nyugat-Európában</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500;1,600&family=Jost:wght@200;300;400;500&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --cream:  #FDFAF5;
+      --linen:  #F2EBE0;
+      --mist:   #E5DDD2;
+      --ink:    #1A1610;
+      --gold:   #C9A84C;
+      --gold2:  #E2C97A;
+      --taupe:  #8C7A5E;
+      --border: #DDD4C8;
+      --serif:  'Cormorant Garamond', Georgia, serif;
+      --sans:   'Jost', 'Helvetica Neue', sans-serif;
+    }
+    html { scroll-behavior: smooth; font-size: 16px; }
+    body {
+      background: var(--cream);
+      color: var(--ink);
+      font-family: var(--sans);
+      font-weight: 300;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+    a { color: inherit; text-decoration: none; }
+    button { cursor: pointer; border: none; background: none; font-family: var(--sans); }
+    input, textarea, select { font-family: var(--sans); }
+
+    /* Property card image zoom on hover */
+    .card-img-wrap { overflow: hidden; }
+    .card-img-inner {
+      transition: transform 0.9s cubic-bezier(0.25,0.1,0.25,1);
+      display: block; width: 100%;
+    }
+    .prop-card:hover .card-img-inner { transform: scale(1.045); }
+
+    /* Nav link underline */
+    .nav-link { position: relative; }
+    .nav-link::after {
+      content: '';
+      position: absolute;
+      bottom: -3px; left: 0; right: 0;
+      height: 1px;
+      background: var(--gold);
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 0.35s ease;
+    }
+    .nav-link:hover::after, .nav-link.active::after { transform: scaleX(1); }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: var(--linen); }
+    ::-webkit-scrollbar-thumb { background: var(--taupe); }
+
+    ::selection { background: var(--gold); color: var(--ink); }
+
+    @keyframes scrollPulse {
+      0%,100% { opacity: 0.3; transform: scaleY(1); }
+      50%      { opacity: 0.8; transform: scaleY(0.6); }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    /* ═══════════════════════════════════════════════════════════
+       DATA — Properties, How It Works, Stats
+       Replace this with API calls or a CMS in production.
+    ═══════════════════════════════════════════════════════════ */
+
+    const PROPERTIES = [
+      {
+        id: 1,
+        title: 'Balatoni Panorámaház',
+        subtitle: 'Felújított villa magánszőlőskerttel',
+        location: 'Badacsony, Veszprém megye',
+        region: 'Balaton-felvidék',
+        type: 'Eladó ház',
+        price_eur: 178000,
+        price_huf: '64 000 000 Ft',
+        beds: 4, baths: 2, area_m2: 210, land_m2: 2400,
+        imgType: 'landscape',
+        featured: true,
+        tag: 'Kiemelt',
+        desc: 'Lélegzetelállító panorámával rendelkező, teljesen felújított villa a Balaton-felvidéken, magánszőlőskerttel és működő borospincével. Az ingatlan 2022-ben teljes körű felújításon esett át, megtartva eredeti karakterét.',
+      },
+      {
+        id: 2,
+        title: 'Baranyai Kúria',
+        subtitle: 'Kastélyszerű 19. századi rezidencia',
+        location: 'Pécs közelében, Baranya megye',
+        region: 'Dél-Dunántúl',
+        type: 'Kastélyok, kúriák',
+        price_eur: 320000,
+        price_huf: '115 200 000 Ft',
+        beds: 7, baths: 4, area_m2: 480, land_m2: 32000,
+        imgType: 'castle',
+        featured: true,
+        tag: 'Exkluzív',
+        desc: 'Historizáló stílusú, 19. századi kúria teljesen restaurálva. 3,2 hektáros angolparkkal, önálló vendégházzal és lovardával. Kiváló befektetési vagy turisztikai lehetőség.',
+      },
+      {
+        id: 3,
+        title: 'Alföldi Tanya',
+        subtitle: 'Tradicionális farm 8 hektáron',
+        location: 'Csemő, Bács-Kiskun megye',
+        region: 'Alföld',
+        type: 'Eladó tanya',
+        price_eur: 85000,
+        price_huf: '30 600 000 Ft',
+        beds: 3, baths: 1, area_m2: 140, land_m2: 80000,
+        imgType: 'aerial',
+        featured: true,
+        tag: null,
+        desc: 'Autentikus alföldi tanya gazdag gyümölcsössel, kertészettel és gazdasági épületekkel. 8 hektár termőfölddel, saját kúttal. Csemő ismert hollandok által kedvelt telepeinek egyike.',
+      },
+      {
+        id: 4,
+        title: 'Zalai Présház',
+        subtitle: 'Felújított parasztház borospincével',
+        location: 'Zalaegerszeg közelében, Zala megye',
+        region: 'Dél-Dunántúl',
+        type: 'Eladó ház',
+        price_eur: 67000,
+        price_huf: '24 100 000 Ft',
+        beds: 3, baths: 1, area_m2: 118, land_m2: 4500,
+        imgType: 'interior',
+        featured: false,
+        tag: null,
+        desc: 'Hagyományos zalai présház teljesen felújítva, eredeti gerendás mennyezettel. Működő pince, tágas terasz, ápolt kert.',
+      },
+      {
+        id: 5,
+        title: 'Tolnai Szőlőbirtok',
+        subtitle: 'Működő szőlészet pinceházzal',
+        location: 'Szekszárd közelében, Tolna megye',
+        region: 'Dél-Dunántúl',
+        type: 'Mezőgazdasági ingatlan',
+        price_eur: 245000,
+        price_huf: '88 200 000 Ft',
+        beds: 5, baths: 2, area_m2: 290, land_m2: 125000,
+        imgType: 'vineyard',
+        featured: false,
+        tag: 'Egyedi',
+        desc: 'Tradicionális szekszárdi szőlőbirtok 12,5 hektáron, teljes felszereléssel. Pincészet, lakóépület, gazdasági épületek. Kiváló minőségű vörösbor-termőterület.',
+      },
+      {
+        id: 6,
+        title: 'Balatonberényi Nyaraló',
+        subtitle: 'Közvetlen vízparti nyaraló',
+        location: 'Balatonberény, Somogy megye',
+        region: 'Balaton',
+        type: 'Eladó nyaraló',
+        price_eur: 195000,
+        price_huf: '70 200 000 Ft',
+        beds: 4, baths: 2, area_m2: 165, land_m2: 1800,
+        imgType: 'waterfront',
+        featured: false,
+        tag: 'Vízpart',
+        desc: 'Közvetlen vízparti nyaraló saját stéggel és csónakházzal. Teljesen felújítva 2022-ben. Nappalin, konyhán és 4 hálószobán kívül fedett terasz és saját parkoló.',
+      },
+    ];
+
+    const HOW_IT_WORKS = [
+      {
+        num: '01',
+        title: 'Hirdetés 9 országban',
+        body: 'Ingatlanát 5 nyelven hirdetjük meg Hollandiában, Belgiumban, Németországban, Angliában és más uniós országokban — kizárólagossági szerződés nélkül.',
+      },
+      {
+        num: '02',
+        title: 'Minősített vevők',
+        body: 'Külföldi érdeklődőink jellemzően készpénzes vevők. Bankihitel és állami támogatás nélkül, egy összegben fizetnek. Csak komoly partnert közvetítünk.',
+      },
+      {
+        num: '03',
+        title: 'Teljes körű ügyintézés',
+        body: 'Kétnyelvű adásvételi szerződés, meghatalmazásos képviselet, földhivatali ügyintézés és közüzemi átírás — mindent elvégzünk Ön helyett.',
+      },
+    ];
+
+    const STATS = [
+      { value: '2013', label: 'Alapítva' },
+      { value: '9',    label: 'Ország' },
+      { value: '5',    label: 'Nyelv' },
+      { value: '4%',   label: 'Jutalék' },
+    ];
+
+    /* ═══════════════════════════════════════════════════════════
+       SHARED UI COMPONENTS
+    ═══════════════════════════════════════════════════════════ */
+
+    // Scroll reveal hook
+    const useReveal = () => {
+      const ref = React.useRef(null);
+      const [vis, setVis] = React.useState(false);
+      React.useEffect(() => {
+        const el = ref.current; if (!el) return;
+        const obs = new IntersectionObserver(
+          ([e]) => { if (e.isIntersecting) { setVis(true); obs.disconnect(); } },
+          { threshold: 0.08 }
+        );
+        obs.observe(el);
+        return () => obs.disconnect();
+      }, []);
+      return [ref, vis];
+    };
+
+    // Reveal wrapper with fade+slide animation
+    const Reveal = ({ children, delay = 0, style = {} }) => {
+      const [ref, vis] = useReveal();
+      return (
+        <div ref={ref} style={{
+          opacity: vis ? 1 : 0,
+          transform: vis ? 'none' : 'translateY(30px)',
+          transition: `opacity 0.95s cubic-bezier(0.25,0.1,0.25,1) ${delay * 0.14}s,
+                       transform 0.95s cubic-bezier(0.25,0.1,0.25,1) ${delay * 0.14}s`,
+          ...style,
+        }}>
+          {children}
+        </div>
+      );
+    };
+
+    // FODEL wordmark logo
+    const Logo = ({ light = false, onClick }) => (
+      <div onClick={onClick} style={{ cursor: 'pointer', userSelect: 'none', lineHeight: 1 }}>
+        <div style={{
+          fontFamily: 'var(--serif)', fontWeight: 500,
+          fontSize: '20px', letterSpacing: '0.38em',
+          color: light ? '#FDFAF5' : 'var(--ink)',
+          textTransform: 'uppercase',
+        }}>FODEL</div>
+        <div style={{ height: '1px', background: 'var(--gold)', margin: '5px 0 4px' }} />
+        <div style={{
+          fontFamily: 'var(--sans)', fontWeight: 200,
+          fontSize: '7.5px', letterSpacing: '0.45em',
+          color: light ? 'rgba(253,250,245,0.6)' : 'var(--taupe)',
+          textTransform: 'uppercase',
+        }}>INGATLAN</div>
+      </div>
+    );
+
+    // Thin gold horizontal rule
+    const GoldRule = ({ width = '48px', center = false, style = {} }) => (
+      <div style={{
+        width, height: '1px', background: 'var(--gold)',
+        margin: center ? '0 auto' : '0', ...style,
+      }} />
+    );
+
+    // Small-caps gold eyebrow label
+    const Eyebrow = ({ children, center = false, style = {} }) => (
+      <div style={{
+        fontFamily: 'var(--sans)', fontWeight: 400,
+        fontSize: '10px', letterSpacing: '0.28em',
+        textTransform: 'uppercase', color: 'var(--gold)',
+        textAlign: center ? 'center' : 'left', ...style,
+      }}>{children}</div>
+    );
+
+    // Property image placeholder — replace with <img> in production
+    // Each type represents a photography style to brief the photographer on
+    const Placeholder = ({ type = 'landscape', style = {} }) => {
+      const cfg = {
+        landscape:  { bg: '#C9BFA8', s1: '#BDB19A', s2: '#D5CAAF', label: 'panoráma fotó' },
+        castle:     { bg: '#B8BAB2', s1: '#A8AAA2', s2: '#C4C6BC', label: 'kastély fotó' },
+        aerial:     { bg: '#B4BFA6', s1: '#A4AF96', s2: '#C0CBB2', label: 'légifotó' },
+        interior:   { bg: '#C8BFAA', s1: '#B8AF9A', s2: '#D4CBBA', label: 'belső tér fotó' },
+        vineyard:   { bg: '#BABA9E', s1: '#AAAA8E', s2: '#C6C6AE', label: 'szőlőbirtok fotó' },
+        waterfront: { bg: '#A8B8C2', s1: '#98A8B2', s2: '#B8C8D2', label: 'vízparti fotó' },
+      };
+      const c = cfg[type] || cfg.landscape;
+      return (
+        <svg viewBox="0 0 800 540"
+             style={{ width: '100%', height: '100%', display: 'block', ...style }}
+             xmlns="http://www.w3.org/2000/svg"
+             preserveAspectRatio="xMidYMid slice">
+          <rect width="800" height="540" fill={c.bg} />
+          {Array.from({ length: 22 }, (_, i) => (
+            <rect key={i} x={i * 74 - 200} y="0" width="37" height="540"
+                  fill={i % 2 === 0 ? c.s1 : c.s2} opacity="0.55" />
+          ))}
+          <text x="400" y="276" textAnchor="middle"
+                fontFamily="'Courier New', monospace" fontSize="13"
+                fill="rgba(26,22,16,0.3)" letterSpacing="3">
+            [ {c.label} ]
+          </text>
+        </svg>
+      );
+    };
+
+    // Sotheby's-style property card
+    const PropertyCard = ({ property, onClick, delay = 0 }) => {
+      const [hov, setHov] = React.useState(false);
+      const { title, location, region, type, price_eur, area_m2, land_m2, imgType, tag, beds } = property;
+      const fmt    = n => '€\u00A0' + n.toLocaleString('de-DE');
+      const fmtL   = m => m >= 10000
+        ? (m / 10000).toFixed(2).replace('.', ',') + '\u00A0ha'
+        : m.toLocaleString('de-DE') + '\u00A0m²';
+      return (
+        <Reveal delay={delay}>
+          <div className="prop-card" onClick={onClick}
+               onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+               style={{ cursor: 'pointer', userSelect: 'none' }}>
+            <div className="card-img-wrap" style={{ position: 'relative', aspectRatio: '4/3' }}>
+              <div className="card-img-inner" style={{ height: '100%' }}>
+                <Placeholder type={imgType} />
+              </div>
+              {tag && (
+                <div style={{
+                  position: 'absolute', top: '14px', left: '14px',
+                  background: 'var(--gold)', color: 'var(--ink)',
+                  fontFamily: 'var(--sans)', fontWeight: 400,
+                  fontSize: '8.5px', letterSpacing: '0.22em',
+                  textTransform: 'uppercase', padding: '4px 11px',
+                }}>{tag}</div>
+              )}
+            </div>
+            <div style={{ paddingTop: '18px' }}>
+              <Eyebrow style={{ marginBottom: '7px' }}>{region} — {type}</Eyebrow>
+              <div style={{
+                fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '21px',
+                color: hov ? 'var(--gold)' : 'var(--ink)',
+                lineHeight: 1.15, marginBottom: '5px',
+                transition: 'color 0.35s ease',
+              }}>{title}</div>
+              <div style={{
+                fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '12px',
+                color: 'var(--taupe)', letterSpacing: '0.04em', marginBottom: '14px',
+              }}>{location}</div>
+              <div style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+                paddingTop: '14px', borderTop: '1px solid var(--border)',
+              }}>
+                <div style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '19px', color: 'var(--ink)' }}>
+                  {fmt(price_eur)}
+                </div>
+                <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '11px', color: 'var(--taupe)' }}>
+                  {beds} szoba · {area_m2} m² · {fmtL(land_m2)}
+                </div>
+              </div>
+            </div>
+          </div>
+        </Reveal>
+      );
+    };
+
+    // Button: dark filled
+    const BtnDark = ({ children, onClick, type = 'button', style = {} }) => {
+      const [hov, setHov] = React.useState(false);
+      return (
+        <button type={type} onClick={onClick}
+          onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+          style={{
+            display: 'inline-block', padding: '14px 38px',
+            background: hov ? 'var(--gold)' : 'var(--ink)',
+            color: hov ? 'var(--ink)' : 'var(--cream)',
+            fontFamily: 'var(--sans)', fontWeight: 400,
+            fontSize: '10.5px', letterSpacing: '0.26em', textTransform: 'uppercase',
+            border: 'none', cursor: 'pointer',
+            transition: 'background 0.4s, color 0.4s', ...style,
+          }}>{children}</button>
+      );
+    };
+
+    // Button: outlined
+    const BtnOutline = ({ children, onClick, light = false, type = 'button', style = {} }) => {
+      const [hov, setHov] = React.useState(false);
+      const bc = light ? 'rgba(253,250,245,0.55)' : 'var(--ink)';
+      return (
+        <button type={type} onClick={onClick}
+          onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+          style={{
+            display: 'inline-block', padding: '14px 38px',
+            background: hov ? (light ? 'rgba(253,250,245,0.1)' : 'var(--linen)') : 'transparent',
+            color: light ? 'var(--cream)' : 'var(--ink)',
+            fontFamily: 'var(--sans)', fontWeight: 400,
+            fontSize: '10.5px', letterSpacing: '0.26em', textTransform: 'uppercase',
+            border: `1px solid ${bc}`, cursor: 'pointer',
+            transition: 'background 0.4s', ...style,
+          }}>{children}</button>
+      );
+    };
+
+    // Button: text with arrow
+    const TextBtn = ({ children, onClick, light = false, style = {} }) => (
+      <button onClick={onClick} style={{
+        fontFamily: 'var(--sans)', fontWeight: 400, fontSize: '10.5px',
+        letterSpacing: '0.22em', textTransform: 'uppercase',
+        color: light ? 'rgba(253,250,245,0.7)' : 'var(--taupe)',
+        background: 'none', border: 'none', cursor: 'pointer',
+        display: 'inline-flex', alignItems: 'center', gap: '10px', ...style,
+      }}>{children} <span style={{ fontSize: '15px', letterSpacing: 0, opacity: 0.8 }}>→</span></button>
+    );
+
+    // Sticky navigation bar
+    const Nav = ({ currentPage, navigate }) => {
+      const [scrolled, setScrolled] = React.useState(false);
+      React.useEffect(() => {
+        const fn = () => setScrolled(window.scrollY > 120);
+        window.addEventListener('scroll', fn, { passive: true });
+        fn();
+        return () => window.removeEventListener('scroll', fn);
+      }, []);
+
+      const links = [
+        { label: 'Ingatlanok', page: 'properties' },
+        { label: 'Eladóknak',  page: 'sellers'    },
+        { label: 'Vevőknek',   page: 'buyers'     },
+        { label: 'Rólunk',     page: 'about'      },
+        { label: 'Kapcsolat',  page: 'contact'    },
+      ];
+
+      return (
+        <nav style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 1000,
+          padding: scrolled ? '16px 64px' : '28px 64px',
+          background: 'rgba(253,250,245,0.96)',
+          borderBottom: '1px solid var(--border)',
+          backdropFilter: scrolled ? 'blur(10px)' : 'none',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          transition: 'padding 0.5s ease',
+        }}>
+          <Logo onClick={() => navigate('home')} />
+          <div style={{ display: 'flex', gap: '38px', alignItems: 'center' }}>
+            {links.map(l => (
+              <button key={l.page} onClick={() => navigate(l.page)}
+                className={`nav-link${currentPage === l.page ? ' active' : ''}`}
+                style={{
+                  fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '10.5px',
+                  letterSpacing: '0.17em', textTransform: 'uppercase', color: 'var(--ink)',
+                  background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0',
+                }}>{l.label}</button>
+            ))}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+            <div style={{ fontFamily: 'var(--sans)', fontSize: '9.5px', letterSpacing: '0.18em', color: 'var(--taupe)', display: 'flex', gap: '4px', alignItems: 'center' }}>
+              {['HU','EN','NL'].map((lng, i) => (
+                <React.Fragment key={lng}>
+                  <span style={{ cursor: 'pointer', fontWeight: i === 0 ? 400 : 200, color: i === 0 ? 'var(--gold)' : 'inherit' }}>{lng}</span>
+                  {i < 2 && <span style={{ opacity: 0.35, margin: '0 3px' }}>|</span>}
+                </React.Fragment>
+              ))}
+            </div>
+            <BtnOutline onClick={() => navigate('contact')} style={{ padding: '9px 20px', fontSize: '9.5px' }}>
+              Kapcsolat
+            </BtnOutline>
+          </div>
+        </nav>
+      );
+    };
+
+    // Site footer
+    const Footer = ({ navigate }) => (
+      <footer style={{ background: 'var(--ink)', color: 'var(--cream)', padding: '88px 80px 52px' }}>
+        <div style={{
+          display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr 1fr', gap: '56px',
+          paddingBottom: '64px', borderBottom: '1px solid rgba(253,250,245,0.1)', marginBottom: '40px',
+        }}>
+          <div>
+            <Logo light onClick={() => navigate('home')} />
+            <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '13px', lineHeight: 1.85, color: 'rgba(253,250,245,0.45)', marginTop: '28px', maxWidth: '230px' }}>
+              Magyar ingatlanok hirdetése Hollandiában és az Unió többi országában. Alapítva 2013-ban, Almere-Buiten, Hollandia.
+            </p>
+          </div>
+          {[
+            { heading: 'Navigáció', items: [
+              { label: 'Ingatlanok', page: 'properties' },
+              { label: 'Eladóknak',  page: 'sellers'    },
+              { label: 'Vevőknek',   page: 'buyers'     },
+              { label: 'Rólunk',     page: 'about'      },
+              { label: 'Kapcsolat',  page: 'contact'    },
+            ]},
+            { heading: 'Kategóriák', items: [
+              'Eladó ház','Kastélyok, kúriák','Eladó tanya',
+              'Eladó nyaraló','Mezőgazdasági ingatlan','Eladó telek',
+            ].map(l => ({ label: l, page: 'properties' }))},
+          ].map(col => (
+            <div key={col.heading}>
+              <Eyebrow style={{ marginBottom: '22px' }}>{col.heading}</Eyebrow>
+              {col.items.map(item => (
+                <div key={item.label} style={{ marginBottom: '11px' }}>
+                  <button onClick={() => navigate(item.page)} style={{
+                    fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '13px',
+                    color: 'rgba(253,250,245,0.48)', background: 'none', border: 'none', cursor: 'pointer',
+                  }}
+                  onMouseEnter={e => e.target.style.color = 'rgba(253,250,245,0.85)'}
+                  onMouseLeave={e => e.target.style.color = 'rgba(253,250,245,0.48)'}
+                  >{item.label}</button>
+                </div>
+              ))}
+            </div>
+          ))}
+          <div>
+            <Eyebrow style={{ marginBottom: '22px' }}>Elérhetőség</Eyebrow>
+            {['+31-644-005-550','+36-70-225-5255','+36-70-231-0031','info@fodel.nl'].map(line => (
+              <div key={line} style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '13px', color: 'rgba(253,250,245,0.48)', marginBottom: '9px' }}>{line}</div>
+            ))}
+            <div style={{ marginTop: '20px', fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '12px', color: 'rgba(253,250,245,0.3)', lineHeight: 1.8 }}>
+              Hétfő–Péntek · 08:00–18:00<br />Almere-Buiten, Hollandia
+            </div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '11px', color: 'rgba(253,250,245,0.25)', letterSpacing: '0.05em' }}>
+            © 2013–2026 FODEL INGATLAN · fodel.nl · fodel.hu · fodel.be
+          </div>
+          <div style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontWeight: 300, fontSize: '14px', color: 'rgba(253,250,245,0.25)' }}>
+            Problémamentes, diszkrét ingatlanközvetítés
+          </div>
+        </div>
+      </footer>
+    );
+
+    /* ═══════════════════════════════════════════════════════════
+       PAGE: HOME
+    ═══════════════════════════════════════════════════════════ */
+
+    const HomePage = ({ navigate }) => {
+      const [loaded, setLoaded] = React.useState(false);
+      React.useEffect(() => { const t = setTimeout(() => setLoaded(true), 80); return () => clearTimeout(t); }, []);
+      const anim = (delay = 0) => ({
+        opacity: loaded ? 1 : 0,
+        transform: loaded ? 'none' : 'translateY(24px)',
+        transition: `opacity 1.1s cubic-bezier(0.25,0.1,0.25,1) ${delay}s, transform 1.1s cubic-bezier(0.25,0.1,0.25,1) ${delay}s`,
+      });
+
+      return (
+        <main data-screen-label="Home">
+          {/* HERO — split layout */}
+          <section style={{ minHeight: '100vh', display: 'flex', overflow: 'hidden' }}>
+            <div style={{ flex: '0 0 54%', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '140px 72px 80px 80px', position: 'relative' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '36px', ...anim(0.1) }}>
+                <div style={{ width: '36px', height: '1px', background: 'var(--gold)' }} />
+                <span style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '10px', letterSpacing: '0.32em', textTransform: 'uppercase', color: 'var(--gold)' }}>
+                  Est. 2013 — Almere, Hollandia
+                </span>
+              </div>
+              <h1 style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: 'clamp(54px, 5.8vw, 92px)', lineHeight: 1.04, color: 'var(--ink)', marginBottom: '32px', ...anim(0.22) }}>
+                Magyar<br /><em style={{ fontStyle: 'italic' }}>Ingatlanok</em><br />Nyugat-Európában
+              </h1>
+              <GoldRule style={{ marginBottom: '28px', ...anim(0.34) }} />
+              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '15px', lineHeight: 1.9, color: 'var(--taupe)', maxWidth: '400px', marginBottom: '52px', ...anim(0.44) }}>
+                Egyedülálló hirdetési modell: 5 nyelven, 9 országban — kizárólagossági szerződés nélkül. Komoly, készpénzes külföldi vevők.
+              </p>
+              <div style={{ display: 'flex', gap: '16px', ...anim(0.54) }}>
+                <BtnDark onClick={() => navigate('properties')}>Ingatlanok</BtnDark>
+                <BtnOutline onClick={() => navigate('sellers')}>Hirdessen nálunk</BtnOutline>
+              </div>
+              <div style={{ position: 'absolute', bottom: '44px', left: '80px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', ...anim(1.1) }}>
+                <div style={{ width: '1px', height: '44px', background: 'var(--taupe)', animation: 'scrollPulse 2.2s ease infinite' }} />
+                <span style={{ fontFamily: 'var(--sans)', fontSize: '8.5px', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'var(--taupe)', writingMode: 'vertical-rl' }}>Görgessen</span>
+              </div>
+            </div>
+            <div style={{ flex: '0 0 46%', position: 'relative', overflow: 'hidden', opacity: loaded ? 1 : 0, transition: 'opacity 1.6s ease 0.15s' }}>
+              <div style={{ position: 'absolute', inset: 0 }}><Placeholder type="landscape" style={{ height: '100%' }} /></div>
+              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(253,250,245,0.25) 0%, transparent 30%)' }} />
+              <div style={{ position: 'absolute', bottom: '44px', left: '44px', background: 'rgba(26,22,16,0.78)', backdropFilter: 'blur(12px)', padding: '22px 30px' }}>
+                <Eyebrow style={{ marginBottom: '7px' }}>Kiemelt Ingatlan</Eyebrow>
+                <div style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '19px', color: 'var(--cream)', marginBottom: '5px' }}>Balatoni Panorámaház</div>
+                <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '12px', color: 'rgba(253,250,245,0.6)' }}>Badacsony · € 178 000</div>
+              </div>
+            </div>
+          </section>
+
+          {/* DUAL AUDIENCE */}
+          <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderTop: '1px solid var(--border)' }}>
+            {[
+              { eyebrow: 'Eladóknak', title: 'Hirdesse ingatlanát\nNyugat-Európában', body: 'Kizárólagossági szerződés nélkül. Hirdetése 5 nyelven jelenik meg 9 országban, célzottan holland, belga és német készpénzes vevőknek.', cta: 'Tudjon meg többet', page: 'sellers' },
+              { eyebrow: 'Vevőknek',  title: 'Ingatlan közvetlenül\na tulajdonostól', body: 'Autentikus magyar házak, birtokok, gazdaságok és szőlők. Lépjen kapcsolatba közvetlenül a tulajdonosokkal, vagy bízza a FODEL-re a teljes folyamatot.', cta: 'Ingatlanok böngészése', page: 'properties' },
+            ].map((col, i) => (
+              <div key={i} style={{ padding: '88px 80px', borderRight: i === 0 ? '1px solid var(--border)' : 'none', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <Reveal>
+                  <Eyebrow style={{ marginBottom: '20px' }}>{col.eyebrow}</Eyebrow>
+                  <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(28px, 2.8vw, 44px)', lineHeight: 1.18, color: 'var(--ink)', marginBottom: '22px', whiteSpace: 'pre-line' }}>{col.title}</h2>
+                  <GoldRule style={{ marginBottom: '22px' }} />
+                  <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', lineHeight: 1.85, color: 'var(--taupe)', marginBottom: '36px', maxWidth: '380px' }}>{col.body}</p>
+                  <TextBtn onClick={() => navigate(col.page)}>{col.cta}</TextBtn>
+                </Reveal>
+              </div>
+            ))}
+          </section>
+
+          {/* FEATURED PROPERTIES */}
+          <section style={{ padding: '108px 80px' }}>
+            <Reveal>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '64px' }}>
+                <div>
+                  <Eyebrow style={{ marginBottom: '14px' }}>Válogatás</Eyebrow>
+                  <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(32px, 3.5vw, 54px)', color: 'var(--ink)', lineHeight: 1.08 }}>Kiemelt Ingatlanok</h2>
+                </div>
+                <TextBtn onClick={() => navigate('properties')}>Összes ingatlan</TextBtn>
+              </div>
+            </Reveal>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '36px' }}>
+              {PROPERTIES.filter(p => p.featured).map((p, i) => (
+                <PropertyCard key={p.id} property={p} delay={i + 1} onClick={() => navigate('detail', p)} />
+              ))}
+            </div>
+          </section>
+
+          {/* STATS */}
+          <section style={{ background: 'var(--linen)', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', padding: '64px 80px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)' }}>
+              {STATS.map((s, i) => (
+                <Reveal key={s.label} delay={i + 1}>
+                  <div style={{ textAlign: 'center', padding: '24px', borderRight: i < 3 ? '1px solid var(--border)' : 'none' }}>
+                    <div style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: 'clamp(44px, 4.5vw, 68px)', color: 'var(--ink)', lineHeight: 1, marginBottom: '10px' }}>{s.value}</div>
+                    <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '10px', letterSpacing: '0.28em', textTransform: 'uppercase', color: 'var(--taupe)' }}>{s.label}</div>
+                  </div>
+                </Reveal>
+              ))}
+            </div>
+          </section>
+
+          {/* EDITORIAL QUOTE */}
+          <section style={{ background: 'var(--ink)', padding: '128px 80px', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', right: '-60px', top: '50%', transform: 'translateY(-50%)', fontFamily: 'var(--serif)', fontSize: '480px', fontWeight: 300, color: 'rgba(201,168,76,0.05)', lineHeight: 1, userSelect: 'none', pointerEvents: 'none' }}>F</div>
+            <Reveal>
+              <div style={{ maxWidth: '820px', margin: '0 auto', textAlign: 'center' }}>
+                <GoldRule center style={{ marginBottom: '48px' }} />
+                <blockquote style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontWeight: 300, fontSize: 'clamp(26px, 2.8vw, 42px)', lineHeight: 1.5, color: 'var(--cream)', marginBottom: '48px' }}>
+                  „A hollandok gyakran nem hisznek a szemüknek, amikor megtudják,<br />hogy Magyarországon mit és milyen áron vásárolhatnak."
+                </blockquote>
+                <GoldRule center style={{ marginBottom: '28px' }} />
+                <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '10px', letterSpacing: '0.28em', textTransform: 'uppercase', color: 'rgba(201,168,76,0.75)' }}>FODEL INGATLAN — fodel.nl</div>
+              </div>
+            </Reveal>
+          </section>
+
+          {/* HOW IT WORKS */}
+          <section style={{ padding: '108px 80px' }}>
+            <Reveal>
+              <div style={{ textAlign: 'center', marginBottom: '80px' }}>
+                <Eyebrow center style={{ marginBottom: '14px' }}>Egyedülálló modell</Eyebrow>
+                <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(32px, 3.5vw, 54px)', color: 'var(--ink)' }}>Így működik a FODEL</h2>
+              </div>
+            </Reveal>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)' }}>
+              {HOW_IT_WORKS.map((step, i) => (
+                <Reveal key={step.num} delay={i + 1}>
+                  <div style={{ padding: '48px 52px', borderRight: i < 2 ? '1px solid var(--border)' : 'none', borderTop: '2px solid var(--gold)' }}>
+                    <div style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: '52px', color: 'var(--gold)', opacity: 0.45, lineHeight: 1, marginBottom: '28px' }}>{step.num}</div>
+                    <h3 style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '23px', color: 'var(--ink)', marginBottom: '16px' }}>{step.title}</h3>
+                    <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', lineHeight: 1.85, color: 'var(--taupe)' }}>{step.body}</p>
+                  </div>
+                </Reveal>
+              ))}
+            </div>
+            <Reveal><div style={{ textAlign: 'center', marginTop: '68px' }}><BtnDark onClick={() => navigate('sellers')}>Tudjon meg többet</BtnDark></div></Reveal>
+          </section>
+
+          {/* CTA BAND */}
+          <section style={{ background: 'var(--linen)', borderTop: '1px solid var(--border)', padding: '72px 80px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Reveal>
+              <div>
+                <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(26px, 2.8vw, 42px)', color: 'var(--ink)', marginBottom: '10px' }}>Forduljon hozzánk bizalommal!</h2>
+                <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', color: 'var(--taupe)' }}>Munkanapokon 08:00–18:00 · A visszahívás ingyenes.</p>
+              </div>
+            </Reveal>
+            <Reveal delay={2}>
+              <div style={{ display: 'flex', gap: '16px', flexShrink: 0 }}>
+                <BtnDark onClick={() => navigate('contact')}>Ingyenes visszahívás</BtnDark>
+                <BtnOutline onClick={() => navigate('properties')}>Ingatlanok böngészése</BtnOutline>
+              </div>
+            </Reveal>
+          </section>
+        </main>
+      );
+    };
+
+    /* ═══════════════════════════════════════════════════════════
+       PAGE: PROPERTIES
+    ═══════════════════════════════════════════════════════════ */
+
+    const PropertiesPage = ({ navigate }) => {
+      const [filter, setFilter] = React.useState('Mind');
+      const cats = ['Mind', 'Eladó ház', 'Kastélyok, kúriák', 'Eladó tanya', 'Mezőgazdasági ingatlan', 'Eladó nyaraló'];
+      const filtered = filter === 'Mind' ? PROPERTIES : PROPERTIES.filter(p => p.type === filter);
+
+      return (
+        <main data-screen-label="Properties" style={{ paddingTop: '80px' }}>
+          <div style={{ padding: '80px 80px 64px', borderBottom: '1px solid var(--border)' }}>
+            <Eyebrow style={{ marginBottom: '18px' }}>FODEL Ingatlan Portál</Eyebrow>
+            <h1 style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: 'clamp(40px, 5vw, 76px)', color: 'var(--ink)', lineHeight: 1.04 }}>
+              Magyar Ingatlanok<br /><em>Külföldi Vevőknek</em>
+            </h1>
+          </div>
+          <div style={{ padding: '20px 80px', borderBottom: '1px solid var(--border)', display: 'flex', gap: '10px', alignItems: 'center', overflowX: 'auto' }}>
+            <span style={{ fontFamily: 'var(--sans)', fontSize: '9.5px', letterSpacing: '0.22em', color: 'var(--taupe)', textTransform: 'uppercase', flexShrink: 0, marginRight: '6px' }}>Szűrő:</span>
+            {cats.map(cat => (
+              <button key={cat} onClick={() => setFilter(cat)} style={{
+                fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '10.5px', letterSpacing: '0.12em',
+                padding: '8px 18px', cursor: 'pointer', flexShrink: 0,
+                background: filter === cat ? 'var(--ink)' : 'transparent',
+                color: filter === cat ? 'var(--cream)' : 'var(--taupe)',
+                border: `1px solid ${filter === cat ? 'var(--ink)' : 'var(--border)'}`,
+                transition: 'all 0.25s',
+              }}>{cat}</button>
+            ))}
+          </div>
+          <div style={{ padding: '64px 80px 108px' }}>
+            <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '12px', color: 'var(--taupe)', marginBottom: '44px' }}>{filtered.length} ingatlan</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '48px 36px' }}>
+              {filtered.map((p, i) => (
+                <PropertyCard key={p.id} property={p} delay={Math.min(i + 1, 4)} onClick={() => navigate('detail', p)} />
+              ))}
+            </div>
+          </div>
+        </main>
+      );
+    };
+
+    /* ═══════════════════════════════════════════════════════════
+       PAGE: PROPERTY DETAIL
+    ═══════════════════════════════════════════════════════════ */
+
+    const PropertyDetailPage = ({ navigate, selectedProp }) => {
+      const prop = selectedProp || PROPERTIES[0];
+      const [fd, setFd] = React.useState({ name: '', email: '', phone: '', message: '' });
+      const [sent, setSent] = React.useState(false);
+      const fmt  = n => '€\u00A0' + n.toLocaleString('de-DE');
+      const fmtL = m => m >= 10000 ? (m/10000).toFixed(2).replace('.', ',') + ' ha' : m.toLocaleString('de-DE') + ' m²';
+      const similar = PROPERTIES.filter(p => p.id !== prop.id && (p.region === prop.region || p.type === prop.type)).slice(0, 3);
+
+      const inputStyle = {
+        width: '100%', background: 'rgba(253,250,245,0.06)',
+        border: '1px solid rgba(253,250,245,0.15)', padding: '13px 16px',
+        fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '13px',
+        color: 'var(--cream)', outline: 'none', transition: 'border-color 0.3s',
+      };
+
+      return (
+        <main data-screen-label="Property Detail" style={{ paddingTop: '80px' }}>
+          {/* Breadcrumb */}
+          <div style={{ padding: '18px 80px', borderBottom: '1px solid var(--border)', display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {[{ l: 'Ingatlanok', fn: () => navigate('properties') }, { l: prop.region, fn: null }, { l: prop.title, fn: null }].map((c, i) => (
+              <React.Fragment key={i}>
+                {i > 0 && <span style={{ color: 'var(--border)', fontSize: '12px' }}>/</span>}
+                <button onClick={c.fn || undefined} style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '11px', color: i === 2 ? 'var(--ink)' : 'var(--taupe)', background: 'none', border: 'none', cursor: c.fn ? 'pointer' : 'default' }}>{c.l}</button>
+              </React.Fragment>
+            ))}
+          </div>
+          {/* Hero image */}
+          <div style={{ height: '66vh', position: 'relative', overflow: 'hidden' }}>
+            <Placeholder type={prop.imgType} style={{ height: '100%', width: '100%' }} />
+            {prop.tag && (
+              <div style={{ position: 'absolute', top: '36px', left: '80px', background: 'var(--gold)', color: 'var(--ink)', fontFamily: 'var(--sans)', fontSize: '9px', letterSpacing: '0.22em', textTransform: 'uppercase', padding: '6px 14px' }}>{prop.tag}</div>
+            )}
+          </div>
+          {/* Content grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 420px', gap: '88px', padding: '88px 80px', alignItems: 'start' }}>
+            <div>
+              <Eyebrow style={{ marginBottom: '14px' }}>{prop.region} — {prop.type}</Eyebrow>
+              <h1 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(36px, 3.5vw, 58px)', color: 'var(--ink)', lineHeight: 1.08, marginBottom: '10px' }}>{prop.title}</h1>
+              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', color: 'var(--taupe)', marginBottom: '36px' }}>{prop.location}</p>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '24px', padding: '24px 0', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', marginBottom: '44px' }}>
+                <div style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '38px', color: 'var(--ink)' }}>{fmt(prop.price_eur)}</div>
+                <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', color: 'var(--taupe)' }}>{prop.price_huf}</div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: '52px', border: '1px solid var(--border)' }}>
+                {[{ l: 'Szobák', v: prop.beds }, { l: 'Fürdők', v: prop.baths }, { l: 'Alapter.', v: prop.area_m2 + ' m²' }, { l: 'Telek', v: fmtL(prop.land_m2) }].map((s, i) => (
+                  <div key={s.l} style={{ padding: '22px 20px', textAlign: 'center', borderRight: i < 3 ? '1px solid var(--border)' : 'none' }}>
+                    <div style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '26px', color: 'var(--ink)', marginBottom: '5px' }}>{s.v}</div>
+                    <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '9.5px', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--taupe)' }}>{s.l}</div>
+                  </div>
+                ))}
+              </div>
+              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '15px', lineHeight: 1.95, color: 'var(--taupe)', marginBottom: '36px' }}>{prop.desc}</p>
+              <GoldRule style={{ marginBottom: '36px' }} />
+              <div style={{ background: 'var(--linen)', padding: '28px', borderLeft: '2px solid var(--gold)' }}>
+                <Eyebrow style={{ marginBottom: '10px' }}>FODEL Garancia</Eyebrow>
+                <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '13px', lineHeight: 1.8, color: 'var(--taupe)' }}>
+                  Minden ingatlan meghirdető azonosítása megtörtént. Kétnyelvű adásvételi szerződés, meghatalmazásos képviselet és földhivatali ügyintézés igény szerint elérhető.
+                </p>
+              </div>
+            </div>
+            {/* Contact form */}
+            <div style={{ background: 'var(--ink)', padding: '44px', position: 'sticky', top: '100px' }}>
+              <Eyebrow style={{ marginBottom: '10px' }}>Érdeklődjön</Eyebrow>
+              <h3 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: '24px', color: 'var(--cream)', marginBottom: '36px', lineHeight: 1.35 }}>Kérek tájékoztatást<br />erről az ingatlanról</h3>
+              {sent ? (
+                <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                  <GoldRule center style={{ marginBottom: '32px' }} />
+                  <p style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontWeight: 300, fontSize: '20px', color: 'var(--cream)', lineHeight: 1.65 }}>Köszönjük érdeklődését.<br />Munkatársunk hamarosan<br />felveszi Önnel a kapcsolatot.</p>
+                </div>
+              ) : (
+                <form onSubmit={e => { e.preventDefault(); setSent(true); }}>
+                  {[{ k: 'name', l: 'Név', t: 'text', ph: 'Az Ön neve' }, { k: 'email', l: 'E-mail', t: 'email', ph: 'email@cím.hu' }, { k: 'phone', l: 'Telefon', t: 'tel', ph: '+36 70 ...' }].map(f => (
+                    <div key={f.k} style={{ marginBottom: '20px' }}>
+                      <label style={{ fontFamily: 'var(--sans)', fontSize: '9.5px', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(253,250,245,0.45)', display: 'block', marginBottom: '7px' }}>{f.l}</label>
+                      <input type={f.t} placeholder={f.ph} value={fd[f.k]} onChange={e => setFd({...fd, [f.k]: e.target.value})} style={inputStyle}
+                        onFocus={e => e.target.style.borderColor = 'var(--gold)'}
+                        onBlur={e => e.target.style.borderColor = 'rgba(253,250,245,0.15)'} />
+                    </div>
+                  ))}
+                  <div style={{ marginBottom: '28px' }}>
+                    <label style={{ fontFamily: 'var(--sans)', fontSize: '9.5px', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(253,250,245,0.45)', display: 'block', marginBottom: '7px' }}>Üzenet</label>
+                    <textarea rows={4} placeholder="Kérdése vagy megjegyzése..." value={fd.message} onChange={e => setFd({...fd, message: e.target.value})} style={{ ...inputStyle, resize: 'vertical' }}
+                      onFocus={e => e.target.style.borderColor = 'var(--gold)'}
+                      onBlur={e => e.target.style.borderColor = 'rgba(253,250,245,0.15)'} />
+                  </div>
+                  <button type="submit" style={{ width: '100%', background: 'var(--gold)', color: 'var(--ink)', fontFamily: 'var(--sans)', fontWeight: 400, fontSize: '10.5px', letterSpacing: '0.26em', textTransform: 'uppercase', padding: '16px', border: 'none', cursor: 'pointer' }}>Üzenet Küldése</button>
+                  <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '11px', color: 'rgba(253,250,245,0.3)', textAlign: 'center', marginTop: '18px', lineHeight: 1.7 }}>Ingyenes visszahívást is kérhet<br />+31-644-005-550 · info@fodel.nl</p>
+                </form>
+              )}
+            </div>
+          </div>
+          {/* Similar properties */}
+          {similar.length > 0 && (
+            <div style={{ padding: '80px 80px 108px', borderTop: '1px solid var(--border)' }}>
+              <Reveal>
+                <Eyebrow style={{ marginBottom: '14px' }}>Hasonló ingatlanok</Eyebrow>
+                <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: '44px', color: 'var(--ink)', marginBottom: '52px' }}>A régióban</h2>
+              </Reveal>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '36px' }}>
+                {similar.map((p, i) => <PropertyCard key={p.id} property={p} delay={i + 1} onClick={() => navigate('detail', p)} />)}
+              </div>
+            </div>
+          )}
+        </main>
+      );
+    };
+
+    /* ═══════════════════════════════════════════════════════════
+       PAGE: SELLERS (Eladóknak)
+    ═══════════════════════════════════════════════════════════ */
+
+    const SellersPage = ({ navigate }) => (
+      <main data-screen-label="Sellers" style={{ paddingTop: '80px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', minHeight: '80vh' }}>
+          <div style={{ padding: '100px 72px 80px 80px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <Reveal>
+              <Eyebrow style={{ marginBottom: '20px' }}>Eladóknak</Eyebrow>
+              <h1 style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: 'clamp(44px, 4.8vw, 76px)', color: 'var(--ink)', lineHeight: 1.04, marginBottom: '28px' }}>
+                Hirdesse ingatlanát<br /><em>Nyugat-Európában</em>
+              </h1>
+              <GoldRule style={{ marginBottom: '28px' }} />
+              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '15px', lineHeight: 1.9, color: 'var(--taupe)', maxWidth: '480px', marginBottom: '48px' }}>
+                A FODEL egyedülálló hirdetési modelljével ingatlana 5 nyelven jelenik meg 9 országban — kizárólagossági szerződés nélkül. Csak komoly, készpénzes külföldi vevőkkel dolgozunk.
+              </p>
+              <BtnDark onClick={() => navigate('contact')}>Ingyenes konzultáció</BtnDark>
+            </Reveal>
+          </div>
+          <div style={{ background: 'var(--linen)', position: 'relative', overflow: 'hidden' }}>
+            <Placeholder type="aerial" style={{ height: '100%', position: 'absolute', inset: 0 }} />
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderTop: '1px solid var(--border)' }}>
+          <div style={{ padding: '88px 72px 88px 80px' }}>
+            <Reveal>
+              <Eyebrow style={{ marginBottom: '20px' }}>Az előnyök</Eyebrow>
+              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(28px, 2.8vw, 42px)', color: 'var(--ink)', lineHeight: 1.2, marginBottom: '28px' }}>Miért érdemes külföldi vevőt keresni?</h2>
+              <GoldRule style={{ marginBottom: '28px' }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {[
+                  'Készpénzes vevők — nincs bankihitel-várakozás, nincs CSOK-ügyintézés.',
+                  'Egy összegben, banki átutalással fizetnek — gyors és biztonságos.',
+                  'Komoly szándék: egy megtekintés legalább 2 napba és €200–300-ba kerül nekik.',
+                  'Stabil, reális vételár — nem alkudoznak irreálisan.',
+                  'FODEL a vevőt személyesen minősíti, Önhöz csak komoly partnert küldünk.',
+                ].map((pt, i) => (
+                  <div key={i} style={{ display: 'flex', gap: '18px', alignItems: 'flex-start' }}>
+                    <div style={{ width: '22px', height: '1px', background: 'var(--gold)', marginTop: '11px', flexShrink: 0 }} />
+                    <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', lineHeight: 1.8, color: 'var(--taupe)' }}>{pt}</p>
+                  </div>
+                ))}
+              </div>
+            </Reveal>
+          </div>
+          <div style={{ background: 'var(--linen)', borderLeft: '1px solid var(--border)', padding: '88px 80px' }}>
+            <Reveal>
+              <Eyebrow style={{ marginBottom: '20px' }}>A vevők</Eyebrow>
+              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(28px, 2.8vw, 42px)', color: 'var(--ink)', lineHeight: 1.2, marginBottom: '28px' }}>Kik a FODEL vásárlói?</h2>
+              <GoldRule style={{ marginBottom: '28px' }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                {[
+                  { t: 'Kisnyugdíjasok', b: 'Alacsonyabb megélhetési költségeket, adókedvezményt és elérhető egészségügyi ellátást keresnek Magyarországon.' },
+                  { t: 'Családok', b: 'Teret, természetet és vidéki életet keresnek. Jellemzően farmot, tanyát vagy nyaralót vásárolnak.' },
+                  { t: 'Befektetők', b: 'Kereskedelmi ingatlanokat, szőlőbirtokokat és mezőgazdasági területeket keresnek.' },
+                  { t: 'Életstílus-emigránsok', b: 'Holland adók és magas ingatlanárak elől menekülnek. Autentikus európai életmódot keresnek.' },
+                ].map(item => (
+                  <div key={item.t} style={{ paddingBottom: '24px', borderBottom: '1px solid var(--border)' }}>
+                    <div style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '17px', color: 'var(--ink)', marginBottom: '6px' }}>{item.t}</div>
+                    <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '13px', lineHeight: 1.8, color: 'var(--taupe)' }}>{item.b}</p>
+                  </div>
+                ))}
+              </div>
+            </Reveal>
+          </div>
+        </div>
+
+        <div style={{ padding: '108px 80px', borderTop: '1px solid var(--border)' }}>
+          <Reveal><div style={{ textAlign: 'center', marginBottom: '80px' }}>
+            <Eyebrow center style={{ marginBottom: '14px' }}>Lépésről lépésre</Eyebrow>
+            <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(32px, 3.5vw, 52px)', color: 'var(--ink)' }}>Az egyedülálló FODEL-modell</h2>
+          </div></Reveal>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)' }}>
+            {HOW_IT_WORKS.map((step, i) => (
+              <Reveal key={step.num} delay={i + 1}>
+                <div style={{ padding: '48px 52px', borderRight: i < 2 ? '1px solid var(--border)' : 'none', borderTop: '2px solid var(--gold)' }}>
+                  <div style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: '52px', color: 'var(--gold)', opacity: 0.45, lineHeight: 1, marginBottom: '28px' }}>{step.num}</div>
+                  <h3 style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '23px', color: 'var(--ink)', marginBottom: '16px' }}>{step.title}</h3>
+                  <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', lineHeight: 1.85, color: 'var(--taupe)' }}>{step.body}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ background: 'var(--ink)', padding: '88px 80px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Reveal>
+            <div>
+              <Eyebrow style={{ marginBottom: '14px' }}>Díjszabás</Eyebrow>
+              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: 'clamp(28px, 3vw, 46px)', color: 'var(--cream)', lineHeight: 1.2, marginBottom: '18px' }}>Jutalék csak sikeres<br />tranzakció esetén</h2>
+              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', color: 'rgba(253,250,245,0.55)', lineHeight: 1.85, maxWidth: '540px' }}>
+                Ha a vevő közvetlenül veszi fel Önnel a kapcsolatot, csak a hirdetési díjat fizeti. FODEL közvetítésnél: 4% nettó (min. €2.000) + 21% holland ÁFA.
+              </p>
+            </div>
+          </Reveal>
+          <Reveal delay={2}><BtnOutline light onClick={() => navigate('contact')} style={{ flexShrink: 0 }}>Árlista kérése</BtnOutline></Reveal>
+        </div>
+      </main>
+    );
+
+    /* ═══════════════════════════════════════════════════════════
+       PAGE: CONTACT
+    ═══════════════════════════════════════════════════════════ */
+
+    const ContactPage = ({ navigate }) => {
+      const [form, setForm] = React.useState({ name: '', email: '', phone: '', subject: 'Hirdetési érdeklődés', message: '' });
+      const [sent, setSent] = React.useState(false);
+
+      const lineStyle = {
+        width: '100%', background: 'transparent', border: 'none',
+        borderBottom: '1px solid var(--border)', padding: '13px 0',
+        fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px',
+        color: 'var(--ink)', outline: 'none', transition: 'border-color 0.3s',
+      };
+
+      return (
+        <main data-screen-label="Contact" style={{ paddingTop: '80px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', minHeight: 'calc(100vh - 80px)' }}>
+            <div style={{ padding: '88px 72px 80px 80px', background: 'var(--linen)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <Reveal>
+                <Eyebrow style={{ marginBottom: '18px' }}>Kapcsolat</Eyebrow>
+                <h1 style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: 'clamp(40px, 4vw, 64px)', color: 'var(--ink)', lineHeight: 1.08, marginBottom: '32px' }}>
+                  Forduljon hozzánk<br /><em>bizalommal</em>
+                </h1>
+                <GoldRule style={{ marginBottom: '48px' }} />
+              </Reveal>
+              <Reveal delay={1}>
+                <div>
+                  {[
+                    { l: 'Holland szám', v: '+31-644-005-550', note: 'Magyarul beszélő munkatársunk ezen a számon is elérhető' },
+                    { l: 'Magyar szám',  v: '+36-70-225-5255', note: '06-70-231-0031' },
+                    { l: 'E-mail',       v: 'info@fodel.nl',   note: null },
+                    { l: 'Nyitvatartás', v: 'Hétfő–Péntek',   note: '08:00–18:00' },
+                  ].map(c => (
+                    <div key={c.l} style={{ padding: '28px 0', borderBottom: '1px solid var(--border)' }}>
+                      <Eyebrow style={{ marginBottom: '8px' }}>{c.l}</Eyebrow>
+                      <div style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '22px', color: 'var(--ink)' }}>{c.v}</div>
+                      {c.note && <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '12.5px', color: 'var(--taupe)', marginTop: '4px' }}>{c.note}</div>}
+                    </div>
+                  ))}
+                </div>
+              </Reveal>
+              <Reveal delay={2}>
+                <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '13px', color: 'var(--taupe)', lineHeight: 1.75, marginTop: '32px' }}>
+                  Almere-Buiten, Flevoland, Hollandia<br />A visszahívást mi fizetjük — Önnek semmibe nem kerül.
+                </p>
+              </Reveal>
+            </div>
+            <div style={{ padding: '88px 80px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              {sent ? (
+                <div style={{ textAlign: 'center' }}>
+                  <GoldRule center style={{ marginBottom: '44px' }} />
+                  <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: '44px', color: 'var(--ink)', marginBottom: '18px' }}>Köszönjük!</h2>
+                  <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '15px', color: 'var(--taupe)', lineHeight: 1.85 }}>Üzenetét megkaptuk. Munkatársunk a megadott elérhetőségre munkanapokon belül visszahív.</p>
+                </div>
+              ) : (
+                <>
+                  <Reveal>
+                    <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: '34px', color: 'var(--ink)', marginBottom: '44px' }}>Ingyenes visszahívás kérése</h2>
+                  </Reveal>
+                  <form onSubmit={e => { e.preventDefault(); setSent(true); }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
+                      {[{ k: 'name', l: 'Név', t: 'text' }, { k: 'phone', l: 'Telefon', t: 'tel' }].map(f => (
+                        <div key={f.k}>
+                          <label style={{ fontFamily: 'var(--sans)', fontSize: '9.5px', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--taupe)', display: 'block', marginBottom: '9px' }}>{f.l}</label>
+                          <input type={f.t} value={form[f.k]} onChange={e => setForm({...form, [f.k]: e.target.value})} style={lineStyle}
+                            onFocus={e => e.target.style.borderBottomColor = 'var(--gold)'}
+                            onBlur={e => e.target.style.borderBottomColor = 'var(--border)'} />
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ marginBottom: '24px' }}>
+                      <label style={{ fontFamily: 'var(--sans)', fontSize: '9.5px', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--taupe)', display: 'block', marginBottom: '9px' }}>E-mail cím</label>
+                      <input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} style={lineStyle}
+                        onFocus={e => e.target.style.borderBottomColor = 'var(--gold)'}
+                        onBlur={e => e.target.style.borderBottomColor = 'var(--border)'} />
+                    </div>
+                    <div style={{ marginBottom: '24px' }}>
+                      <label style={{ fontFamily: 'var(--sans)', fontSize: '9.5px', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--taupe)', display: 'block', marginBottom: '9px' }}>Tárgy</label>
+                      <select value={form.subject} onChange={e => setForm({...form, subject: e.target.value})} style={{ ...lineStyle, appearance: 'none', cursor: 'pointer' }}>
+                        {['Hirdetési érdeklődés','Vételérdeklődés','Árlista kérése','Visszahívás kérése','Egyéb'].map(o => <option key={o}>{o}</option>)}
+                      </select>
+                    </div>
+                    <div style={{ marginBottom: '44px' }}>
+                      <label style={{ fontFamily: 'var(--sans)', fontSize: '9.5px', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--taupe)', display: 'block', marginBottom: '9px' }}>Üzenet</label>
+                      <textarea rows={4} value={form.message} onChange={e => setForm({...form, message: e.target.value})} placeholder="Írja le kérdését vagy igényét..." style={{ ...lineStyle, resize: 'none' }}
+                        onFocus={e => e.target.style.borderBottomColor = 'var(--gold)'}
+                        onBlur={e => e.target.style.borderBottomColor = 'var(--border)'} />
+                    </div>
+                    <BtnDark type="submit" style={{ width: '100%' }}>Üzenet Küldése</BtnDark>
+                  </form>
+                </>
+              )}
+            </div>
+          </div>
+        </main>
+      );
+    };
+
+    /* ═══════════════════════════════════════════════════════════
+       PAGE: RÓLUNK (About)
+    ═══════════════════════════════════════════════════════════ */
+
+    const AboutPage = ({ navigate }) => (
+      <main data-screen-label="About" style={{ paddingTop: '80px' }}>
+
+        {/* HERO — split */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', minHeight: '80vh' }}>
+          <div style={{ padding: '100px 72px 80px 80px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <Reveal>
+              <Eyebrow style={{ marginBottom: '20px' }}>Rólunk</Eyebrow>
+              <h1 style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: 'clamp(44px, 4.8vw, 76px)', color: 'var(--ink)', lineHeight: 1.04, marginBottom: '28px' }}>
+                Egy híd két<br /><em style={{ fontStyle: 'italic' }}>világ között</em>
+              </h1>
+              <GoldRule style={{ marginBottom: '28px' }} />
+              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '15px', lineHeight: 1.9, color: 'var(--taupe)', maxWidth: '480px', marginBottom: '48px' }}>
+                2013 óta segítjük a magyar ingatlan-eladókat abban, hogy megtalálják a megfelelő külföldi vevőt — diszkréten, hatékonyan, kizárólagossági szerződés nélkül.
+              </p>
+              <TextBtn onClick={() => navigate('contact')}>Vegye fel velünk a kapcsolatot</TextBtn>
+            </Reveal>
+          </div>
+          <div style={{ background: 'var(--linen)', position: 'relative', overflow: 'hidden' }}>
+            <Placeholder type="interior" style={{ height: '100%', position: 'absolute', inset: 0 }} />
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(253,250,245,0.18) 0%, transparent 30%)' }} />
+          </div>
+        </div>
+
+        {/* EDITORIAL ORIGIN — ink bg */}
+        <section style={{ background: 'var(--ink)', padding: '128px 80px', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', right: '-60px', top: '50%', transform: 'translateY(-50%)', fontFamily: 'var(--serif)', fontSize: '480px', fontWeight: 300, color: 'rgba(201,168,76,0.04)', lineHeight: 1, userSelect: 'none', pointerEvents: 'none' }}>F</div>
+          <Reveal>
+            <div style={{ maxWidth: '820px', margin: '0 auto', textAlign: 'center' }}>
+              <GoldRule center style={{ marginBottom: '48px' }} />
+              <Eyebrow center style={{ marginBottom: '28px' }}>A kezdetek — Almere-Buiten, 2013</Eyebrow>
+              <blockquote style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontWeight: 300, fontSize: 'clamp(22px, 2.4vw, 36px)', lineHeight: 1.55, color: 'var(--cream)', marginBottom: '48px' }}>
+                „Almere-Buitenben élve láttuk, hogy a hollandok mennyire vágynak autentikus európai életmódra — míg Magyarországon a legjobb ingatlanok ismeretlenül várnak gazdára."
+              </blockquote>
+              <GoldRule center style={{ marginBottom: '28px' }} />
+              <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '10px', letterSpacing: '0.28em', textTransform: 'uppercase', color: 'rgba(201,168,76,0.75)' }}>FODEL INGATLAN — fodel.nl</div>
+            </div>
+          </Reveal>
+        </section>
+
+        {/* VALUES — 3-column */}
+        <section style={{ padding: '108px 80px', borderBottom: '1px solid var(--border)' }}>
+          <Reveal>
+            <div style={{ textAlign: 'center', marginBottom: '80px' }}>
+              <Eyebrow center style={{ marginBottom: '14px' }}>Értékeink</Eyebrow>
+              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(32px, 3.5vw, 54px)', color: 'var(--ink)' }}>Amire minden munkánkban támaszkodunk</h2>
+            </div>
+          </Reveal>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)' }}>
+            {[
+              { num: '01', title: 'Diszkréció', body: 'Az eladók és vevők adatait a legnagyobb diszkrécióval kezeljük. Az ingatlan és a tulajdonos személyes adatai nem kerülnek illetéktelen kezekbe — ez alapelvünk.' },
+              { num: '02', title: 'Átláthatóság', body: 'Nincsenek rejtett díjak, nincsenek meglepetések. A jutalék mértéke előre rögzített; a folyamat minden lépésénél tájékoztatjuk ügyfeleinket.' },
+              { num: '03', title: 'Tapasztalat', body: '2013 óta több száz tranzakciót bonyolítottunk le sikeresen. Ismerjük mindkét piac jogi hátterét, szokásait és a külföldi vevők elvárásait.' },
+            ].map((v, i) => (
+              <Reveal key={v.num} delay={i + 1}>
+                <div style={{ padding: '48px 52px', borderRight: i < 2 ? '1px solid var(--border)' : 'none', borderTop: '2px solid var(--gold)' }}>
+                  <div style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: '52px', color: 'var(--gold)', opacity: 0.45, lineHeight: 1, marginBottom: '28px' }}>{v.num}</div>
+                  <h3 style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '23px', color: 'var(--ink)', marginBottom: '16px' }}>{v.title}</h3>
+                  <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', lineHeight: 1.85, color: 'var(--taupe)' }}>{v.body}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </section>
+
+        {/* STATS */}
+        <section style={{ background: 'var(--linen)', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', padding: '64px 80px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)' }}>
+            {[
+              { value: '2013', label: 'Alapítva' },
+              { value: '9',    label: 'Ország' },
+              { value: '5',    label: 'Nyelv' },
+              { value: '13+',  label: 'Év tapasztalat' },
+            ].map((s, i) => (
+              <Reveal key={s.label} delay={i + 1}>
+                <div style={{ textAlign: 'center', padding: '24px', borderRight: i < 3 ? '1px solid var(--border)' : 'none' }}>
+                  <div style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: 'clamp(44px, 4.5vw, 68px)', color: 'var(--ink)', lineHeight: 1, marginBottom: '10px' }}>{s.value}</div>
+                  <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '10px', letterSpacing: '0.28em', textTransform: 'uppercase', color: 'var(--taupe)' }}>{s.label}</div>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </section>
+
+        {/* STORY / APPROACH — two-column */}
+        <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ padding: '88px 72px 88px 80px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <Reveal>
+              <Eyebrow style={{ marginBottom: '20px' }}>A mi megközelítésünk</Eyebrow>
+              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(28px, 2.8vw, 42px)', color: 'var(--ink)', lineHeight: 1.2, marginBottom: '28px' }}>
+                Nem vagyunk nagy iroda.<br /><em style={{ fontStyle: 'italic' }}>Ez az előnyünk.</em>
+              </h2>
+              <GoldRule style={{ marginBottom: '28px' }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {[
+                  'Minden ügyféllel személyesen foglalkozunk — nincs call center, nincs anonim ügyintézés.',
+                  'Mindkét kultúrát belülről ismerjük: holland és magyar szemmel egyaránt értékeljük az ingatlanokat.',
+                  'Az ingatlan és a vevő összeillesztése a mi felelősségünk — nem a szerencsén múlik.',
+                  'Kizárólagossági szerződés nélkül dolgozunk, mert bízunk abban, hogy eredménnyel bizonyítunk.',
+                ].map((pt, i) => (
+                  <div key={i} style={{ display: 'flex', gap: '18px', alignItems: 'flex-start' }}>
+                    <div style={{ width: '22px', height: '1px', background: 'var(--gold)', marginTop: '11px', flexShrink: 0 }} />
+                    <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', lineHeight: 1.8, color: 'var(--taupe)' }}>{pt}</p>
+                  </div>
+                ))}
+              </div>
+            </Reveal>
+          </div>
+          <div style={{ background: 'var(--linen)', borderLeft: '1px solid var(--border)', padding: '88px 80px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <Reveal>
+              <Eyebrow style={{ marginBottom: '20px' }}>Almere-Buiten, Flevoland</Eyebrow>
+              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(28px, 2.8vw, 42px)', color: 'var(--ink)', lineHeight: 1.2, marginBottom: '28px' }}>
+                A híd, amelyet<br /><em style={{ fontStyle: 'italic' }}>megépítettünk</em>
+              </h2>
+              <GoldRule style={{ marginBottom: '28px' }} />
+              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', lineHeight: 1.9, color: 'var(--taupe)', marginBottom: '20px' }}>
+                A FODEL Hollandiában élő magyarok által alapított ingatlanközvetítő iroda. Almere-Buitenben indultunk el 2013-ban, ahol rájöttünk: rengeteg holland és belga érdeklődő szeretne autentikus magyar ingatlant vásárolni — de nem tudja, hogyan fogjon hozzá.
+              </p>
+              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', lineHeight: 1.9, color: 'var(--taupe)', marginBottom: '20px' }}>
+                Ma 9 országban hirdetünk, 5 nyelven — és minden tranzakciót elejétől a végéig kísérünk. Kétnyelvű adásvételi szerződéssel, meghatalmazásos képviselettel, földhivatali ügyintézéssel.
+              </p>
+              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '13px', lineHeight: 1.75, color: 'var(--taupe)', opacity: 0.7 }}>
+                Flevoland, Hollandia · info@fodel.nl
+              </p>
+            </Reveal>
+          </div>
+        </section>
+
+        {/* CTA BAND */}
+        <section style={{ background: 'var(--linen)', borderTop: '1px solid var(--border)', padding: '72px 80px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Reveal>
+            <div>
+              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(26px, 2.8vw, 42px)', color: 'var(--ink)', marginBottom: '10px' }}>Dolgozzunk együtt!</h2>
+              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', color: 'var(--taupe)' }}>Munkanapokon 08:00–18:00 · A visszahívás ingyenes.</p>
+            </div>
+          </Reveal>
+          <Reveal delay={2}>
+            <div style={{ display: 'flex', gap: '16px', flexShrink: 0 }}>
+              <BtnDark onClick={() => navigate('contact')}>Ingyenes visszahívás</BtnDark>
+              <BtnOutline onClick={() => navigate('sellers')}>Hirdessen nálunk</BtnOutline>
+            </div>
+          </Reveal>
+        </section>
+
+      </main>
+    );
+
+    /* ═══════════════════════════════════════════════════════════
+       APP — Router + Root render
+    ═══════════════════════════════════════════════════════════ */
+
+    const App = () => {
+      const [page, setPage] = React.useState('home');
+      const [selectedProp, setSelectedProp] = React.useState(null);
+
+      const navigate = (pg, prop = null) => {
+        setPage(pg);
+        if (prop !== null) setSelectedProp(prop);
+        window.scrollTo({ top: 0 });
+      };
+
+      const pageProps = { navigate, currentPage: page, selectedProp };
+
+      const renderPage = () => {
+        switch (page) {
+          case 'home':       return <HomePage {...pageProps} />;
+          case 'properties': return <PropertiesPage {...pageProps} />;
+          case 'detail':     return <PropertyDetailPage {...pageProps} />;
+          case 'sellers':
+          case 'buyers':     return <SellersPage {...pageProps} />;
+          case 'about':      return <AboutPage {...pageProps} />;
+          case 'contact':    return <ContactPage {...pageProps} />;
+          default:           return <HomePage {...pageProps} />;
+        }
+      };
+
+      return (
+        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+          <Nav currentPage={page} navigate={navigate} />
+          <div style={{ flex: 1 }}>{renderPage()}</div>
+          <Footer navigate={navigate} />
+        </div>
+      );
+    };
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
