@@ -41,14 +41,14 @@
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
     :root {
-      --cream:  #FDFAF5;
-      --linen:  #F2EBE0;
-      --mist:   #E5DDD2;
-      --ink:    #1A1610;
-      --gold:   #C9A84C;
-      --gold2:  #E2C97A;
-      --taupe:  #8C7A5E;
-      --border: #DDD4C8;
+      --cream:  #F4F4F2;
+      --linen:  #ECEDEF;
+      --mist:   #E0E2E4;
+      --ink:    #171A1C;
+      --gold:   #2D4A3E;
+      --gold2:  #4A7A68;
+      --taupe:  #5E6E72;
+      --border: #D0D4D6;
       --serif:  'Cormorant Garamond', Georgia, serif;
       --sans:   'Jost', 'Helvetica Neue', sans-serif;
     }
@@ -269,14 +269,14 @@
         <div style={{
           fontFamily: 'var(--serif)', fontWeight: 500,
           fontSize: '20px', letterSpacing: '0.38em',
-          color: light ? '#FDFAF5' : 'var(--ink)',
+          color: light ? '#F4F4F2' : 'var(--ink)',
           textTransform: 'uppercase',
         }}>FODEL</div>
         <div style={{ height: '1px', background: 'var(--gold)', margin: '5px 0 4px' }} />
         <div style={{
           fontFamily: 'var(--sans)', fontWeight: 200,
           fontSize: '7.5px', letterSpacing: '0.45em',
-          color: light ? 'rgba(253,250,245,0.6)' : 'var(--taupe)',
+          color: light ? 'rgba(244,244,242,0.6)' : 'var(--taupe)',
           textTransform: 'uppercase',
         }}>INGATLAN</div>
       </div>
@@ -324,7 +324,7 @@
           ))}
           <text x="400" y="276" textAnchor="middle"
                 fontFamily="'Courier New', monospace" fontSize="13"
-                fill="rgba(26,22,16,0.3)" letterSpacing="3">
+                fill="rgba(23,26,28,0.3)" letterSpacing="3">
             [ {c.label} ]
           </text>
         </svg>
@@ -408,13 +408,13 @@
     // Button: outlined
     const BtnOutline = ({ children, onClick, light = false, type = 'button', style = {} }) => {
       const [hov, setHov] = React.useState(false);
-      const bc = light ? 'rgba(253,250,245,0.55)' : 'var(--ink)';
+      const bc = light ? 'rgba(244,244,242,0.55)' : 'var(--ink)';
       return (
         <button type={type} onClick={onClick}
           onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
           style={{
             display: 'inline-block', padding: '14px 38px',
-            background: hov ? (light ? 'rgba(253,250,245,0.1)' : 'var(--linen)') : 'transparent',
+            background: hov ? (light ? 'rgba(244,244,242,0.1)' : 'var(--linen)') : 'transparent',
             color: light ? 'var(--cream)' : 'var(--ink)',
             fontFamily: 'var(--sans)', fontWeight: 400,
             fontSize: '10.5px', letterSpacing: '0.26em', textTransform: 'uppercase',
@@ -429,7 +429,7 @@
       <button onClick={onClick} style={{
         fontFamily: 'var(--sans)', fontWeight: 400, fontSize: '10.5px',
         letterSpacing: '0.22em', textTransform: 'uppercase',
-        color: light ? 'rgba(253,250,245,0.7)' : 'var(--taupe)',
+        color: light ? 'rgba(244,244,242,0.7)' : 'var(--taupe)',
         background: 'none', border: 'none', cursor: 'pointer',
         display: 'inline-flex', alignItems: 'center', gap: '10px', ...style,
       }}>{children} <span style={{ fontSize: '15px', letterSpacing: 0, opacity: 0.8 }}>→</span></button>
@@ -457,7 +457,7 @@
         <nav style={{
           position: 'fixed', top: 0, left: 0, right: 0, zIndex: 1000,
           padding: scrolled ? '16px 64px' : '28px 64px',
-          background: 'rgba(253,250,245,0.96)',
+          background: 'rgba(244,244,242,0.96)',
           borderBottom: '1px solid var(--border)',
           backdropFilter: scrolled ? 'blur(10px)' : 'none',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -497,11 +497,11 @@
       <footer style={{ background: 'var(--ink)', color: 'var(--cream)', padding: '88px 80px 52px' }}>
         <div style={{
           display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr 1fr', gap: '56px',
-          paddingBottom: '64px', borderBottom: '1px solid rgba(253,250,245,0.1)', marginBottom: '40px',
+          paddingBottom: '64px', borderBottom: '1px solid rgba(244,244,242,0.1)', marginBottom: '40px',
         }}>
           <div>
             <Logo light onClick={() => navigate('home')} />
-            <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '13px', lineHeight: 1.85, color: 'rgba(253,250,245,0.45)', marginTop: '28px', maxWidth: '230px' }}>
+            <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '13px', lineHeight: 1.85, color: 'rgba(244,244,242,0.45)', marginTop: '28px', maxWidth: '230px' }}>
               Magyar ingatlanok hirdetése Hollandiában és az Unió többi országában. Alapítva 2013-ban, Almere-Buiten, Hollandia.
             </p>
           </div>
@@ -524,10 +524,10 @@
                 <div key={item.label} style={{ marginBottom: '11px' }}>
                   <button onClick={() => navigate(item.page)} style={{
                     fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '13px',
-                    color: 'rgba(253,250,245,0.48)', background: 'none', border: 'none', cursor: 'pointer',
+                    color: 'rgba(244,244,242,0.48)', background: 'none', border: 'none', cursor: 'pointer',
                   }}
-                  onMouseEnter={e => e.target.style.color = 'rgba(253,250,245,0.85)'}
-                  onMouseLeave={e => e.target.style.color = 'rgba(253,250,245,0.48)'}
+                  onMouseEnter={e => e.target.style.color = 'rgba(244,244,242,0.85)'}
+                  onMouseLeave={e => e.target.style.color = 'rgba(244,244,242,0.48)'}
                   >{item.label}</button>
                 </div>
               ))}
@@ -536,18 +536,18 @@
           <div>
             <Eyebrow style={{ marginBottom: '22px' }}>Elérhetőség</Eyebrow>
             {['+31-644-005-550','+36-70-225-5255','+36-70-231-0031','info@fodel.nl'].map(line => (
-              <div key={line} style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '13px', color: 'rgba(253,250,245,0.48)', marginBottom: '9px' }}>{line}</div>
+              <div key={line} style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '13px', color: 'rgba(244,244,242,0.48)', marginBottom: '9px' }}>{line}</div>
             ))}
-            <div style={{ marginTop: '20px', fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '12px', color: 'rgba(253,250,245,0.3)', lineHeight: 1.8 }}>
+            <div style={{ marginTop: '20px', fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '12px', color: 'rgba(244,244,242,0.3)', lineHeight: 1.8 }}>
               Hétfő–Péntek · 08:00–18:00<br />Almere-Buiten, Hollandia
             </div>
           </div>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '11px', color: 'rgba(253,250,245,0.25)', letterSpacing: '0.05em' }}>
+          <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '11px', color: 'rgba(244,244,242,0.25)', letterSpacing: '0.05em' }}>
             © 2013–2026 FODEL INGATLAN · fodel.nl · fodel.hu · fodel.be
           </div>
-          <div style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontWeight: 300, fontSize: '14px', color: 'rgba(253,250,245,0.25)' }}>
+          <div style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontWeight: 300, fontSize: '14px', color: 'rgba(244,244,242,0.25)' }}>
             Problémamentes, diszkrét ingatlanközvetítés
           </div>
         </div>
@@ -596,29 +596,29 @@
             </div>
             <div style={{ flex: '0 0 46%', position: 'relative', overflow: 'hidden', opacity: loaded ? 1 : 0, transition: 'opacity 1.6s ease 0.15s' }}>
               <img src="assets/hero.png" alt="Balatoni Panorámaház" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(253,250,245,0.25) 0%, transparent 30%)' }} />
-              <div style={{ position: 'absolute', bottom: '44px', left: '44px', background: 'rgba(26,22,16,0.78)', backdropFilter: 'blur(12px)', padding: '22px 30px' }}>
+              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(244,244,242,0.25) 0%, transparent 30%)' }} />
+              <div style={{ position: 'absolute', bottom: '44px', left: '44px', background: 'rgba(23,26,28,0.82)', backdropFilter: 'blur(12px)', padding: '22px 30px' }}>
                 <Eyebrow style={{ marginBottom: '7px' }}>Kiemelt Ingatlan</Eyebrow>
                 <div style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '19px', color: 'var(--cream)', marginBottom: '5px' }}>Balatoni Panorámaház</div>
-                <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '12px', color: 'rgba(253,250,245,0.6)', marginBottom: '18px' }}>Badacsony · € 178 000</div>
+                <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '12px', color: 'rgba(244,244,242,0.6)', marginBottom: '18px' }}>Badacsony · € 178 000</div>
                 <TextBtn light onClick={() => navigate('detail', PROPERTIES[0])}>Megtekintés</TextBtn>
               </div>
             </div>
           </section>
 
           {/* DUAL AUDIENCE */}
-          <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderTop: '1px solid var(--border)' }}>
+          <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderTop: '1px solid rgba(244,244,242,0.1)', background: 'var(--ink)' }}>
             {[
               { eyebrow: 'Eladóknak', title: 'Hirdesse ingatlanát\nNyugat-Európában', body: 'Kizárólagossági szerződés nélkül. Hirdetése 5 nyelven jelenik meg 9 országban, célzottan holland, belga és német készpénzes vevőknek.', cta: 'Tudjon meg többet', page: 'sellers' },
               { eyebrow: 'Vevőknek',  title: 'Ingatlan közvetlenül\na tulajdonostól', body: 'Autentikus magyar házak, birtokok, gazdaságok és szőlők. Lépjen kapcsolatba közvetlenül a tulajdonosokkal, vagy bízza a FODEL-re a teljes folyamatot.', cta: 'Ingatlanok böngészése', page: 'properties' },
             ].map((col, i) => (
-              <div key={i} style={{ padding: '88px 80px', borderRight: i === 0 ? '1px solid var(--border)' : 'none', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <div key={i} style={{ padding: '88px 80px', borderRight: i === 0 ? '1px solid rgba(244,244,242,0.1)' : 'none', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <Reveal>
                   <Eyebrow style={{ marginBottom: '20px' }}>{col.eyebrow}</Eyebrow>
-                  <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(28px, 2.8vw, 44px)', lineHeight: 1.18, color: 'var(--ink)', marginBottom: '22px', whiteSpace: 'pre-line' }}>{col.title}</h2>
+                  <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(28px, 2.8vw, 44px)', lineHeight: 1.18, color: 'var(--cream)', marginBottom: '22px', whiteSpace: 'pre-line' }}>{col.title}</h2>
                   <GoldRule style={{ marginBottom: '22px' }} />
-                  <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', lineHeight: 1.85, color: 'var(--taupe)', marginBottom: '36px', maxWidth: '380px' }}>{col.body}</p>
-                  <TextBtn onClick={() => navigate(col.page)}>{col.cta}</TextBtn>
+                  <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', lineHeight: 1.85, color: 'var(--cream)', marginBottom: '36px', maxWidth: '380px' }}>{col.body}</p>
+                  <TextBtn light onClick={() => navigate(col.page)}>{col.cta}</TextBtn>
                 </Reveal>
               </div>
             ))}
@@ -642,23 +642,9 @@
             </div>
           </section>
 
-          {/* STATS */}
-          <section style={{ background: 'var(--linen)', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', padding: '64px 80px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)' }}>
-              {STATS.map((s, i) => (
-                <Reveal key={s.label} delay={i + 1}>
-                  <div style={{ textAlign: 'center', padding: '24px', borderRight: i < 3 ? '1px solid var(--border)' : 'none' }}>
-                    <div style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: 'clamp(44px, 4.5vw, 68px)', color: 'var(--ink)', lineHeight: 1, marginBottom: '10px' }}>{s.value}</div>
-                    <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '10px', letterSpacing: '0.28em', textTransform: 'uppercase', color: 'var(--taupe)' }}>{s.label}</div>
-                  </div>
-                </Reveal>
-              ))}
-            </div>
-          </section>
-
           {/* EDITORIAL QUOTE */}
           <section style={{ background: 'var(--ink)', padding: '128px 80px', position: 'relative', overflow: 'hidden' }}>
-            <div style={{ position: 'absolute', right: '-60px', top: '50%', transform: 'translateY(-50%)', fontFamily: 'var(--serif)', fontSize: '480px', fontWeight: 300, color: 'rgba(201,168,76,0.05)', lineHeight: 1, userSelect: 'none', pointerEvents: 'none' }}>F</div>
+            <div style={{ position: 'absolute', right: '-60px', top: '50%', transform: 'translateY(-50%)', fontFamily: 'var(--serif)', fontSize: '480px', fontWeight: 300, color: 'rgba(45,74,62,0.07)', lineHeight: 1, userSelect: 'none', pointerEvents: 'none' }}>F</div>
             <Reveal>
               <div style={{ maxWidth: '820px', margin: '0 auto', textAlign: 'center' }}>
                 <GoldRule center style={{ marginBottom: '48px' }} />
@@ -666,7 +652,7 @@
                   „A hollandok gyakran nem hisznek a szemüknek, amikor megtudják,<br />hogy Magyarországon mit és milyen áron vásárolhatnak."
                 </blockquote>
                 <GoldRule center style={{ marginBottom: '28px' }} />
-                <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '10px', letterSpacing: '0.28em', textTransform: 'uppercase', color: 'rgba(201,168,76,0.75)' }}>FODEL INGATLAN — fodel.nl</div>
+                <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '10px', letterSpacing: '0.28em', textTransform: 'uppercase', color: 'rgba(74,122,104,0.9)' }}>FODEL INGATLAN — fodel.nl</div>
               </div>
             </Reveal>
           </section>
@@ -767,8 +753,8 @@
       const similar = PROPERTIES.filter(p => p.id !== prop.id && (p.region === prop.region || p.type === prop.type)).slice(0, 3);
 
       const inputStyle = {
-        width: '100%', background: 'rgba(253,250,245,0.06)',
-        border: '1px solid rgba(253,250,245,0.15)', padding: '13px 16px',
+        width: '100%', background: 'rgba(244,244,242,0.06)',
+        border: '1px solid rgba(244,244,242,0.15)', padding: '13px 16px',
         fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '13px',
         color: 'var(--cream)', outline: 'none', transition: 'border-color 0.3s',
       };
@@ -831,20 +817,20 @@
                 <form onSubmit={e => { e.preventDefault(); setSent(true); }}>
                   {[{ k: 'name', l: 'Név', t: 'text', ph: 'Az Ön neve' }, { k: 'email', l: 'E-mail', t: 'email', ph: 'email@cím.hu' }, { k: 'phone', l: 'Telefon', t: 'tel', ph: '+36 70 ...' }].map(f => (
                     <div key={f.k} style={{ marginBottom: '20px' }}>
-                      <label style={{ fontFamily: 'var(--sans)', fontSize: '9.5px', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(253,250,245,0.45)', display: 'block', marginBottom: '7px' }}>{f.l}</label>
+                      <label style={{ fontFamily: 'var(--sans)', fontSize: '9.5px', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(244,244,242,0.45)', display: 'block', marginBottom: '7px' }}>{f.l}</label>
                       <input type={f.t} placeholder={f.ph} value={fd[f.k]} onChange={e => setFd({...fd, [f.k]: e.target.value})} style={inputStyle}
                         onFocus={e => e.target.style.borderColor = 'var(--gold)'}
-                        onBlur={e => e.target.style.borderColor = 'rgba(253,250,245,0.15)'} />
+                        onBlur={e => e.target.style.borderColor = 'rgba(244,244,242,0.15)'} />
                     </div>
                   ))}
                   <div style={{ marginBottom: '28px' }}>
-                    <label style={{ fontFamily: 'var(--sans)', fontSize: '9.5px', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(253,250,245,0.45)', display: 'block', marginBottom: '7px' }}>Üzenet</label>
+                    <label style={{ fontFamily: 'var(--sans)', fontSize: '9.5px', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(244,244,242,0.45)', display: 'block', marginBottom: '7px' }}>Üzenet</label>
                     <textarea rows={4} placeholder="Kérdése vagy megjegyzése..." value={fd.message} onChange={e => setFd({...fd, message: e.target.value})} style={{ ...inputStyle, resize: 'vertical' }}
                       onFocus={e => e.target.style.borderColor = 'var(--gold)'}
-                      onBlur={e => e.target.style.borderColor = 'rgba(253,250,245,0.15)'} />
+                      onBlur={e => e.target.style.borderColor = 'rgba(244,244,242,0.15)'} />
                   </div>
                   <button type="submit" style={{ width: '100%', background: 'var(--gold)', color: 'var(--ink)', fontFamily: 'var(--sans)', fontWeight: 400, fontSize: '10.5px', letterSpacing: '0.26em', textTransform: 'uppercase', padding: '16px', border: 'none', cursor: 'pointer' }}>Üzenet Küldése</button>
-                  <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '11px', color: 'rgba(253,250,245,0.3)', textAlign: 'center', marginTop: '18px', lineHeight: 1.7 }}>Ingyenes visszahívást is kérhet<br />+31-644-005-550 · info@fodel.nl</p>
+                  <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '11px', color: 'rgba(244,244,242,0.3)', textAlign: 'center', marginTop: '18px', lineHeight: 1.7 }}>Ingyenes visszahívást is kérhet<br />+31-644-005-550 · info@fodel.nl</p>
                 </form>
               )}
             </div>
@@ -886,7 +872,7 @@
             </Reveal>
           </div>
           <div style={{ background: 'var(--linen)', position: 'relative', overflow: 'hidden' }}>
-            <Placeholder type="aerial" style={{ height: '100%', position: 'absolute', inset: 0 }} />
+            <img src="assets/vineyard.png" style={{ height: '100%', width: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }} alt="Vineyard" />
           </div>
         </div>
 
@@ -957,7 +943,7 @@
             <div>
               <Eyebrow style={{ marginBottom: '14px' }}>Díjszabás</Eyebrow>
               <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: 'clamp(28px, 3vw, 46px)', color: 'var(--cream)', lineHeight: 1.2, marginBottom: '18px' }}>Jutalék csak sikeres<br />tranzakció esetén</h2>
-              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', color: 'rgba(253,250,245,0.55)', lineHeight: 1.85, maxWidth: '540px' }}>
+              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', color: 'rgba(244,244,242,0.55)', lineHeight: 1.85, maxWidth: '540px' }}>
                 Ha a vevő közvetlenül veszi fel Önnel a kapcsolatot, csak a hirdetési díjat fizeti. FODEL közvetítésnél: 4% nettó (min. €2.000) + 21% holland ÁFA.
               </p>
             </div>
@@ -1092,19 +1078,19 @@
             </Reveal>
           </div>
           <div style={{ background: 'var(--linen)', position: 'relative', overflow: 'hidden' }}>
-            <Placeholder type="landscape" style={{ height: '100%', position: 'absolute', inset: 0 }} />
-            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(253,250,245,0.18) 0%, transparent 30%)' }} />
-            <div style={{ position: 'absolute', bottom: '44px', left: '44px', background: 'rgba(26,22,16,0.78)', backdropFilter: 'blur(12px)', padding: '22px 30px' }}>
+            <img src="assets/vevoknek.jpg" style={{ height: '100%', width: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }} alt="Property" />
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(244,244,242,0.18) 0%, transparent 30%)' }} />
+            <div style={{ position: 'absolute', bottom: '44px', left: '44px', background: 'rgba(23,26,28,0.82)', backdropFilter: 'blur(12px)', padding: '22px 30px' }}>
               <Eyebrow style={{ marginBottom: '7px' }}>FODEL</Eyebrow>
               <div style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '17px', color: 'var(--cream)', marginBottom: '4px' }}>Property Direct From The Owner</div>
-              <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '12px', color: 'rgba(253,250,245,0.6)' }}>Est. 2013 — Almere, Netherlands</div>
+              <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '12px', color: 'rgba(244,244,242,0.6)' }}>Est. 2013 — Almere, Netherlands</div>
             </div>
           </div>
         </div>
 
         {/* EDITORIAL — ink bg */}
         <section style={{ background: 'var(--ink)', padding: '128px 80px', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', right: '-60px', top: '50%', transform: 'translateY(-50%)', fontFamily: 'var(--serif)', fontSize: '480px', fontWeight: 300, color: 'rgba(201,168,76,0.04)', lineHeight: 1, userSelect: 'none', pointerEvents: 'none' }}>M</div>
+          <div style={{ position: 'absolute', right: '-60px', top: '50%', transform: 'translateY(-50%)', fontFamily: 'var(--serif)', fontSize: '480px', fontWeight: 300, color: 'rgba(45,74,62,0.06)', lineHeight: 1, userSelect: 'none', pointerEvents: 'none' }}>M</div>
           <Reveal>
             <div style={{ maxWidth: '820px', margin: '0 auto', textAlign: 'center' }}>
               <GoldRule center style={{ marginBottom: '48px' }} />
@@ -1113,7 +1099,7 @@
                 „A Hollandiában élők egyre növekvő számban döntenek úgy, hogy zaklatott mindennapjaikat egy tágasabb élettérre cserélik: Magyarországra. Itt ugyanis megtalálják azt az Európát, amelyet saját országukban mára elveszítettek."
               </blockquote>
               <GoldRule center style={{ marginBottom: '28px' }} />
-              <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '10px', letterSpacing: '0.28em', textTransform: 'uppercase', color: 'rgba(201,168,76,0.75)' }}>FODEL INGATLAN — fodel.nl</div>
+              <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '10px', letterSpacing: '0.28em', textTransform: 'uppercase', color: 'rgba(74,122,104,0.9)' }}>FODEL INGATLAN — fodel.nl</div>
             </div>
           </Reveal>
         </section>
@@ -1255,7 +1241,7 @@
               <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: 'clamp(28px, 3vw, 46px)', color: 'var(--cream)', lineHeight: 1.2, marginBottom: '18px' }}>
                 Keressen minket — mi fizetjük<br />a visszahívást
               </h2>
-              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', color: 'rgba(253,250,245,0.55)', lineHeight: 1.85, maxWidth: '540px' }}>
+              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', color: 'rgba(244,244,242,0.55)', lineHeight: 1.85, maxWidth: '540px' }}>
                 Munkanapokon 08:00–18:00 között elérhet minket telefonon, e-mailben, vagy kérjen ingyenes visszahívást a Kapcsolat oldalunkon. A hívást mi fizetjük — Önnek semmibe nem kerül.
               </p>
             </div>
@@ -1295,13 +1281,13 @@
           </div>
           <div style={{ background: 'var(--linen)', position: 'relative', overflow: 'hidden' }}>
             <Placeholder type="interior" style={{ height: '100%', position: 'absolute', inset: 0 }} />
-            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(253,250,245,0.18) 0%, transparent 30%)' }} />
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(244,244,242,0.18) 0%, transparent 30%)' }} />
           </div>
         </div>
 
         {/* EDITORIAL ORIGIN — ink bg */}
         <section style={{ background: 'var(--ink)', padding: '128px 80px', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', right: '-60px', top: '50%', transform: 'translateY(-50%)', fontFamily: 'var(--serif)', fontSize: '480px', fontWeight: 300, color: 'rgba(201,168,76,0.04)', lineHeight: 1, userSelect: 'none', pointerEvents: 'none' }}>F</div>
+          <div style={{ position: 'absolute', right: '-60px', top: '50%', transform: 'translateY(-50%)', fontFamily: 'var(--serif)', fontSize: '480px', fontWeight: 300, color: 'rgba(45,74,62,0.06)', lineHeight: 1, userSelect: 'none', pointerEvents: 'none' }}>F</div>
           <Reveal>
             <div style={{ maxWidth: '820px', margin: '0 auto', textAlign: 'center' }}>
               <GoldRule center style={{ marginBottom: '48px' }} />
@@ -1310,7 +1296,7 @@
                 „Almere-Buitenben élve láttuk, hogy a hollandok mennyire vágynak autentikus európai életmódra — míg Magyarországon a legjobb ingatlanok ismeretlenül várnak gazdára."
               </blockquote>
               <GoldRule center style={{ marginBottom: '28px' }} />
-              <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '10px', letterSpacing: '0.28em', textTransform: 'uppercase', color: 'rgba(201,168,76,0.75)' }}>FODEL INGATLAN — fodel.nl</div>
+              <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '10px', letterSpacing: '0.28em', textTransform: 'uppercase', color: 'rgba(74,122,104,0.9)' }}>FODEL INGATLAN — fodel.nl</div>
             </div>
           </Reveal>
         </section>
