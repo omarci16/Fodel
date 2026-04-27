@@ -595,12 +595,13 @@
               </div>
             </div>
             <div style={{ flex: '0 0 46%', position: 'relative', overflow: 'hidden', opacity: loaded ? 1 : 0, transition: 'opacity 1.6s ease 0.15s' }}>
-              <div style={{ position: 'absolute', inset: 0 }}><Placeholder type="landscape" style={{ height: '100%' }} /></div>
+              <img src="assets/hero.png" alt="Balatoni Panorámaház" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
               <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(253,250,245,0.25) 0%, transparent 30%)' }} />
               <div style={{ position: 'absolute', bottom: '44px', left: '44px', background: 'rgba(26,22,16,0.78)', backdropFilter: 'blur(12px)', padding: '22px 30px' }}>
                 <Eyebrow style={{ marginBottom: '7px' }}>Kiemelt Ingatlan</Eyebrow>
                 <div style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '19px', color: 'var(--cream)', marginBottom: '5px' }}>Balatoni Panorámaház</div>
-                <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '12px', color: 'rgba(253,250,245,0.6)' }}>Badacsony · € 178 000</div>
+                <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '12px', color: 'rgba(253,250,245,0.6)', marginBottom: '18px' }}>Badacsony · € 178 000</div>
+                <TextBtn light onClick={() => navigate('detail', PROPERTIES[0])}>Megtekintés</TextBtn>
               </div>
             </div>
           </section>
