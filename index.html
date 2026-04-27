@@ -44,9 +44,9 @@
       --cream:  #F4F4F2;
       --linen:  #ECEDEF;
       --mist:   #E0E2E4;
-      --ink:    #171A1C;
-      --gold:   #2D4A3E;
-      --gold2:  #4A7A68;
+      --ink:    #102A43;
+      --gold:   #ECEDEF;
+      --gold2:  #ECEDEF;
       --taupe:  #5E6E72;
       --border: #D0D4D6;
       --serif:  'Cormorant Garamond', Georgia, serif;
@@ -231,6 +231,17 @@
        SHARED UI COMPONENTS
     ═══════════════════════════════════════════════════════════ */
 
+    // Mobile breakpoint hook
+    const useIsMobile = () => {
+      const [mob, setMob] = React.useState(() => window.innerWidth < 768);
+      React.useEffect(() => {
+        const fn = () => setMob(window.innerWidth < 768);
+        window.addEventListener('resize', fn, { passive: true });
+        return () => window.removeEventListener('resize', fn);
+      }, []);
+      return mob;
+    };
+
     // Scroll reveal hook
     const useReveal = () => {
       const ref = React.useRef(null);
@@ -324,7 +335,7 @@
           ))}
           <text x="400" y="276" textAnchor="middle"
                 fontFamily="'Courier New', monospace" fontSize="13"
-                fill="rgba(23,26,28,0.3)" letterSpacing="3">
+                fill="rgba(16,42,67,0.3)" letterSpacing="3">
             [ {c.label} ]
           </text>
         </svg>
@@ -438,12 +449,18 @@
     // Sticky navigation bar
     const Nav = ({ currentPage, navigate }) => {
       const [scrolled, setScrolled] = React.useState(false);
+      const [menuOpen, setMenuOpen] = React.useState(false);
+      const mob = useIsMobile();
+
       React.useEffect(() => {
         const fn = () => setScrolled(window.scrollY > 120);
         window.addEventListener('scroll', fn, { passive: true });
         fn();
         return () => window.removeEventListener('scroll', fn);
       }, []);
+
+      // Close menu on page change
+      React.useEffect(() => { setMenuOpen(false); }, [currentPage]);
 
       const links = [
         { label: 'Ingatlanok', page: 'properties' },
@@ -453,106 +470,163 @@
         { label: 'Kapcsolat',  page: 'contact'    },
       ];
 
+      const navPad = mob ? '13px 20px' : (scrolled ? '16px 64px' : '28px 64px');
+
       return (
-        <nav style={{
-          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 1000,
-          padding: scrolled ? '16px 64px' : '28px 64px',
-          background: 'rgba(244,244,242,0.96)',
-          borderBottom: '1px solid var(--border)',
-          backdropFilter: scrolled ? 'blur(10px)' : 'none',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          transition: 'padding 0.5s ease',
-        }}>
-          <Logo onClick={() => navigate('home')} />
-          <div style={{ display: 'flex', gap: '38px', alignItems: 'center' }}>
-            {links.map(l => (
-              <button key={l.page} onClick={() => navigate(l.page)}
-                className={`nav-link${currentPage === l.page ? ' active' : ''}`}
-                style={{
-                  fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '10.5px',
-                  letterSpacing: '0.17em', textTransform: 'uppercase', color: 'var(--ink)',
-                  background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0',
-                }}>{l.label}</button>
-            ))}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-            <div style={{ fontFamily: 'var(--sans)', fontSize: '9.5px', letterSpacing: '0.18em', color: 'var(--taupe)', display: 'flex', gap: '4px', alignItems: 'center' }}>
-              {['HU','EN','NL'].map((lng, i) => (
-                <React.Fragment key={lng}>
-                  <span style={{ cursor: 'pointer', fontWeight: i === 0 ? 400 : 200, color: i === 0 ? 'var(--gold)' : 'inherit' }}>{lng}</span>
-                  {i < 2 && <span style={{ opacity: 0.35, margin: '0 3px' }}>|</span>}
-                </React.Fragment>
+        <>
+          <nav style={{
+            position: 'fixed', top: 0, left: 0, right: 0, zIndex: 1000,
+            padding: navPad,
+            background: 'rgba(244,244,242,0.97)',
+            borderBottom: '1px solid var(--border)',
+            backdropFilter: (scrolled || menuOpen) ? 'blur(10px)' : 'none',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            transition: 'padding 0.5s ease',
+          }}>
+            <Logo onClick={() => navigate('home')} />
+
+            {!mob && (
+              <div style={{ display: 'flex', gap: '38px', alignItems: 'center' }}>
+                {links.map(l => (
+                  <button key={l.page} onClick={() => navigate(l.page)}
+                    className={`nav-link${currentPage === l.page ? ' active' : ''}`}
+                    style={{
+                      fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '10.5px',
+                      letterSpacing: '0.17em', textTransform: 'uppercase', color: 'var(--ink)',
+                      background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0',
+                    }}>{l.label}</button>
+                ))}
+              </div>
+            )}
+
+            {!mob ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+                <div style={{ fontFamily: 'var(--sans)', fontSize: '9.5px', letterSpacing: '0.18em', color: 'var(--taupe)', display: 'flex', gap: '4px', alignItems: 'center' }}>
+                  {['HU','EN','NL'].map((lng, i) => (
+                    <React.Fragment key={lng}>
+                      <span style={{ cursor: 'pointer', fontWeight: i === 0 ? 400 : 200, color: i === 0 ? 'var(--gold)' : 'inherit' }}>{lng}</span>
+                      {i < 2 && <span style={{ opacity: 0.35, margin: '0 3px' }}>|</span>}
+                    </React.Fragment>
+                  ))}
+                </div>
+                <BtnOutline onClick={() => navigate('contact')} style={{ padding: '9px 20px', fontSize: '9.5px' }}>
+                  Kapcsolat
+                </BtnOutline>
+              </div>
+            ) : (
+              <button onClick={() => setMenuOpen(o => !o)} aria-label="Menu"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '8px', display: 'flex', flexDirection: 'column', gap: '5px', alignItems: 'flex-end' }}>
+                <span style={{ display: 'block', height: '1.5px', background: 'var(--ink)', transition: 'all 0.3s',
+                  width: menuOpen ? '22px' : '22px',
+                  transform: menuOpen ? 'translateY(6.5px) rotate(45deg)' : 'none' }} />
+                <span style={{ display: 'block', width: '16px', height: '1.5px', background: 'var(--ink)', transition: 'all 0.3s',
+                  opacity: menuOpen ? 0 : 1, transform: menuOpen ? 'scaleX(0)' : 'none' }} />
+                <span style={{ display: 'block', height: '1.5px', background: 'var(--ink)', transition: 'all 0.3s',
+                  width: menuOpen ? '22px' : '22px',
+                  transform: menuOpen ? 'translateY(-6.5px) rotate(-45deg)' : 'none' }} />
+              </button>
+            )}
+          </nav>
+
+          {mob && (
+            <div style={{
+              position: 'fixed', top: '57px', left: 0, right: 0, zIndex: 998,
+              background: 'rgba(244,244,242,0.99)', backdropFilter: 'blur(12px)',
+              borderBottom: '1px solid var(--border)',
+              transform: menuOpen ? 'translateY(0)' : 'translateY(-110%)',
+              transition: 'transform 0.38s cubic-bezier(0.25,0.1,0.25,1)',
+              paddingBottom: '12px',
+            }}>
+              {links.map((l, i) => (
+                <button key={l.page} onClick={() => navigate(l.page)}
+                  style={{
+                    display: 'block', width: '100%', textAlign: 'left',
+                    padding: '16px 24px',
+                    fontFamily: 'var(--sans)', fontWeight: currentPage === l.page ? 400 : 300,
+                    fontSize: '12px', letterSpacing: '0.18em', textTransform: 'uppercase',
+                    color: currentPage === l.page ? 'var(--gold)' : 'var(--ink)',
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    borderBottom: i < links.length - 1 ? '1px solid var(--border)' : 'none',
+                  }}>{l.label}</button>
               ))}
+              <div style={{ padding: '16px 24px 4px' }}>
+                <BtnDark onClick={() => navigate('contact')} style={{ width: '100%', padding: '13px', fontSize: '9.5px', textAlign: 'center' }}>
+                  Ingyenes visszahívás
+                </BtnDark>
+              </div>
             </div>
-            <BtnOutline onClick={() => navigate('contact')} style={{ padding: '9px 20px', fontSize: '9.5px' }}>
-              Kapcsolat
-            </BtnOutline>
-          </div>
-        </nav>
+          )}
+        </>
       );
     };
 
     // Site footer
-    const Footer = ({ navigate }) => (
-      <footer style={{ background: 'var(--ink)', color: 'var(--cream)', padding: '88px 80px 52px' }}>
-        <div style={{
-          display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr 1fr', gap: '56px',
-          paddingBottom: '64px', borderBottom: '1px solid rgba(244,244,242,0.1)', marginBottom: '40px',
-        }}>
-          <div>
-            <Logo light onClick={() => navigate('home')} />
-            <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '13px', lineHeight: 1.85, color: 'rgba(244,244,242,0.45)', marginTop: '28px', maxWidth: '230px' }}>
-              Magyar ingatlanok hirdetése Hollandiában és az Unió többi országában. Alapítva 2013-ban, Almere-Buiten, Hollandia.
-            </p>
-          </div>
-          {[
-            { heading: 'Navigáció', items: [
-              { label: 'Ingatlanok', page: 'properties' },
-              { label: 'Eladóknak',  page: 'sellers'    },
-              { label: 'Vevőknek',   page: 'buyers'     },
-              { label: 'Rólunk',     page: 'about'      },
-              { label: 'Kapcsolat',  page: 'contact'    },
-            ]},
-            { heading: 'Kategóriák', items: [
-              'Eladó ház','Kastélyok, kúriák','Eladó tanya',
-              'Eladó nyaraló','Mezőgazdasági ingatlan','Eladó telek',
-            ].map(l => ({ label: l, page: 'properties' }))},
-          ].map(col => (
-            <div key={col.heading}>
-              <Eyebrow style={{ marginBottom: '22px' }}>{col.heading}</Eyebrow>
-              {col.items.map(item => (
-                <div key={item.label} style={{ marginBottom: '11px' }}>
-                  <button onClick={() => navigate(item.page)} style={{
-                    fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '13px',
-                    color: 'rgba(244,244,242,0.48)', background: 'none', border: 'none', cursor: 'pointer',
-                  }}
-                  onMouseEnter={e => e.target.style.color = 'rgba(244,244,242,0.85)'}
-                  onMouseLeave={e => e.target.style.color = 'rgba(244,244,242,0.48)'}
-                  >{item.label}</button>
-                </div>
-              ))}
+    const Footer = ({ navigate }) => {
+      const mob = useIsMobile();
+      return (
+        <footer style={{ background: 'var(--ink)', color: 'var(--cream)', padding: mob ? '52px 24px 36px' : '88px 80px 52px' }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: mob ? '1fr 1fr' : '1.2fr 1fr 1fr 1fr',
+            gap: mob ? '36px 24px' : '56px',
+            paddingBottom: mob ? '36px' : '64px',
+            borderBottom: '1px solid rgba(244,244,242,0.1)', marginBottom: mob ? '28px' : '40px',
+          }}>
+            <div style={{ gridColumn: mob ? '1 / -1' : undefined }}>
+              <Logo light onClick={() => navigate('home')} />
+              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '13px', lineHeight: 1.85, color: 'rgba(244,244,242,0.45)', marginTop: '20px', maxWidth: mob ? '100%' : '230px' }}>
+                Magyar ingatlanok hirdetése Hollandiában és az Unió többi országában. Alapítva 2013-ban, Almere-Buiten, Hollandia.
+              </p>
             </div>
-          ))}
-          <div>
-            <Eyebrow style={{ marginBottom: '22px' }}>Elérhetőség</Eyebrow>
-            {['+31-644-005-550','+36-70-225-5255','+36-70-231-0031','info@fodel.nl'].map(line => (
-              <div key={line} style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '13px', color: 'rgba(244,244,242,0.48)', marginBottom: '9px' }}>{line}</div>
+            {[
+              { heading: 'Navigáció', items: [
+                { label: 'Ingatlanok', page: 'properties' },
+                { label: 'Eladóknak',  page: 'sellers'    },
+                { label: 'Vevőknek',   page: 'buyers'     },
+                { label: 'Rólunk',     page: 'about'      },
+                { label: 'Kapcsolat',  page: 'contact'    },
+              ]},
+              { heading: 'Kategóriák', items: [
+                'Eladó ház','Kastélyok, kúriák','Eladó tanya',
+                'Eladó nyaraló','Mezőgazdasági ingatlan','Eladó telek',
+              ].map(l => ({ label: l, page: 'properties' }))},
+            ].map(col => (
+              <div key={col.heading}>
+                <Eyebrow style={{ marginBottom: '18px' }}>{col.heading}</Eyebrow>
+                {col.items.map(item => (
+                  <div key={item.label} style={{ marginBottom: '10px' }}>
+                    <button onClick={() => navigate(item.page)} style={{
+                      fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '13px',
+                      color: 'rgba(244,244,242,0.48)', background: 'none', border: 'none', cursor: 'pointer',
+                    }}
+                    onMouseEnter={e => e.target.style.color = 'rgba(244,244,242,0.85)'}
+                    onMouseLeave={e => e.target.style.color = 'rgba(244,244,242,0.48)'}
+                    >{item.label}</button>
+                  </div>
+                ))}
+              </div>
             ))}
-            <div style={{ marginTop: '20px', fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '12px', color: 'rgba(244,244,242,0.3)', lineHeight: 1.8 }}>
-              Hétfő–Péntek · 08:00–18:00<br />Almere-Buiten, Hollandia
+            <div style={{ gridColumn: mob ? '1 / -1' : undefined }}>
+              <Eyebrow style={{ marginBottom: '18px' }}>Elérhetőség</Eyebrow>
+              {['+31-644-005-550','+36-70-225-5255','+36-70-231-0031','info@fodel.nl'].map(line => (
+                <div key={line} style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '13px', color: 'rgba(244,244,242,0.48)', marginBottom: '9px' }}>{line}</div>
+              ))}
+              <div style={{ marginTop: '18px', fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '12px', color: 'rgba(244,244,242,0.3)', lineHeight: 1.8 }}>
+                Hétfő–Péntek · 08:00–18:00<br />Almere-Buiten, Hollandia
+              </div>
             </div>
           </div>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '11px', color: 'rgba(244,244,242,0.25)', letterSpacing: '0.05em' }}>
-            © 2013–2026 FODEL INGATLAN · fodel.nl · fodel.hu · fodel.be
+          <div style={{ display: 'flex', flexDirection: mob ? 'column' : 'row', justifyContent: 'space-between', alignItems: mob ? 'flex-start' : 'center', gap: mob ? '8px' : '0' }}>
+            <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '11px', color: 'rgba(244,244,242,0.25)', letterSpacing: '0.05em' }}>
+              © 2013–2026 FODEL INGATLAN · fodel.nl · fodel.hu · fodel.be
+            </div>
+            <div style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontWeight: 300, fontSize: '13px', color: 'rgba(244,244,242,0.25)' }}>
+              Problémamentes, diszkrét ingatlanközvetítés
+            </div>
           </div>
-          <div style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontWeight: 300, fontSize: '14px', color: 'rgba(244,244,242,0.25)' }}>
-            Problémamentes, diszkrét ingatlanközvetítés
-          </div>
-        </div>
-      </footer>
-    );
+        </footer>
+      );
+    };
 
     /* ═══════════════════════════════════════════════════════════
        PAGE: HOME
@@ -560,6 +634,7 @@
 
     const HomePage = ({ navigate }) => {
       const [loaded, setLoaded] = React.useState(false);
+      const mob = useIsMobile();
       React.useEffect(() => { const t = setTimeout(() => setLoaded(true), 80); return () => clearTimeout(t); }, []);
       const anim = (delay = 0) => ({
         opacity: loaded ? 1 : 0,
@@ -569,55 +644,76 @@
 
       return (
         <main data-screen-label="Home">
-          {/* HERO — split layout */}
-          <section style={{ minHeight: '100vh', display: 'flex', overflow: 'hidden' }}>
-            <div style={{ flex: '0 0 54%', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '140px 72px 80px 80px', position: 'relative' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '36px', ...anim(0.1) }}>
-                <div style={{ width: '36px', height: '1px', background: 'var(--gold)' }} />
-                <span style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '10px', letterSpacing: '0.32em', textTransform: 'uppercase', color: 'var(--gold)' }}>
+          {/* HERO */}
+          <section style={{ minHeight: mob ? 'auto' : '100vh', display: 'flex', flexDirection: mob ? 'column' : 'row', overflow: 'hidden' }}>
+            {/* Hero image — top on mobile */}
+            {mob && (
+              <div style={{ position: 'relative', height: '56vw', minHeight: '240px', overflow: 'hidden', opacity: loaded ? 1 : 0, transition: 'opacity 1.6s ease 0.15s' }}>
+                <img src="assets/hero.png" alt="Balatoni Panorámaház" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, transparent 50%, rgba(244,244,242,0.35) 100%)' }} />
+              </div>
+            )}
+            <div style={{ flex: mob ? 'none' : '0 0 54%', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: mob ? '36px 24px 32px' : '140px 72px 80px 80px', position: 'relative' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: mob ? '20px' : '36px', ...anim(0.1) }}>
+                <div style={{ width: '28px', height: '1px', background: 'var(--gold)' }} />
+                <span style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '9.5px', letterSpacing: '0.28em', textTransform: 'uppercase', color: 'var(--gold)' }}>
                   Est. 2013 — Almere, Hollandia
                 </span>
               </div>
-              <h1 style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: 'clamp(54px, 5.8vw, 92px)', lineHeight: 1.04, color: 'var(--ink)', marginBottom: '32px', ...anim(0.22) }}>
+              <h1 style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: mob ? 'clamp(42px, 11vw, 64px)' : 'clamp(54px, 5.8vw, 92px)', lineHeight: 1.04, color: 'var(--ink)', marginBottom: mob ? '20px' : '32px', ...anim(0.22) }}>
                 Magyar<br /><em style={{ fontStyle: 'italic' }}>Ingatlanok</em><br />Nyugat-Európában
               </h1>
-              <GoldRule style={{ marginBottom: '28px', ...anim(0.34) }} />
-              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '15px', lineHeight: 1.9, color: 'var(--taupe)', maxWidth: '400px', marginBottom: '52px', ...anim(0.44) }}>
+              <GoldRule style={{ marginBottom: mob ? '18px' : '28px', ...anim(0.34) }} />
+              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: mob ? '14px' : '15px', lineHeight: 1.9, color: 'var(--taupe)', maxWidth: mob ? '100%' : '400px', marginBottom: mob ? '28px' : '52px', ...anim(0.44) }}>
                 Egyedülálló hirdetési modell: 5 nyelven, 9 országban — kizárólagossági szerződés nélkül. Komoly, készpénzes külföldi vevők.
               </p>
-              <div style={{ display: 'flex', gap: '16px', ...anim(0.54) }}>
-                <BtnDark onClick={() => navigate('properties')}>Ingatlanok</BtnDark>
-                <BtnOutline onClick={() => navigate('sellers')}>Hirdessen nálunk</BtnOutline>
+              <div style={{ display: 'flex', flexDirection: mob ? 'column' : 'row', gap: mob ? '12px' : '16px', ...anim(0.54) }}>
+                <BtnDark onClick={() => navigate('properties')} style={mob ? { width: '100%', textAlign: 'center' } : {}}>Ingatlanok</BtnDark>
+                <BtnOutline onClick={() => navigate('sellers')} style={mob ? { width: '100%', textAlign: 'center' } : {}}>Hirdessen nálunk</BtnOutline>
               </div>
-              <div style={{ position: 'absolute', bottom: '44px', left: '80px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', ...anim(1.1) }}>
-                <div style={{ width: '1px', height: '44px', background: 'var(--taupe)', animation: 'scrollPulse 2.2s ease infinite' }} />
-                <span style={{ fontFamily: 'var(--sans)', fontSize: '8.5px', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'var(--taupe)', writingMode: 'vertical-rl' }}>Görgessen</span>
-              </div>
+              {!mob && (
+                <div style={{ position: 'absolute', bottom: '44px', left: '80px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', ...anim(1.1) }}>
+                  <div style={{ width: '1px', height: '44px', background: 'var(--taupe)', animation: 'scrollPulse 2.2s ease infinite' }} />
+                  <span style={{ fontFamily: 'var(--sans)', fontSize: '8.5px', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'var(--taupe)', writingMode: 'vertical-rl' }}>Görgessen</span>
+                </div>
+              )}
             </div>
-            <div style={{ flex: '0 0 46%', position: 'relative', overflow: 'hidden', opacity: loaded ? 1 : 0, transition: 'opacity 1.6s ease 0.15s' }}>
-              <img src="assets/hero.png" alt="Balatoni Panorámaház" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(244,244,242,0.25) 0%, transparent 30%)' }} />
-              <div style={{ position: 'absolute', bottom: '44px', left: '44px', background: 'rgba(23,26,28,0.82)', backdropFilter: 'blur(12px)', padding: '22px 30px' }}>
-                <Eyebrow style={{ marginBottom: '7px' }}>Kiemelt Ingatlan</Eyebrow>
-                <div style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '19px', color: 'var(--cream)', marginBottom: '5px' }}>Balatoni Panorámaház</div>
-                <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '12px', color: 'rgba(244,244,242,0.6)', marginBottom: '18px' }}>Badacsony · € 178 000</div>
+            {!mob && (
+              <div style={{ flex: '0 0 46%', position: 'relative', overflow: 'hidden', opacity: loaded ? 1 : 0, transition: 'opacity 1.6s ease 0.15s' }}>
+                <img src="assets/hero.png" alt="Balatoni Panorámaház" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(244,244,242,0.25) 0%, transparent 30%)' }} />
+                <div style={{ position: 'absolute', bottom: '44px', left: '44px', background: 'rgba(16,42,67,0.82)', backdropFilter: 'blur(12px)', padding: '22px 30px' }}>
+                  <Eyebrow style={{ marginBottom: '7px' }}>Kiemelt Ingatlan</Eyebrow>
+                  <div style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '19px', color: 'var(--cream)', marginBottom: '5px' }}>Balatoni Panorámaház</div>
+                  <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '12px', color: 'rgba(244,244,242,0.6)', marginBottom: '18px' }}>Badacsony · € 178 000</div>
+                  <TextBtn light onClick={() => navigate('detail', PROPERTIES[0])}>Megtekintés</TextBtn>
+                </div>
+              </div>
+            )}
+            {mob && (
+              <div style={{ margin: '0 24px 32px', background: 'rgba(16,42,67,0.92)', padding: '18px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <Eyebrow style={{ marginBottom: '4px' }}>Kiemelt Ingatlan</Eyebrow>
+                  <div style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '16px', color: 'var(--cream)' }}>Balatoni Panorámaház</div>
+                  <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '11px', color: 'rgba(244,244,242,0.6)', marginTop: '2px' }}>Badacsony · € 178 000</div>
+                </div>
                 <TextBtn light onClick={() => navigate('detail', PROPERTIES[0])}>Megtekintés</TextBtn>
               </div>
-            </div>
+            )}
           </section>
 
           {/* DUAL AUDIENCE */}
-          <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderTop: '1px solid rgba(244,244,242,0.1)', background: 'var(--ink)' }}>
+          <section style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', borderTop: '1px solid rgba(244,244,242,0.1)', background: 'var(--ink)' }}>
             {[
               { eyebrow: 'Eladóknak', title: 'Hirdesse ingatlanát\nNyugat-Európában', body: 'Kizárólagossági szerződés nélkül. Hirdetése 5 nyelven jelenik meg 9 országban, célzottan holland, belga és német készpénzes vevőknek.', cta: 'Tudjon meg többet', page: 'sellers' },
               { eyebrow: 'Vevőknek',  title: 'Ingatlan közvetlenül\na tulajdonostól', body: 'Autentikus magyar házak, birtokok, gazdaságok és szőlők. Lépjen kapcsolatba közvetlenül a tulajdonosokkal, vagy bízza a FODEL-re a teljes folyamatot.', cta: 'Ingatlanok böngészése', page: 'properties' },
             ].map((col, i) => (
-              <div key={i} style={{ padding: '88px 80px', borderRight: i === 0 ? '1px solid rgba(244,244,242,0.1)' : 'none', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <div key={i} style={{ padding: mob ? '44px 24px' : '88px 80px', borderRight: (!mob && i === 0) ? '1px solid rgba(244,244,242,0.1)' : 'none', borderBottom: (mob && i === 0) ? '1px solid rgba(244,244,242,0.1)' : 'none', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <Reveal>
-                  <Eyebrow style={{ marginBottom: '20px' }}>{col.eyebrow}</Eyebrow>
-                  <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(28px, 2.8vw, 44px)', lineHeight: 1.18, color: 'var(--cream)', marginBottom: '22px', whiteSpace: 'pre-line' }}>{col.title}</h2>
-                  <GoldRule style={{ marginBottom: '22px' }} />
-                  <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', lineHeight: 1.85, color: 'var(--cream)', marginBottom: '36px', maxWidth: '380px' }}>{col.body}</p>
+                  <Eyebrow style={{ marginBottom: '16px' }}>{col.eyebrow}</Eyebrow>
+                  <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: mob ? 'clamp(26px, 7vw, 36px)' : 'clamp(28px, 2.8vw, 44px)', lineHeight: 1.18, color: 'var(--cream)', marginBottom: '18px', whiteSpace: 'pre-line' }}>{col.title}</h2>
+                  <GoldRule style={{ marginBottom: '18px' }} />
+                  <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', lineHeight: 1.85, color: 'var(--cream)', marginBottom: '28px', maxWidth: mob ? '100%' : '380px' }}>{col.body}</p>
                   <TextBtn light onClick={() => navigate(col.page)}>{col.cta}</TextBtn>
                 </Reveal>
               </div>
@@ -625,72 +721,77 @@
           </section>
 
           {/* FEATURED PROPERTIES */}
-          <section style={{ padding: '108px 80px' }}>
+          <section style={{ padding: mob ? '52px 24px' : '108px 80px' }}>
             <Reveal>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '64px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: mob ? '32px' : '64px' }}>
                 <div>
-                  <Eyebrow style={{ marginBottom: '14px' }}>Válogatás</Eyebrow>
-                  <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(32px, 3.5vw, 54px)', color: 'var(--ink)', lineHeight: 1.08 }}>Kiemelt Ingatlanok</h2>
+                  <Eyebrow style={{ marginBottom: '12px' }}>Válogatás</Eyebrow>
+                  <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: mob ? 'clamp(28px, 8vw, 40px)' : 'clamp(32px, 3.5vw, 54px)', color: 'var(--ink)', lineHeight: 1.08 }}>Kiemelt Ingatlanok</h2>
                 </div>
-                <TextBtn onClick={() => navigate('properties')}>Összes ingatlan</TextBtn>
+                {!mob && <TextBtn onClick={() => navigate('properties')}>Összes ingatlan</TextBtn>}
               </div>
             </Reveal>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '36px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : 'repeat(3, 1fr)', gap: mob ? '28px' : '36px' }}>
               {PROPERTIES.filter(p => p.featured).map((p, i) => (
                 <PropertyCard key={p.id} property={p} delay={i + 1} onClick={() => navigate('detail', p)} />
               ))}
             </div>
+            {mob && (
+              <div style={{ textAlign: 'center', marginTop: '28px' }}>
+                <BtnOutline onClick={() => navigate('properties')} style={{ width: '100%' }}>Összes ingatlan</BtnOutline>
+              </div>
+            )}
           </section>
 
           {/* EDITORIAL QUOTE */}
-          <section style={{ background: 'var(--ink)', padding: '128px 80px', position: 'relative', overflow: 'hidden' }}>
-            <div style={{ position: 'absolute', right: '-60px', top: '50%', transform: 'translateY(-50%)', fontFamily: 'var(--serif)', fontSize: '480px', fontWeight: 300, color: 'rgba(45,74,62,0.07)', lineHeight: 1, userSelect: 'none', pointerEvents: 'none' }}>F</div>
+          <section style={{ background: 'var(--ink)', padding: mob ? '64px 24px' : '128px 80px', position: 'relative', overflow: 'hidden' }}>
+            {!mob && <div style={{ position: 'absolute', right: '-60px', top: '50%', transform: 'translateY(-50%)', fontFamily: 'var(--serif)', fontSize: '480px', fontWeight: 300, color: 'rgba(236,237,239,0.07)', lineHeight: 1, userSelect: 'none', pointerEvents: 'none' }}>F</div>}
             <Reveal>
               <div style={{ maxWidth: '820px', margin: '0 auto', textAlign: 'center' }}>
-                <GoldRule center style={{ marginBottom: '48px' }} />
-                <blockquote style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontWeight: 300, fontSize: 'clamp(26px, 2.8vw, 42px)', lineHeight: 1.5, color: 'var(--cream)', marginBottom: '48px' }}>
-                  „A hollandok gyakran nem hisznek a szemüknek, amikor megtudják,<br />hogy Magyarországon mit és milyen áron vásárolhatnak."
+                <GoldRule center style={{ marginBottom: mob ? '32px' : '48px' }} />
+                <blockquote style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontWeight: 300, fontSize: mob ? 'clamp(20px, 5.5vw, 28px)' : 'clamp(26px, 2.8vw, 42px)', lineHeight: 1.55, color: 'var(--cream)', marginBottom: mob ? '32px' : '48px' }}>
+                  „A hollandok gyakran nem hisznek a szemüknek, amikor megtudják, hogy Magyarországon mit és milyen áron vásárolhatnak."
                 </blockquote>
-                <GoldRule center style={{ marginBottom: '28px' }} />
-                <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '10px', letterSpacing: '0.28em', textTransform: 'uppercase', color: 'rgba(74,122,104,0.9)' }}>FODEL INGATLAN — fodel.nl</div>
+                <GoldRule center style={{ marginBottom: '24px' }} />
+                <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '10px', letterSpacing: '0.28em', textTransform: 'uppercase', color: 'rgba(236,237,239,0.9)' }}>FODEL INGATLAN — fodel.nl</div>
               </div>
             </Reveal>
           </section>
 
           {/* HOW IT WORKS */}
-          <section style={{ padding: '108px 80px' }}>
+          <section style={{ padding: mob ? '52px 24px' : '108px 80px' }}>
             <Reveal>
-              <div style={{ textAlign: 'center', marginBottom: '80px' }}>
-                <Eyebrow center style={{ marginBottom: '14px' }}>Egyedülálló modell</Eyebrow>
-                <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(32px, 3.5vw, 54px)', color: 'var(--ink)' }}>Így működik a FODEL</h2>
+              <div style={{ textAlign: 'center', marginBottom: mob ? '40px' : '80px' }}>
+                <Eyebrow center style={{ marginBottom: '12px' }}>Egyedülálló modell</Eyebrow>
+                <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: mob ? 'clamp(28px, 8vw, 40px)' : 'clamp(32px, 3.5vw, 54px)', color: 'var(--ink)' }}>Így működik a FODEL</h2>
               </div>
             </Reveal>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : 'repeat(3, 1fr)' }}>
               {HOW_IT_WORKS.map((step, i) => (
                 <Reveal key={step.num} delay={i + 1}>
-                  <div style={{ padding: '48px 52px', borderRight: i < 2 ? '1px solid var(--border)' : 'none', borderTop: '2px solid var(--gold)' }}>
-                    <div style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: '52px', color: 'var(--gold)', opacity: 0.45, lineHeight: 1, marginBottom: '28px' }}>{step.num}</div>
-                    <h3 style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '23px', color: 'var(--ink)', marginBottom: '16px' }}>{step.title}</h3>
+                  <div style={{ padding: mob ? '28px 0' : '48px 52px', borderRight: (!mob && i < 2) ? '1px solid var(--border)' : 'none', borderTop: '2px solid var(--gold)', marginBottom: mob ? '0' : '0', ...(mob && i < HOW_IT_WORKS.length - 1 ? { borderBottom: '1px solid var(--border)', paddingBottom: '28px', marginBottom: '0' } : {}) }}>
+                    <div style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: mob ? '40px' : '52px', color: 'var(--gold)', opacity: 0.45, lineHeight: 1, marginBottom: mob ? '16px' : '28px' }}>{step.num}</div>
+                    <h3 style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: mob ? '20px' : '23px', color: 'var(--ink)', marginBottom: '12px' }}>{step.title}</h3>
                     <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', lineHeight: 1.85, color: 'var(--taupe)' }}>{step.body}</p>
                   </div>
                 </Reveal>
               ))}
             </div>
-            <Reveal><div style={{ textAlign: 'center', marginTop: '68px' }}><BtnDark onClick={() => navigate('sellers')}>Tudjon meg többet</BtnDark></div></Reveal>
+            <Reveal><div style={{ textAlign: 'center', marginTop: mob ? '36px' : '68px' }}><BtnDark onClick={() => navigate('sellers')} style={mob ? { width: '100%' } : {}}>Tudjon meg többet</BtnDark></div></Reveal>
           </section>
 
           {/* CTA BAND */}
-          <section style={{ background: 'var(--linen)', borderTop: '1px solid var(--border)', padding: '72px 80px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <section style={{ background: 'var(--linen)', borderTop: '1px solid var(--border)', padding: mob ? '44px 24px' : '72px 80px', display: 'flex', flexDirection: mob ? 'column' : 'row', justifyContent: 'space-between', alignItems: mob ? 'stretch' : 'center', gap: mob ? '24px' : '0' }}>
             <Reveal>
               <div>
-                <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(26px, 2.8vw, 42px)', color: 'var(--ink)', marginBottom: '10px' }}>Forduljon hozzánk bizalommal!</h2>
+                <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: mob ? 'clamp(24px, 7vw, 34px)' : 'clamp(26px, 2.8vw, 42px)', color: 'var(--ink)', marginBottom: '8px' }}>Forduljon hozzánk bizalommal!</h2>
                 <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', color: 'var(--taupe)' }}>Munkanapokon 08:00–18:00 · A visszahívás ingyenes.</p>
               </div>
             </Reveal>
             <Reveal delay={2}>
-              <div style={{ display: 'flex', gap: '16px', flexShrink: 0 }}>
-                <BtnDark onClick={() => navigate('contact')}>Ingyenes visszahívás</BtnDark>
-                <BtnOutline onClick={() => navigate('properties')}>Ingatlanok böngészése</BtnOutline>
+              <div style={{ display: 'flex', flexDirection: mob ? 'column' : 'row', gap: mob ? '12px' : '16px', flexShrink: 0 }}>
+                <BtnDark onClick={() => navigate('contact')} style={mob ? { width: '100%', textAlign: 'center' } : {}}>Ingyenes visszahívás</BtnDark>
+                <BtnOutline onClick={() => navigate('properties')} style={mob ? { width: '100%', textAlign: 'center' } : {}}>Ingatlanok böngészése</BtnOutline>
               </div>
             </Reveal>
           </section>
@@ -704,23 +805,24 @@
 
     const PropertiesPage = ({ navigate }) => {
       const [filter, setFilter] = React.useState('Mind');
+      const mob = useIsMobile();
       const cats = ['Mind', 'Eladó ház', 'Kastélyok, kúriák', 'Eladó tanya', 'Mezőgazdasági ingatlan', 'Eladó nyaraló'];
       const filtered = filter === 'Mind' ? PROPERTIES : PROPERTIES.filter(p => p.type === filter);
 
       return (
-        <main data-screen-label="Properties" style={{ paddingTop: '80px' }}>
-          <div style={{ padding: '80px 80px 64px', borderBottom: '1px solid var(--border)' }}>
-            <Eyebrow style={{ marginBottom: '18px' }}>FODEL Ingatlan Portál</Eyebrow>
-            <h1 style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: 'clamp(40px, 5vw, 76px)', color: 'var(--ink)', lineHeight: 1.04 }}>
+        <main data-screen-label="Properties" style={{ paddingTop: mob ? '57px' : '80px' }}>
+          <div style={{ padding: mob ? '36px 24px 28px' : '80px 80px 64px', borderBottom: '1px solid var(--border)' }}>
+            <Eyebrow style={{ marginBottom: '14px' }}>FODEL Ingatlan Portál</Eyebrow>
+            <h1 style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: mob ? 'clamp(34px, 9vw, 52px)' : 'clamp(40px, 5vw, 76px)', color: 'var(--ink)', lineHeight: 1.04 }}>
               Magyar Ingatlanok<br /><em>Külföldi Vevőknek</em>
             </h1>
           </div>
-          <div style={{ padding: '20px 80px', borderBottom: '1px solid var(--border)', display: 'flex', gap: '10px', alignItems: 'center', overflowX: 'auto' }}>
-            <span style={{ fontFamily: 'var(--sans)', fontSize: '9.5px', letterSpacing: '0.22em', color: 'var(--taupe)', textTransform: 'uppercase', flexShrink: 0, marginRight: '6px' }}>Szűrő:</span>
+          <div style={{ padding: mob ? '14px 16px' : '20px 80px', borderBottom: '1px solid var(--border)', display: 'flex', gap: '8px', alignItems: 'center', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <span style={{ fontFamily: 'var(--sans)', fontSize: '9.5px', letterSpacing: '0.22em', color: 'var(--taupe)', textTransform: 'uppercase', flexShrink: 0, marginRight: '4px' }}>Szűrő:</span>
             {cats.map(cat => (
               <button key={cat} onClick={() => setFilter(cat)} style={{
-                fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '10.5px', letterSpacing: '0.12em',
-                padding: '8px 18px', cursor: 'pointer', flexShrink: 0,
+                fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '10px', letterSpacing: '0.1em',
+                padding: mob ? '7px 14px' : '8px 18px', cursor: 'pointer', flexShrink: 0,
                 background: filter === cat ? 'var(--ink)' : 'transparent',
                 color: filter === cat ? 'var(--cream)' : 'var(--taupe)',
                 border: `1px solid ${filter === cat ? 'var(--ink)' : 'var(--border)'}`,
@@ -728,9 +830,9 @@
               }}>{cat}</button>
             ))}
           </div>
-          <div style={{ padding: '64px 80px 108px' }}>
-            <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '12px', color: 'var(--taupe)', marginBottom: '44px' }}>{filtered.length} ingatlan</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '48px 36px' }}>
+          <div style={{ padding: mob ? '32px 24px 64px' : '64px 80px 108px' }}>
+            <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '12px', color: 'var(--taupe)', marginBottom: mob ? '24px' : '44px' }}>{filtered.length} ingatlan</div>
+            <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : 'repeat(3, 1fr)', gap: mob ? '32px' : '48px 36px' }}>
               {filtered.map((p, i) => (
                 <PropertyCard key={p.id} property={p} delay={Math.min(i + 1, 4)} onClick={() => navigate('detail', p)} />
               ))}
@@ -750,6 +852,7 @@
       const [sent, setSent] = React.useState(false);
       const fmt  = n => '€\u00A0' + n.toLocaleString('de-DE');
       const fmtL = m => m >= 10000 ? (m/10000).toFixed(2).replace('.', ',') + ' ha' : m.toLocaleString('de-DE') + ' m²';
+      const mob = useIsMobile();
       const similar = PROPERTIES.filter(p => p.id !== prop.id && (p.region === prop.region || p.type === prop.type)).slice(0, 3);
 
       const inputStyle = {
@@ -760,89 +863,89 @@
       };
 
       return (
-        <main data-screen-label="Property Detail" style={{ paddingTop: '80px' }}>
+        <main data-screen-label="Property Detail" style={{ paddingTop: mob ? '57px' : '80px' }}>
           {/* Breadcrumb */}
-          <div style={{ padding: '18px 80px', borderBottom: '1px solid var(--border)', display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div style={{ padding: mob ? '12px 20px' : '18px 80px', borderBottom: '1px solid var(--border)', display: 'flex', gap: '6px', alignItems: 'center', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
             {[{ l: 'Ingatlanok', fn: () => navigate('properties') }, { l: prop.region, fn: null }, { l: prop.title, fn: null }].map((c, i) => (
               <React.Fragment key={i}>
-                {i > 0 && <span style={{ color: 'var(--border)', fontSize: '12px' }}>/</span>}
-                <button onClick={c.fn || undefined} style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '11px', color: i === 2 ? 'var(--ink)' : 'var(--taupe)', background: 'none', border: 'none', cursor: c.fn ? 'pointer' : 'default' }}>{c.l}</button>
+                {i > 0 && <span style={{ color: 'var(--border)', fontSize: '12px', flexShrink: 0 }}>/</span>}
+                <button onClick={c.fn || undefined} style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '11px', color: i === 2 ? 'var(--ink)' : 'var(--taupe)', background: 'none', border: 'none', cursor: c.fn ? 'pointer' : 'default', whiteSpace: 'nowrap' }}>{c.l}</button>
               </React.Fragment>
             ))}
           </div>
           {/* Hero image */}
-          <div style={{ height: '66vh', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ height: mob ? '52vw' : '66vh', minHeight: mob ? '200px' : undefined, position: 'relative', overflow: 'hidden' }}>
             <Placeholder type={prop.imgType} style={{ height: '100%', width: '100%' }} />
             {prop.tag && (
-              <div style={{ position: 'absolute', top: '36px', left: '80px', background: 'var(--gold)', color: 'var(--ink)', fontFamily: 'var(--sans)', fontSize: '9px', letterSpacing: '0.22em', textTransform: 'uppercase', padding: '6px 14px' }}>{prop.tag}</div>
+              <div style={{ position: 'absolute', top: mob ? '16px' : '36px', left: mob ? '20px' : '80px', background: 'var(--gold)', color: 'var(--ink)', fontFamily: 'var(--sans)', fontSize: '9px', letterSpacing: '0.22em', textTransform: 'uppercase', padding: '6px 14px' }}>{prop.tag}</div>
             )}
           </div>
           {/* Content grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 420px', gap: '88px', padding: '88px 80px', alignItems: 'start' }}>
-            <div>
-              <Eyebrow style={{ marginBottom: '14px' }}>{prop.region} — {prop.type}</Eyebrow>
-              <h1 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(36px, 3.5vw, 58px)', color: 'var(--ink)', lineHeight: 1.08, marginBottom: '10px' }}>{prop.title}</h1>
-              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', color: 'var(--taupe)', marginBottom: '36px' }}>{prop.location}</p>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '24px', padding: '24px 0', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', marginBottom: '44px' }}>
-                <div style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '38px', color: 'var(--ink)' }}>{fmt(prop.price_eur)}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 420px', gap: mob ? '0' : '88px', padding: mob ? '32px 24px 0' : '88px 80px', alignItems: 'start' }}>
+            <div style={{ paddingBottom: mob ? '0' : '0' }}>
+              <Eyebrow style={{ marginBottom: '12px' }}>{prop.region} — {prop.type}</Eyebrow>
+              <h1 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: mob ? 'clamp(28px, 8vw, 44px)' : 'clamp(36px, 3.5vw, 58px)', color: 'var(--ink)', lineHeight: 1.08, marginBottom: '8px' }}>{prop.title}</h1>
+              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', color: 'var(--taupe)', marginBottom: mob ? '20px' : '36px' }}>{prop.location}</p>
+              <div style={{ display: 'flex', flexDirection: mob ? 'column' : 'row', alignItems: mob ? 'flex-start' : 'baseline', gap: mob ? '4px' : '24px', padding: '20px 0', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', marginBottom: mob ? '24px' : '44px' }}>
+                <div style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: mob ? '30px' : '38px', color: 'var(--ink)' }}>{fmt(prop.price_eur)}</div>
                 <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', color: 'var(--taupe)' }}>{prop.price_huf}</div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: '52px', border: '1px solid var(--border)' }}>
-                {[{ l: 'Szobák', v: prop.beds }, { l: 'Fürdők', v: prop.baths }, { l: 'Alapter.', v: prop.area_m2 + ' m²' }, { l: 'Telek', v: fmtL(prop.land_m2) }].map((s, i) => (
-                  <div key={s.l} style={{ padding: '22px 20px', textAlign: 'center', borderRight: i < 3 ? '1px solid var(--border)' : 'none' }}>
-                    <div style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '26px', color: 'var(--ink)', marginBottom: '5px' }}>{s.v}</div>
-                    <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '9.5px', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--taupe)' }}>{s.l}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', marginBottom: mob ? '24px' : '52px', border: '1px solid var(--border)' }}>
+                {[{ l: 'Szobák', v: prop.beds }, { l: 'Fürdők', v: prop.baths }, { l: 'Alapterület', v: prop.area_m2 + ' m²' }, { l: 'Telek', v: fmtL(prop.land_m2) }].map((s, i) => (
+                  <div key={s.l} style={{ padding: mob ? '14px 12px' : '22px 20px', textAlign: 'center', borderRight: i % 2 === 0 ? '1px solid var(--border)' : 'none', borderBottom: i < 2 ? '1px solid var(--border)' : 'none' }}>
+                    <div style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: mob ? '20px' : '26px', color: 'var(--ink)', marginBottom: '4px' }}>{s.v}</div>
+                    <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '9.5px', letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--taupe)' }}>{s.l}</div>
                   </div>
                 ))}
               </div>
-              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '15px', lineHeight: 1.95, color: 'var(--taupe)', marginBottom: '36px' }}>{prop.desc}</p>
-              <GoldRule style={{ marginBottom: '36px' }} />
-              <div style={{ background: 'var(--linen)', padding: '28px', borderLeft: '2px solid var(--gold)' }}>
-                <Eyebrow style={{ marginBottom: '10px' }}>FODEL Garancia</Eyebrow>
+              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: mob ? '14px' : '15px', lineHeight: 1.95, color: 'var(--taupe)', marginBottom: mob ? '20px' : '36px' }}>{prop.desc}</p>
+              <GoldRule style={{ marginBottom: mob ? '20px' : '36px' }} />
+              <div style={{ background: 'var(--linen)', padding: mob ? '18px' : '28px', borderLeft: '2px solid var(--gold)', marginBottom: mob ? '32px' : '0' }}>
+                <Eyebrow style={{ marginBottom: '8px' }}>FODEL Garancia</Eyebrow>
                 <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '13px', lineHeight: 1.8, color: 'var(--taupe)' }}>
                   Minden ingatlan meghirdető azonosítása megtörtént. Kétnyelvű adásvételi szerződés, meghatalmazásos képviselet és földhivatali ügyintézés igény szerint elérhető.
                 </p>
               </div>
             </div>
             {/* Contact form */}
-            <div style={{ background: 'var(--ink)', padding: '44px', position: 'sticky', top: '100px' }}>
+            <div style={{ background: 'var(--ink)', padding: mob ? '28px 24px' : '44px', position: mob ? 'static' : 'sticky', top: '100px' }}>
               <Eyebrow style={{ marginBottom: '10px' }}>Érdeklődjön</Eyebrow>
-              <h3 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: '24px', color: 'var(--cream)', marginBottom: '36px', lineHeight: 1.35 }}>Kérek tájékoztatást<br />erről az ingatlanról</h3>
+              <h3 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: mob ? '20px' : '24px', color: 'var(--cream)', marginBottom: '28px', lineHeight: 1.35 }}>Kérek tájékoztatást<br />erről az ingatlanról</h3>
               {sent ? (
-                <div style={{ textAlign: 'center', padding: '40px 0' }}>
-                  <GoldRule center style={{ marginBottom: '32px' }} />
-                  <p style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontWeight: 300, fontSize: '20px', color: 'var(--cream)', lineHeight: 1.65 }}>Köszönjük érdeklődését.<br />Munkatársunk hamarosan<br />felveszi Önnel a kapcsolatot.</p>
+                <div style={{ textAlign: 'center', padding: '32px 0' }}>
+                  <GoldRule center style={{ marginBottom: '28px' }} />
+                  <p style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontWeight: 300, fontSize: '19px', color: 'var(--cream)', lineHeight: 1.65 }}>Köszönjük érdeklődését.<br />Munkatársunk hamarosan<br />felveszi Önnel a kapcsolatot.</p>
                 </div>
               ) : (
                 <form onSubmit={e => { e.preventDefault(); setSent(true); }}>
                   {[{ k: 'name', l: 'Név', t: 'text', ph: 'Az Ön neve' }, { k: 'email', l: 'E-mail', t: 'email', ph: 'email@cím.hu' }, { k: 'phone', l: 'Telefon', t: 'tel', ph: '+36 70 ...' }].map(f => (
-                    <div key={f.k} style={{ marginBottom: '20px' }}>
+                    <div key={f.k} style={{ marginBottom: '16px' }}>
                       <label style={{ fontFamily: 'var(--sans)', fontSize: '9.5px', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(244,244,242,0.45)', display: 'block', marginBottom: '7px' }}>{f.l}</label>
                       <input type={f.t} placeholder={f.ph} value={fd[f.k]} onChange={e => setFd({...fd, [f.k]: e.target.value})} style={inputStyle}
                         onFocus={e => e.target.style.borderColor = 'var(--gold)'}
                         onBlur={e => e.target.style.borderColor = 'rgba(244,244,242,0.15)'} />
                     </div>
                   ))}
-                  <div style={{ marginBottom: '28px' }}>
+                  <div style={{ marginBottom: '20px' }}>
                     <label style={{ fontFamily: 'var(--sans)', fontSize: '9.5px', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(244,244,242,0.45)', display: 'block', marginBottom: '7px' }}>Üzenet</label>
                     <textarea rows={4} placeholder="Kérdése vagy megjegyzése..." value={fd.message} onChange={e => setFd({...fd, message: e.target.value})} style={{ ...inputStyle, resize: 'vertical' }}
                       onFocus={e => e.target.style.borderColor = 'var(--gold)'}
                       onBlur={e => e.target.style.borderColor = 'rgba(244,244,242,0.15)'} />
                   </div>
                   <button type="submit" style={{ width: '100%', background: 'var(--gold)', color: 'var(--ink)', fontFamily: 'var(--sans)', fontWeight: 400, fontSize: '10.5px', letterSpacing: '0.26em', textTransform: 'uppercase', padding: '16px', border: 'none', cursor: 'pointer' }}>Üzenet Küldése</button>
-                  <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '11px', color: 'rgba(244,244,242,0.3)', textAlign: 'center', marginTop: '18px', lineHeight: 1.7 }}>Ingyenes visszahívást is kérhet<br />+31-644-005-550 · info@fodel.nl</p>
+                  <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '11px', color: 'rgba(244,244,242,0.3)', textAlign: 'center', marginTop: '16px', lineHeight: 1.7 }}>Ingyenes visszahívást is kérhet<br />+31-644-005-550 · info@fodel.nl</p>
                 </form>
               )}
             </div>
           </div>
           {/* Similar properties */}
           {similar.length > 0 && (
-            <div style={{ padding: '80px 80px 108px', borderTop: '1px solid var(--border)' }}>
+            <div style={{ padding: mob ? '40px 24px 60px' : '80px 80px 108px', borderTop: '1px solid var(--border)', marginTop: mob ? '0' : '0' }}>
               <Reveal>
-                <Eyebrow style={{ marginBottom: '14px' }}>Hasonló ingatlanok</Eyebrow>
-                <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: '44px', color: 'var(--ink)', marginBottom: '52px' }}>A régióban</h2>
+                <Eyebrow style={{ marginBottom: '12px' }}>Hasonló ingatlanok</Eyebrow>
+                <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: mob ? '30px' : '44px', color: 'var(--ink)', marginBottom: mob ? '28px' : '52px' }}>A régióban</h2>
               </Reveal>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '36px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : 'repeat(3, 1fr)', gap: mob ? '28px' : '36px' }}>
                 {similar.map((p, i) => <PropertyCard key={p.id} property={p} delay={i + 1} onClick={() => navigate('detail', p)} />)}
               </div>
             </div>
@@ -855,34 +958,45 @@
        PAGE: SELLERS (Eladóknak)
     ═══════════════════════════════════════════════════════════ */
 
-    const SellersPage = ({ navigate }) => (
-      <main data-screen-label="Sellers" style={{ paddingTop: '80px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', minHeight: '80vh' }}>
-          <div style={{ padding: '100px 72px 80px 80px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+    const SellersPage = ({ navigate }) => {
+      const mob = useIsMobile();
+      return (
+      <main data-screen-label="Sellers" style={{ paddingTop: mob ? '57px' : '80px' }}>
+        {/* Hero split */}
+        <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', minHeight: mob ? 'auto' : '80vh' }}>
+          {mob && (
+            <div style={{ height: '56vw', minHeight: '220px', position: 'relative', overflow: 'hidden' }}>
+              <img src="assets/vineyard.png" style={{ height: '100%', width: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }} alt="Vineyard" />
+            </div>
+          )}
+          <div style={{ padding: mob ? '36px 24px 32px' : '100px 72px 80px 80px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <Reveal>
-              <Eyebrow style={{ marginBottom: '20px' }}>Eladóknak</Eyebrow>
-              <h1 style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: 'clamp(44px, 4.8vw, 76px)', color: 'var(--ink)', lineHeight: 1.04, marginBottom: '28px' }}>
+              <Eyebrow style={{ marginBottom: '16px' }}>Eladóknak</Eyebrow>
+              <h1 style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: mob ? 'clamp(36px, 9vw, 54px)' : 'clamp(44px, 4.8vw, 76px)', color: 'var(--ink)', lineHeight: 1.04, marginBottom: mob ? '18px' : '28px' }}>
                 Hirdesse ingatlanát<br /><em>Nyugat-Európában</em>
               </h1>
-              <GoldRule style={{ marginBottom: '28px' }} />
-              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '15px', lineHeight: 1.9, color: 'var(--taupe)', maxWidth: '480px', marginBottom: '48px' }}>
+              <GoldRule style={{ marginBottom: mob ? '18px' : '28px' }} />
+              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: mob ? '14px' : '15px', lineHeight: 1.9, color: 'var(--taupe)', maxWidth: mob ? '100%' : '480px', marginBottom: mob ? '28px' : '48px' }}>
                 A FODEL egyedülálló hirdetési modelljével ingatlana 5 nyelven jelenik meg 9 országban — kizárólagossági szerződés nélkül. Csak komoly, készpénzes külföldi vevőkkel dolgozunk.
               </p>
-              <BtnDark onClick={() => navigate('contact')}>Ingyenes konzultáció</BtnDark>
+              <BtnDark onClick={() => navigate('contact')} style={mob ? { width: '100%', textAlign: 'center' } : {}}>Ingyenes konzultáció</BtnDark>
             </Reveal>
           </div>
-          <div style={{ background: 'var(--linen)', position: 'relative', overflow: 'hidden' }}>
-            <img src="assets/vineyard.png" style={{ height: '100%', width: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }} alt="Vineyard" />
-          </div>
+          {!mob && (
+            <div style={{ background: 'var(--linen)', position: 'relative', overflow: 'hidden' }}>
+              <img src="assets/vineyard.png" style={{ height: '100%', width: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }} alt="Vineyard" />
+            </div>
+          )}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderTop: '1px solid var(--border)' }}>
-          <div style={{ padding: '88px 72px 88px 80px' }}>
+        {/* Benefits + Buyers */}
+        <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', borderTop: '1px solid var(--border)' }}>
+          <div style={{ padding: mob ? '40px 24px' : '88px 72px 88px 80px', borderBottom: mob ? '1px solid var(--border)' : 'none' }}>
             <Reveal>
-              <Eyebrow style={{ marginBottom: '20px' }}>Az előnyök</Eyebrow>
-              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(28px, 2.8vw, 42px)', color: 'var(--ink)', lineHeight: 1.2, marginBottom: '28px' }}>Miért érdemes külföldi vevőt keresni?</h2>
-              <GoldRule style={{ marginBottom: '28px' }} />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <Eyebrow style={{ marginBottom: '16px' }}>Az előnyök</Eyebrow>
+              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: mob ? 'clamp(24px, 7vw, 34px)' : 'clamp(28px, 2.8vw, 42px)', color: 'var(--ink)', lineHeight: 1.2, marginBottom: mob ? '18px' : '28px' }}>Miért érdemes külföldi vevőt keresni?</h2>
+              <GoldRule style={{ marginBottom: mob ? '18px' : '28px' }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {[
                   'Készpénzes vevők — nincs bankihitel-várakozás, nincs CSOK-ügyintézés.',
                   'Egy összegben, banki átutalással fizetnek — gyors és biztonságos.',
@@ -890,28 +1004,28 @@
                   'Stabil, reális vételár — nem alkudoznak irreálisan.',
                   'FODEL a vevőt személyesen minősíti, Önhöz csak komoly partnert küldünk.',
                 ].map((pt, i) => (
-                  <div key={i} style={{ display: 'flex', gap: '18px', alignItems: 'flex-start' }}>
-                    <div style={{ width: '22px', height: '1px', background: 'var(--gold)', marginTop: '11px', flexShrink: 0 }} />
+                  <div key={i} style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
+                    <div style={{ width: '20px', height: '1px', background: 'var(--gold)', marginTop: '11px', flexShrink: 0 }} />
                     <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', lineHeight: 1.8, color: 'var(--taupe)' }}>{pt}</p>
                   </div>
                 ))}
               </div>
             </Reveal>
           </div>
-          <div style={{ background: 'var(--linen)', borderLeft: '1px solid var(--border)', padding: '88px 80px' }}>
+          <div style={{ background: 'var(--linen)', borderLeft: mob ? 'none' : '1px solid var(--border)', padding: mob ? '40px 24px' : '88px 80px' }}>
             <Reveal>
-              <Eyebrow style={{ marginBottom: '20px' }}>A vevők</Eyebrow>
-              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(28px, 2.8vw, 42px)', color: 'var(--ink)', lineHeight: 1.2, marginBottom: '28px' }}>Kik a FODEL vásárlói?</h2>
-              <GoldRule style={{ marginBottom: '28px' }} />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              <Eyebrow style={{ marginBottom: '16px' }}>A vevők</Eyebrow>
+              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: mob ? 'clamp(24px, 7vw, 34px)' : 'clamp(28px, 2.8vw, 42px)', color: 'var(--ink)', lineHeight: 1.2, marginBottom: mob ? '18px' : '28px' }}>Kik a FODEL vásárlói?</h2>
+              <GoldRule style={{ marginBottom: mob ? '18px' : '28px' }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 {[
                   { t: 'Kisnyugdíjasok', b: 'Alacsonyabb megélhetési költségeket, adókedvezményt és elérhető egészségügyi ellátást keresnek Magyarországon.' },
                   { t: 'Családok', b: 'Teret, természetet és vidéki életet keresnek. Jellemzően farmot, tanyát vagy nyaralót vásárolnak.' },
                   { t: 'Befektetők', b: 'Kereskedelmi ingatlanokat, szőlőbirtokokat és mezőgazdasági területeket keresnek.' },
                   { t: 'Életstílus-emigránsok', b: 'Holland adók és magas ingatlanárak elől menekülnek. Autentikus európai életmódot keresnek.' },
                 ].map(item => (
-                  <div key={item.t} style={{ paddingBottom: '24px', borderBottom: '1px solid var(--border)' }}>
-                    <div style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '17px', color: 'var(--ink)', marginBottom: '6px' }}>{item.t}</div>
+                  <div key={item.t} style={{ paddingBottom: '20px', borderBottom: '1px solid var(--border)' }}>
+                    <div style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '17px', color: 'var(--ink)', marginBottom: '5px' }}>{item.t}</div>
                     <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '13px', lineHeight: 1.8, color: 'var(--taupe)' }}>{item.b}</p>
                   </div>
                 ))}
@@ -920,17 +1034,18 @@
           </div>
         </div>
 
-        <div style={{ padding: '108px 80px', borderTop: '1px solid var(--border)' }}>
-          <Reveal><div style={{ textAlign: 'center', marginBottom: '80px' }}>
-            <Eyebrow center style={{ marginBottom: '14px' }}>Lépésről lépésre</Eyebrow>
-            <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(32px, 3.5vw, 52px)', color: 'var(--ink)' }}>Az egyedülálló FODEL-modell</h2>
+        {/* How it works */}
+        <div style={{ padding: mob ? '48px 24px' : '108px 80px', borderTop: '1px solid var(--border)' }}>
+          <Reveal><div style={{ textAlign: 'center', marginBottom: mob ? '36px' : '80px' }}>
+            <Eyebrow center style={{ marginBottom: '12px' }}>Lépésről lépésre</Eyebrow>
+            <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: mob ? 'clamp(26px, 7vw, 36px)' : 'clamp(32px, 3.5vw, 52px)', color: 'var(--ink)' }}>Az egyedülálló FODEL-modell</h2>
           </div></Reveal>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : 'repeat(3, 1fr)' }}>
             {HOW_IT_WORKS.map((step, i) => (
               <Reveal key={step.num} delay={i + 1}>
-                <div style={{ padding: '48px 52px', borderRight: i < 2 ? '1px solid var(--border)' : 'none', borderTop: '2px solid var(--gold)' }}>
-                  <div style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: '52px', color: 'var(--gold)', opacity: 0.45, lineHeight: 1, marginBottom: '28px' }}>{step.num}</div>
-                  <h3 style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '23px', color: 'var(--ink)', marginBottom: '16px' }}>{step.title}</h3>
+                <div style={{ padding: mob ? '24px 0' : '48px 52px', borderRight: (!mob && i < 2) ? '1px solid var(--border)' : 'none', borderTop: '2px solid var(--gold)', ...(mob && i < HOW_IT_WORKS.length - 1 ? { borderBottom: '1px solid var(--border)', marginBottom: '0' } : {}) }}>
+                  <div style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: mob ? '40px' : '52px', color: 'var(--gold)', opacity: 0.45, lineHeight: 1, marginBottom: mob ? '14px' : '28px' }}>{step.num}</div>
+                  <h3 style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: mob ? '19px' : '23px', color: 'var(--ink)', marginBottom: '12px' }}>{step.title}</h3>
                   <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', lineHeight: 1.85, color: 'var(--taupe)' }}>{step.body}</p>
                 </div>
               </Reveal>
@@ -938,20 +1053,22 @@
           </div>
         </div>
 
-        <div style={{ background: 'var(--ink)', padding: '88px 80px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        {/* Pricing CTA */}
+        <div style={{ background: 'var(--ink)', padding: mob ? '44px 24px' : '88px 80px', display: 'flex', flexDirection: mob ? 'column' : 'row', justifyContent: 'space-between', alignItems: mob ? 'stretch' : 'center', gap: mob ? '28px' : '0' }}>
           <Reveal>
             <div>
-              <Eyebrow style={{ marginBottom: '14px' }}>Díjszabás</Eyebrow>
-              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: 'clamp(28px, 3vw, 46px)', color: 'var(--cream)', lineHeight: 1.2, marginBottom: '18px' }}>Jutalék csak sikeres<br />tranzakció esetén</h2>
-              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', color: 'rgba(244,244,242,0.55)', lineHeight: 1.85, maxWidth: '540px' }}>
+              <Eyebrow style={{ marginBottom: '12px' }}>Díjszabás</Eyebrow>
+              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: mob ? 'clamp(24px, 7vw, 34px)' : 'clamp(28px, 3vw, 46px)', color: 'var(--cream)', lineHeight: 1.2, marginBottom: '16px' }}>Jutalék csak sikeres<br />tranzakció esetén</h2>
+              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', color: 'rgba(244,244,242,0.55)', lineHeight: 1.85, maxWidth: mob ? '100%' : '540px' }}>
                 Ha a vevő közvetlenül veszi fel Önnel a kapcsolatot, csak a hirdetési díjat fizeti. FODEL közvetítésnél: 4% nettó (min. €2.000) + 21% holland ÁFA.
               </p>
             </div>
           </Reveal>
-          <Reveal delay={2}><BtnOutline light onClick={() => navigate('contact')} style={{ flexShrink: 0 }}>Árlista kérése</BtnOutline></Reveal>
+          <Reveal delay={2}><BtnOutline light onClick={() => navigate('contact')} style={{ flexShrink: 0, ...(mob ? { textAlign: 'center' } : {}) }}>Árlista kérése</BtnOutline></Reveal>
         </div>
       </main>
-    );
+      );
+    };
 
     /* ═══════════════════════════════════════════════════════════
        PAGE: CONTACT
@@ -960,6 +1077,7 @@
     const ContactPage = ({ navigate }) => {
       const [form, setForm] = React.useState({ name: '', email: '', phone: '', subject: 'Hirdetési érdeklődés', message: '' });
       const [sent, setSent] = React.useState(false);
+      const mob = useIsMobile();
 
       const lineStyle = {
         width: '100%', background: 'transparent', border: 'none',
@@ -969,15 +1087,15 @@
       };
 
       return (
-        <main data-screen-label="Contact" style={{ paddingTop: '80px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', minHeight: 'calc(100vh - 80px)' }}>
-            <div style={{ padding: '88px 72px 80px 80px', background: 'var(--linen)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <main data-screen-label="Contact" style={{ paddingTop: mob ? '57px' : '80px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', minHeight: mob ? 'auto' : 'calc(100vh - 80px)' }}>
+            <div style={{ padding: mob ? '36px 24px 32px' : '88px 72px 80px 80px', background: 'var(--linen)', borderRight: mob ? 'none' : '1px solid var(--border)', borderBottom: mob ? '1px solid var(--border)' : 'none', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
               <Reveal>
-                <Eyebrow style={{ marginBottom: '18px' }}>Kapcsolat</Eyebrow>
-                <h1 style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: 'clamp(40px, 4vw, 64px)', color: 'var(--ink)', lineHeight: 1.08, marginBottom: '32px' }}>
+                <Eyebrow style={{ marginBottom: '14px' }}>Kapcsolat</Eyebrow>
+                <h1 style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: mob ? 'clamp(32px, 9vw, 50px)' : 'clamp(40px, 4vw, 64px)', color: 'var(--ink)', lineHeight: 1.08, marginBottom: mob ? '20px' : '32px' }}>
                   Forduljon hozzánk<br /><em>bizalommal</em>
                 </h1>
-                <GoldRule style={{ marginBottom: '48px' }} />
+                <GoldRule style={{ marginBottom: mob ? '28px' : '48px' }} />
               </Reveal>
               <Reveal delay={1}>
                 <div>
@@ -987,36 +1105,36 @@
                     { l: 'E-mail',       v: 'info@fodel.nl',   note: null },
                     { l: 'Nyitvatartás', v: 'Hétfő–Péntek',   note: '08:00–18:00' },
                   ].map(c => (
-                    <div key={c.l} style={{ padding: '28px 0', borderBottom: '1px solid var(--border)' }}>
-                      <Eyebrow style={{ marginBottom: '8px' }}>{c.l}</Eyebrow>
-                      <div style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '22px', color: 'var(--ink)' }}>{c.v}</div>
+                    <div key={c.l} style={{ padding: mob ? '18px 0' : '28px 0', borderBottom: '1px solid var(--border)' }}>
+                      <Eyebrow style={{ marginBottom: '6px' }}>{c.l}</Eyebrow>
+                      <div style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: mob ? '19px' : '22px', color: 'var(--ink)' }}>{c.v}</div>
                       {c.note && <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '12.5px', color: 'var(--taupe)', marginTop: '4px' }}>{c.note}</div>}
                     </div>
                   ))}
                 </div>
               </Reveal>
               <Reveal delay={2}>
-                <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '13px', color: 'var(--taupe)', lineHeight: 1.75, marginTop: '32px' }}>
+                <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '13px', color: 'var(--taupe)', lineHeight: 1.75, marginTop: mob ? '20px' : '32px' }}>
                   Almere-Buiten, Flevoland, Hollandia<br />A visszahívást mi fizetjük — Önnek semmibe nem kerül.
                 </p>
               </Reveal>
             </div>
-            <div style={{ padding: '88px 80px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <div style={{ padding: mob ? '36px 24px 48px' : '88px 80px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
               {sent ? (
-                <div style={{ textAlign: 'center' }}>
-                  <GoldRule center style={{ marginBottom: '44px' }} />
-                  <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: '44px', color: 'var(--ink)', marginBottom: '18px' }}>Köszönjük!</h2>
+                <div style={{ textAlign: 'center', padding: mob ? '20px 0' : '0' }}>
+                  <GoldRule center style={{ marginBottom: '36px' }} />
+                  <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: mob ? '36px' : '44px', color: 'var(--ink)', marginBottom: '16px' }}>Köszönjük!</h2>
                   <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '15px', color: 'var(--taupe)', lineHeight: 1.85 }}>Üzenetét megkaptuk. Munkatársunk a megadott elérhetőségre munkanapokon belül visszahív.</p>
                 </div>
               ) : (
                 <>
                   <Reveal>
-                    <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: '34px', color: 'var(--ink)', marginBottom: '44px' }}>Ingyenes visszahívás kérése</h2>
+                    <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: mob ? '26px' : '34px', color: 'var(--ink)', marginBottom: mob ? '28px' : '44px' }}>Ingyenes visszahívás kérése</h2>
                   </Reveal>
                   <form onSubmit={e => { e.preventDefault(); setSent(true); }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap: mob ? '0' : '24px', marginBottom: mob ? '0' : '24px' }}>
                       {[{ k: 'name', l: 'Név', t: 'text' }, { k: 'phone', l: 'Telefon', t: 'tel' }].map(f => (
-                        <div key={f.k}>
+                        <div key={f.k} style={{ marginBottom: mob ? '20px' : '0' }}>
                           <label style={{ fontFamily: 'var(--sans)', fontSize: '9.5px', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--taupe)', display: 'block', marginBottom: '9px' }}>{f.l}</label>
                           <input type={f.t} value={form[f.k]} onChange={e => setForm({...form, [f.k]: e.target.value})} style={lineStyle}
                             onFocus={e => e.target.style.borderBottomColor = 'var(--gold)'}
@@ -1024,19 +1142,19 @@
                         </div>
                       ))}
                     </div>
-                    <div style={{ marginBottom: '24px' }}>
+                    <div style={{ marginBottom: '20px' }}>
                       <label style={{ fontFamily: 'var(--sans)', fontSize: '9.5px', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--taupe)', display: 'block', marginBottom: '9px' }}>E-mail cím</label>
                       <input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} style={lineStyle}
                         onFocus={e => e.target.style.borderBottomColor = 'var(--gold)'}
                         onBlur={e => e.target.style.borderBottomColor = 'var(--border)'} />
                     </div>
-                    <div style={{ marginBottom: '24px' }}>
+                    <div style={{ marginBottom: '20px' }}>
                       <label style={{ fontFamily: 'var(--sans)', fontSize: '9.5px', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--taupe)', display: 'block', marginBottom: '9px' }}>Tárgy</label>
                       <select value={form.subject} onChange={e => setForm({...form, subject: e.target.value})} style={{ ...lineStyle, appearance: 'none', cursor: 'pointer' }}>
                         {['Hirdetési érdeklődés','Vételérdeklődés','Árlista kérése','Visszahívás kérése','Egyéb'].map(o => <option key={o}>{o}</option>)}
                       </select>
                     </div>
-                    <div style={{ marginBottom: '44px' }}>
+                    <div style={{ marginBottom: mob ? '32px' : '44px' }}>
                       <label style={{ fontFamily: 'var(--sans)', fontSize: '9.5px', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--taupe)', display: 'block', marginBottom: '9px' }}>Üzenet</label>
                       <textarea rows={4} value={form.message} onChange={e => setForm({...form, message: e.target.value})} placeholder="Írja le kérdését vagy igényét..." style={{ ...lineStyle, resize: 'none' }}
                         onFocus={e => e.target.style.borderBottomColor = 'var(--gold)'}
@@ -1056,63 +1174,72 @@
        PAGE: VEVŐKNEK (Buyers)
     ═══════════════════════════════════════════════════════════ */
 
-    const BuyersPage = ({ navigate }) => (
-      <main data-screen-label="Buyers" style={{ paddingTop: '80px' }}>
+    const BuyersPage = ({ navigate }) => {
+      const mob = useIsMobile();
+      return (
+      <main data-screen-label="Buyers" style={{ paddingTop: mob ? '57px' : '80px' }}>
 
         {/* HERO — split */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', minHeight: '80vh' }}>
-          <div style={{ padding: '100px 72px 80px 80px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', minHeight: mob ? 'auto' : '80vh' }}>
+          {mob && (
+            <div style={{ height: '56vw', minHeight: '220px', position: 'relative', overflow: 'hidden' }}>
+              <img src="assets/vevoknek.jpg" style={{ height: '100%', width: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }} alt="Property" />
+            </div>
+          )}
+          <div style={{ padding: mob ? '36px 24px 32px' : '100px 72px 80px 80px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <Reveal>
-              <Eyebrow style={{ marginBottom: '20px' }}>Vevőknek</Eyebrow>
-              <h1 style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: 'clamp(44px, 4.8vw, 76px)', color: 'var(--ink)', lineHeight: 1.04, marginBottom: '28px' }}>
+              <Eyebrow style={{ marginBottom: '16px' }}>Vevőknek</Eyebrow>
+              <h1 style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: mob ? 'clamp(36px, 9vw, 54px)' : 'clamp(44px, 4.8vw, 76px)', color: 'var(--ink)', lineHeight: 1.04, marginBottom: mob ? '18px' : '28px' }}>
                 Magyar ingatlan,<br /><em style={{ fontStyle: 'italic' }}>közvetlenül<br />a tulajdonostól</em>
               </h1>
-              <GoldRule style={{ marginBottom: '28px' }} />
-              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '15px', lineHeight: 1.9, color: 'var(--taupe)', maxWidth: '480px', marginBottom: '48px' }}>
+              <GoldRule style={{ marginBottom: mob ? '18px' : '28px' }} />
+              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: mob ? '14px' : '15px', lineHeight: 1.9, color: 'var(--taupe)', maxWidth: mob ? '100%' : '480px', marginBottom: mob ? '28px' : '48px' }}>
                 A FODEL portálon szereplő ingatlanok tulajdonosaival közvetlenül is felvehet kapcsolatot — vagy bízza ránk az egész folyamatot, a megtekintéstől a kulcsátadásig.
               </p>
-              <div style={{ display: 'flex', gap: '16px' }}>
-                <BtnDark onClick={() => navigate('properties')}>Ingatlanok böngészése</BtnDark>
-                <BtnOutline onClick={() => navigate('contact')}>Kapcsolat</BtnOutline>
+              <div style={{ display: 'flex', flexDirection: mob ? 'column' : 'row', gap: mob ? '12px' : '16px' }}>
+                <BtnDark onClick={() => navigate('properties')} style={mob ? { textAlign: 'center' } : {}}>Ingatlanok böngészése</BtnDark>
+                <BtnOutline onClick={() => navigate('contact')} style={mob ? { textAlign: 'center' } : {}}>Kapcsolat</BtnOutline>
               </div>
             </Reveal>
           </div>
-          <div style={{ background: 'var(--linen)', position: 'relative', overflow: 'hidden' }}>
-            <img src="assets/vevoknek.jpg" style={{ height: '100%', width: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }} alt="Property" />
-            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(244,244,242,0.18) 0%, transparent 30%)' }} />
-            <div style={{ position: 'absolute', bottom: '44px', left: '44px', background: 'rgba(23,26,28,0.82)', backdropFilter: 'blur(12px)', padding: '22px 30px' }}>
-              <Eyebrow style={{ marginBottom: '7px' }}>FODEL</Eyebrow>
-              <div style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '17px', color: 'var(--cream)', marginBottom: '4px' }}>Property Direct From The Owner</div>
-              <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '12px', color: 'rgba(244,244,242,0.6)' }}>Est. 2013 — Almere, Netherlands</div>
+          {!mob && (
+            <div style={{ background: 'var(--linen)', position: 'relative', overflow: 'hidden' }}>
+              <img src="assets/vevoknek.jpg" style={{ height: '100%', width: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }} alt="Property" />
+              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(244,244,242,0.18) 0%, transparent 30%)' }} />
+              <div style={{ position: 'absolute', bottom: '44px', left: '44px', background: 'rgba(16,42,67,0.82)', backdropFilter: 'blur(12px)', padding: '22px 30px' }}>
+                <Eyebrow style={{ marginBottom: '7px' }}>FODEL</Eyebrow>
+                <div style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '17px', color: 'var(--cream)', marginBottom: '4px' }}>Property Direct From The Owner</div>
+                <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '12px', color: 'rgba(244,244,242,0.6)' }}>Est. 2013 — Almere, Netherlands</div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* EDITORIAL — ink bg */}
-        <section style={{ background: 'var(--ink)', padding: '128px 80px', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', right: '-60px', top: '50%', transform: 'translateY(-50%)', fontFamily: 'var(--serif)', fontSize: '480px', fontWeight: 300, color: 'rgba(45,74,62,0.06)', lineHeight: 1, userSelect: 'none', pointerEvents: 'none' }}>M</div>
+        <section style={{ background: 'var(--ink)', padding: mob ? '56px 24px' : '128px 80px', position: 'relative', overflow: 'hidden' }}>
+          {!mob && <div style={{ position: 'absolute', right: '-60px', top: '50%', transform: 'translateY(-50%)', fontFamily: 'var(--serif)', fontSize: '480px', fontWeight: 300, color: 'rgba(236,237,239,0.06)', lineHeight: 1, userSelect: 'none', pointerEvents: 'none' }}>M</div>}
           <Reveal>
             <div style={{ maxWidth: '820px', margin: '0 auto', textAlign: 'center' }}>
-              <GoldRule center style={{ marginBottom: '48px' }} />
-              <Eyebrow center style={{ marginBottom: '28px' }}>Miért Magyarország?</Eyebrow>
-              <blockquote style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontWeight: 300, fontSize: 'clamp(22px, 2.4vw, 36px)', lineHeight: 1.55, color: 'var(--cream)', marginBottom: '48px' }}>
+              <GoldRule center style={{ marginBottom: mob ? '28px' : '48px' }} />
+              <Eyebrow center style={{ marginBottom: mob ? '18px' : '28px' }}>Miért Magyarország?</Eyebrow>
+              <blockquote style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontWeight: 300, fontSize: mob ? 'clamp(19px, 5vw, 26px)' : 'clamp(22px, 2.4vw, 36px)', lineHeight: 1.55, color: 'var(--cream)', marginBottom: mob ? '28px' : '48px' }}>
                 „A Hollandiában élők egyre növekvő számban döntenek úgy, hogy zaklatott mindennapjaikat egy tágasabb élettérre cserélik: Magyarországra. Itt ugyanis megtalálják azt az Európát, amelyet saját országukban mára elveszítettek."
               </blockquote>
-              <GoldRule center style={{ marginBottom: '28px' }} />
-              <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '10px', letterSpacing: '0.28em', textTransform: 'uppercase', color: 'rgba(74,122,104,0.9)' }}>FODEL INGATLAN — fodel.nl</div>
+              <GoldRule center style={{ marginBottom: '24px' }} />
+              <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '10px', letterSpacing: '0.28em', textTransform: 'uppercase', color: 'rgba(236,237,239,0.9)' }}>FODEL INGATLAN — fodel.nl</div>
             </div>
           </Reveal>
         </section>
 
-        {/* BUYER PROFILES — 4-column */}
-        <section style={{ padding: '108px 80px', borderBottom: '1px solid var(--border)' }}>
+        {/* BUYER PROFILES */}
+        <section style={{ padding: mob ? '48px 24px' : '108px 80px', borderBottom: '1px solid var(--border)' }}>
           <Reveal>
-            <div style={{ textAlign: 'center', marginBottom: '80px' }}>
-              <Eyebrow center style={{ marginBottom: '14px' }}>Kik vásárolnak Magyarországon?</Eyebrow>
-              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(32px, 3.5vw, 54px)', color: 'var(--ink)' }}>A FODEL vásárlói</h2>
+            <div style={{ textAlign: 'center', marginBottom: mob ? '32px' : '80px' }}>
+              <Eyebrow center style={{ marginBottom: '12px' }}>Kik vásárolnak Magyarországon?</Eyebrow>
+              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: mob ? 'clamp(26px, 7vw, 36px)' : 'clamp(32px, 3.5vw, 54px)', color: 'var(--ink)' }}>A FODEL vásárlói</h2>
             </div>
           </Reveal>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr 1fr' : 'repeat(4, 1fr)' }}>
             {[
               { num: '01', title: 'Kisnyugdíjasok', body: 'Alacsonyabb megélhetési költségeket, adókedvezményt a holland nyugdíjra és elérhető egészségügyi ellátást keresnek Magyarországon.' },
               { num: '02', title: 'Családok', body: 'Teret, természetet és vidéki életet keresnek. Jellemzően farmot, tanyát vagy nyaralót vásárolnak — ahol a gyerekek szabadon nőhetnek fel.' },
@@ -1120,44 +1247,56 @@
               { num: '04', title: 'Életstílus-emigránsok', body: 'A magas holland adók, az elszállt ingatlanárak és a zsúfolt városok elől menekülnek — megtalálva azt az Európát, amelyet otthon elveszítettek.' },
             ].map((b, i) => (
               <Reveal key={b.num} delay={i + 1}>
-                <div style={{ padding: '44px 40px', borderRight: i < 3 ? '1px solid var(--border)' : 'none', borderTop: '2px solid var(--gold)' }}>
-                  <div style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: '48px', color: 'var(--gold)', opacity: 0.45, lineHeight: 1, marginBottom: '24px' }}>{b.num}</div>
-                  <h3 style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '21px', color: 'var(--ink)', marginBottom: '14px' }}>{b.title}</h3>
-                  <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '13.5px', lineHeight: 1.85, color: 'var(--taupe)' }}>{b.body}</p>
+                <div style={{
+                  padding: mob ? '20px 16px' : '44px 40px',
+                  borderRight: mob ? (i % 2 === 0 ? '1px solid var(--border)' : 'none') : (i < 3 ? '1px solid var(--border)' : 'none'),
+                  borderBottom: mob && i < 2 ? '1px solid var(--border)' : 'none',
+                  borderTop: '2px solid var(--gold)',
+                }}>
+                  <div style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: mob ? '36px' : '48px', color: 'var(--gold)', opacity: 0.45, lineHeight: 1, marginBottom: mob ? '12px' : '24px' }}>{b.num}</div>
+                  <h3 style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: mob ? '17px' : '21px', color: 'var(--ink)', marginBottom: '10px' }}>{b.title}</h3>
+                  <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: mob ? '12.5px' : '13.5px', lineHeight: 1.85, color: 'var(--taupe)' }}>{b.body}</p>
                 </div>
               </Reveal>
             ))}
           </div>
         </section>
 
-        {/* PRICE ANCHOR — linen */}
-        <section style={{ background: 'var(--linen)', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', padding: '108px 80px' }}>
+        {/* PRICE ANCHOR */}
+        <section style={{ background: 'var(--linen)', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', padding: mob ? '48px 24px' : '108px 80px' }}>
           <Reveal>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '80px', alignItems: 'start', maxWidth: '1100px', margin: '0 auto' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr auto', gap: mob ? '32px' : '80px', alignItems: 'start', maxWidth: '1100px', margin: '0 auto' }}>
               <div>
                 <Eyebrow style={{ marginBottom: '14px' }}>Az árak</Eyebrow>
-                <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(28px, 3vw, 48px)', color: 'var(--ink)', lineHeight: 1.15, marginBottom: '28px' }}>
-                  „A hollandok gyakran nem hisznek<br />a szemüknek."
+                <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: mob ? 'clamp(24px, 7vw, 36px)' : 'clamp(28px, 3vw, 48px)', color: 'var(--ink)', lineHeight: 1.15, marginBottom: mob ? '18px' : '28px' }}>
+                  „A hollandok gyakran nem hisznek a szemüknek."
                 </h2>
-                <GoldRule style={{ marginBottom: '28px' }} />
-                <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '15px', lineHeight: 1.9, color: 'var(--taupe)', maxWidth: '480px', marginBottom: '12px' }}>
+                <GoldRule style={{ marginBottom: mob ? '18px' : '28px' }} />
+                <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: mob ? '14px' : '15px', lineHeight: 1.9, color: 'var(--taupe)', maxWidth: mob ? '100%' : '480px', marginBottom: '12px' }}>
                   Magyarországon 50 000 €-ért (≈ 16 millió Ft) már szép, tágas családi ház és mellé 3 hektár föld is vásárolható. Vidéken egy közművesített építési telek négyzetméterenkénti ára megegyezik egy holland csésze kávéval.
                 </p>
-                <p style={{ fontFamily: 'var(--sans)', fontStyle: 'italic', fontWeight: 300, fontSize: '14px', lineHeight: 1.9, color: 'var(--taupe)', maxWidth: '480px', marginBottom: '36px' }}>
+                <p style={{ fontFamily: 'var(--sans)', fontStyle: 'italic', fontWeight: 300, fontSize: '14px', lineHeight: 1.9, color: 'var(--taupe)', maxWidth: '480px', marginBottom: mob ? '24px' : '36px' }}>
                   Pedig tény.
                 </p>
                 <TextBtn onClick={() => navigate('properties')}>Böngésszen az ingatlanok között</TextBtn>
               </div>
-              <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: '80px' }}>
+              <div style={{ borderLeft: mob ? 'none' : '1px solid var(--border)', borderTop: mob ? '1px solid var(--border)' : 'none', paddingLeft: mob ? '0' : '80px', paddingTop: mob ? '28px' : '0', display: 'grid', gridTemplateColumns: mob ? 'repeat(3, 1fr)' : '1fr', gap: mob ? '0' : '0' }}>
                 {[
-                  { value: '€ 50 000', label: 'Ház + 3 ha föld',         note: '≈ 16 millió Ft' },
-                  { value: '4%',       label: 'Közvetítői jutalék',       note: 'min. €2 000 + 21% ÁFA' },
-                  { value: '9',        label: 'Ország, ahol hirdetünk',   note: '5 nyelven egyidejűleg' },
+                  { value: '€ 50 000', label: 'Ház + 3 ha föld', note: '≈ 16 millió Ft' },
+                  { value: '4%', label: 'Közvetítői jutalék', note: 'min. €2 000 + 21% ÁFA' },
+                  { value: '9', label: 'Ország, ahol hirdetünk', note: '5 nyelven egyidejűleg' },
                 ].map((s, i) => (
-                  <div key={s.label} style={{ paddingBottom: i < 2 ? '36px' : '0', marginBottom: i < 2 ? '36px' : '0', borderBottom: i < 2 ? '1px solid var(--border)' : 'none' }}>
-                    <div style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: 'clamp(32px, 3vw, 46px)', color: 'var(--ink)', lineHeight: 1, marginBottom: '6px' }}>{s.value}</div>
-                    <div style={{ fontFamily: 'var(--sans)', fontWeight: 400, fontSize: '10px', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'var(--ink)', marginBottom: '3px' }}>{s.label}</div>
-                    <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '11.5px', color: 'var(--taupe)' }}>{s.note}</div>
+                  <div key={s.label} style={{
+                    paddingBottom: mob ? '0' : (i < 2 ? '28px' : '0'),
+                    marginBottom: mob ? '0' : (i < 2 ? '28px' : '0'),
+                    borderBottom: mob ? 'none' : (i < 2 ? '1px solid var(--border)' : 'none'),
+                    borderRight: mob && i < 2 ? '1px solid var(--border)' : 'none',
+                    padding: mob ? '0 16px 0 0' : undefined,
+                    textAlign: mob ? 'center' : 'left',
+                  }}>
+                    <div style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: mob ? 'clamp(24px, 6vw, 36px)' : 'clamp(32px, 3vw, 46px)', color: 'var(--ink)', lineHeight: 1, marginBottom: '6px' }}>{s.value}</div>
+                    <div style={{ fontFamily: 'var(--sans)', fontWeight: 400, fontSize: '9.5px', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink)', marginBottom: '3px' }}>{s.label}</div>
+                    <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '11px', color: 'var(--taupe)' }}>{s.note}</div>
                   </div>
                 ))}
               </div>
@@ -1165,16 +1304,16 @@
           </Reveal>
         </section>
 
-        {/* SERVICES + AGRICULTURAL LAND — two-column */}
-        <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ padding: '88px 72px 88px 80px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        {/* SERVICES + AGRICULTURAL LAND */}
+        <section style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ padding: mob ? '40px 24px' : '88px 72px 88px 80px', display: 'flex', flexDirection: 'column', justifyContent: 'center', borderBottom: mob ? '1px solid var(--border)' : 'none' }}>
             <Reveal>
-              <Eyebrow style={{ marginBottom: '20px' }}>Mit vállalunk Ön helyett</Eyebrow>
-              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(28px, 2.8vw, 42px)', color: 'var(--ink)', lineHeight: 1.2, marginBottom: '28px' }}>
+              <Eyebrow style={{ marginBottom: '16px' }}>Mit vállalunk Ön helyett</Eyebrow>
+              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: mob ? 'clamp(24px, 7vw, 34px)' : 'clamp(28px, 2.8vw, 42px)', color: 'var(--ink)', lineHeight: 1.2, marginBottom: mob ? '18px' : '28px' }}>
                 Teljes körű<br /><em style={{ fontStyle: 'italic' }}>ügyintézés</em>
               </h2>
-              <GoldRule style={{ marginBottom: '28px' }} />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <GoldRule style={{ marginBottom: mob ? '18px' : '28px' }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {[
                   'Kétnyelvű adásvételi szerződés — magyar, német vagy angol nyelven, igény szerint.',
                   'Meghatalmazásos képviselet: nem kell Magyarországra utaznia az aláíráshoz.',
@@ -1182,25 +1321,25 @@
                   'Közüzemi átírás — víz, gáz, villany, minden.',
                   'Keresési megbízás: off-market, még nem hirdetett ingatlanok felkutatása.',
                 ].map((pt, i) => (
-                  <div key={i} style={{ display: 'flex', gap: '18px', alignItems: 'flex-start' }}>
-                    <div style={{ width: '22px', height: '1px', background: 'var(--gold)', marginTop: '11px', flexShrink: 0 }} />
+                  <div key={i} style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
+                    <div style={{ width: '20px', height: '1px', background: 'var(--gold)', marginTop: '11px', flexShrink: 0 }} />
                     <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', lineHeight: 1.8, color: 'var(--taupe)' }}>{pt}</p>
                   </div>
                 ))}
               </div>
             </Reveal>
           </div>
-          <div style={{ background: 'var(--linen)', borderLeft: '1px solid var(--border)', padding: '88px 80px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <div style={{ background: 'var(--linen)', borderLeft: mob ? 'none' : '1px solid var(--border)', padding: mob ? '40px 24px' : '88px 80px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <Reveal>
-              <Eyebrow style={{ marginBottom: '20px' }}>EU-s állampolgároknak</Eyebrow>
-              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(28px, 2.8vw, 42px)', color: 'var(--ink)', lineHeight: 1.2, marginBottom: '28px' }}>
+              <Eyebrow style={{ marginBottom: '16px' }}>EU-s állampolgároknak</Eyebrow>
+              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: mob ? 'clamp(24px, 7vw, 34px)' : 'clamp(28px, 2.8vw, 42px)', color: 'var(--ink)', lineHeight: 1.2, marginBottom: mob ? '18px' : '28px' }}>
                 Akár 300 hektár<br /><em style={{ fontStyle: 'italic' }}>termőföld</em>
               </h2>
-              <GoldRule style={{ marginBottom: '28px' }} />
-              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', lineHeight: 1.9, color: 'var(--taupe)', marginBottom: '20px' }}>
+              <GoldRule style={{ marginBottom: mob ? '18px' : '28px' }} />
+              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', lineHeight: 1.9, color: 'var(--taupe)', marginBottom: '18px' }}>
                 Amennyiben Ön uniós állampolgár és agrárvégzettséggel rendelkezik, jogosult akár 300 hektár magyarországi termőföld megvásárlására.
               </p>
-              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', lineHeight: 1.9, color: 'var(--taupe)', marginBottom: '36px' }}>
+              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', lineHeight: 1.9, color: 'var(--taupe)', marginBottom: mob ? '24px' : '36px' }}>
                 Ennek a folyamatnak a teljes körű lebonyolítását — jogi képviselettől a földhivatali bejegyzésig — a FODEL vállalja Ön helyett.
               </p>
               <TextBtn onClick={() => navigate('contact')}>Érdeklődjön a lehetőségekről</TextBtn>
@@ -1208,24 +1347,24 @@
           </div>
         </section>
 
-        {/* HOW IT WORKS FOR BUYERS — 3-column */}
-        <section style={{ padding: '108px 80px', borderBottom: '1px solid var(--border)' }}>
+        {/* HOW IT WORKS FOR BUYERS */}
+        <section style={{ padding: mob ? '48px 24px' : '108px 80px', borderBottom: '1px solid var(--border)' }}>
           <Reveal>
-            <div style={{ textAlign: 'center', marginBottom: '80px' }}>
-              <Eyebrow center style={{ marginBottom: '14px' }}>Lépésről lépésre</Eyebrow>
-              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(32px, 3.5vw, 52px)', color: 'var(--ink)' }}>Így vásárolhat Magyarországon</h2>
+            <div style={{ textAlign: 'center', marginBottom: mob ? '32px' : '80px' }}>
+              <Eyebrow center style={{ marginBottom: '12px' }}>Lépésről lépésre</Eyebrow>
+              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: mob ? 'clamp(26px, 7vw, 36px)' : 'clamp(32px, 3.5vw, 52px)', color: 'var(--ink)' }}>Így vásárolhat Magyarországon</h2>
             </div>
           </Reveal>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : 'repeat(3, 1fr)' }}>
             {[
               { num: '01', title: 'Válasszon ingatlant', body: 'Böngésszen a portálunkon, vagy adjon keresési megbízást — mi megtaláljuk az Ön igényeire szabott ingatlant, akár a piacon kívülről is.' },
               { num: '02', title: 'Mi elkísérjük', body: 'A megtekintésen FODEL munkatársunk tolmácsként és tanácsadóként is rendelkezésére áll. Ismerjük a helyi piacot és a jogi tudnivalókat egyaránt.' },
               { num: '03', title: 'Kulcsrakész ügyintézés', body: 'Kétnyelvű szerződés, meghatalmazásos képviselet, földhivatal, közüzemi átírás — mindent elvégzünk. Önnek nem kell Magyarországra utaznia az aláíráshoz.' },
             ].map((step, i) => (
               <Reveal key={step.num} delay={i + 1}>
-                <div style={{ padding: '48px 52px', borderRight: i < 2 ? '1px solid var(--border)' : 'none', borderTop: '2px solid var(--gold)' }}>
-                  <div style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: '52px', color: 'var(--gold)', opacity: 0.45, lineHeight: 1, marginBottom: '28px' }}>{step.num}</div>
-                  <h3 style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '23px', color: 'var(--ink)', marginBottom: '16px' }}>{step.title}</h3>
+                <div style={{ padding: mob ? '24px 0' : '48px 52px', borderRight: (!mob && i < 2) ? '1px solid var(--border)' : 'none', borderTop: '2px solid var(--gold)', ...(mob && i < 2 ? { borderBottom: '1px solid var(--border)' } : {}) }}>
+                  <div style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: mob ? '40px' : '52px', color: 'var(--gold)', opacity: 0.45, lineHeight: 1, marginBottom: mob ? '14px' : '28px' }}>{step.num}</div>
+                  <h3 style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: mob ? '19px' : '23px', color: 'var(--ink)', marginBottom: '12px' }}>{step.title}</h3>
                   <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', lineHeight: 1.85, color: 'var(--taupe)' }}>{step.body}</p>
                 </div>
               </Reveal>
@@ -1234,91 +1373,101 @@
         </section>
 
         {/* CTA BAND — ink */}
-        <section style={{ background: 'var(--ink)', padding: '88px 80px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <section style={{ background: 'var(--ink)', padding: mob ? '44px 24px' : '88px 80px', display: 'flex', flexDirection: mob ? 'column' : 'row', justifyContent: 'space-between', alignItems: mob ? 'stretch' : 'center', gap: mob ? '28px' : '0' }}>
           <Reveal>
             <div>
-              <Eyebrow style={{ marginBottom: '14px' }}>Forduljon hozzánk bizalommal!</Eyebrow>
-              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: 'clamp(28px, 3vw, 46px)', color: 'var(--cream)', lineHeight: 1.2, marginBottom: '18px' }}>
+              <Eyebrow style={{ marginBottom: '12px' }}>Forduljon hozzánk bizalommal!</Eyebrow>
+              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: mob ? 'clamp(24px, 7vw, 34px)' : 'clamp(28px, 3vw, 46px)', color: 'var(--cream)', lineHeight: 1.2, marginBottom: '16px' }}>
                 Keressen minket — mi fizetjük<br />a visszahívást
               </h2>
-              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', color: 'rgba(244,244,242,0.55)', lineHeight: 1.85, maxWidth: '540px' }}>
+              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', color: 'rgba(244,244,242,0.55)', lineHeight: 1.85, maxWidth: mob ? '100%' : '540px' }}>
                 Munkanapokon 08:00–18:00 között elérhet minket telefonon, e-mailben, vagy kérjen ingyenes visszahívást a Kapcsolat oldalunkon. A hívást mi fizetjük — Önnek semmibe nem kerül.
               </p>
             </div>
           </Reveal>
           <Reveal delay={2}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flexShrink: 0, alignItems: 'stretch' }}>
-              <BtnOutline light onClick={() => navigate('contact')}>Ingyenes visszahívás</BtnOutline>
-              <BtnOutline light onClick={() => navigate('properties')}>Ingatlanok böngészése</BtnOutline>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flexShrink: 0, alignItems: 'stretch' }}>
+              <BtnOutline light onClick={() => navigate('contact')} style={mob ? { textAlign: 'center' } : {}}>Ingyenes visszahívás</BtnOutline>
+              <BtnOutline light onClick={() => navigate('properties')} style={mob ? { textAlign: 'center' } : {}}>Ingatlanok böngészése</BtnOutline>
             </div>
           </Reveal>
         </section>
 
       </main>
-    );
+      );
+    };
 
     /* ═══════════════════════════════════════════════════════════
        PAGE: RÓLUNK (About)
     ═══════════════════════════════════════════════════════════ */
 
-    const AboutPage = ({ navigate }) => (
-      <main data-screen-label="About" style={{ paddingTop: '80px' }}>
+    const AboutPage = ({ navigate }) => {
+      const mob = useIsMobile();
+      return (
+      <main data-screen-label="About" style={{ paddingTop: mob ? '57px' : '80px' }}>
 
         {/* HERO — split */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', minHeight: '80vh' }}>
-          <div style={{ padding: '100px 72px 80px 80px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', minHeight: mob ? 'auto' : '80vh' }}>
+          {mob && (
+            <div style={{ height: '52vw', minHeight: '200px', position: 'relative', overflow: 'hidden' }}>
+              <Placeholder type="interior" style={{ height: '100%', position: 'absolute', inset: 0 }} />
+            </div>
+          )}
+          <div style={{ padding: mob ? '36px 24px 32px' : '100px 72px 80px 80px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <Reveal>
-              <Eyebrow style={{ marginBottom: '20px' }}>Rólunk</Eyebrow>
-              <h1 style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: 'clamp(44px, 4.8vw, 76px)', color: 'var(--ink)', lineHeight: 1.04, marginBottom: '28px' }}>
+              <Eyebrow style={{ marginBottom: '16px' }}>Rólunk</Eyebrow>
+              <h1 style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: mob ? 'clamp(36px, 9vw, 54px)' : 'clamp(44px, 4.8vw, 76px)', color: 'var(--ink)', lineHeight: 1.04, marginBottom: mob ? '18px' : '28px' }}>
                 Egy híd két<br /><em style={{ fontStyle: 'italic' }}>világ között</em>
               </h1>
-              <GoldRule style={{ marginBottom: '28px' }} />
-              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '15px', lineHeight: 1.9, color: 'var(--taupe)', maxWidth: '480px', marginBottom: '48px' }}>
+              <GoldRule style={{ marginBottom: mob ? '18px' : '28px' }} />
+              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: mob ? '14px' : '15px', lineHeight: 1.9, color: 'var(--taupe)', maxWidth: mob ? '100%' : '480px', marginBottom: mob ? '28px' : '48px' }}>
                 2013 óta segítjük a magyar ingatlan-eladókat abban, hogy megtalálják a megfelelő külföldi vevőt — diszkréten, hatékonyan, kizárólagossági szerződés nélkül.
               </p>
               <TextBtn onClick={() => navigate('contact')}>Vegye fel velünk a kapcsolatot</TextBtn>
             </Reveal>
           </div>
-          <div style={{ background: 'var(--linen)', position: 'relative', overflow: 'hidden' }}>
-            <Placeholder type="interior" style={{ height: '100%', position: 'absolute', inset: 0 }} />
-            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(244,244,242,0.18) 0%, transparent 30%)' }} />
-          </div>
+          {!mob && (
+            <div style={{ background: 'var(--linen)', position: 'relative', overflow: 'hidden' }}>
+              <Placeholder type="interior" style={{ height: '100%', position: 'absolute', inset: 0 }} />
+              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(244,244,242,0.18) 0%, transparent 30%)' }} />
+            </div>
+          )}
         </div>
 
         {/* EDITORIAL ORIGIN — ink bg */}
-        <section style={{ background: 'var(--ink)', padding: '128px 80px', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', right: '-60px', top: '50%', transform: 'translateY(-50%)', fontFamily: 'var(--serif)', fontSize: '480px', fontWeight: 300, color: 'rgba(45,74,62,0.06)', lineHeight: 1, userSelect: 'none', pointerEvents: 'none' }}>F</div>
+        <section style={{ background: 'var(--ink)', padding: mob ? '56px 24px' : '128px 80px', position: 'relative', overflow: 'hidden' }}>
+          {!mob && <div style={{ position: 'absolute', right: '-60px', top: '50%', transform: 'translateY(-50%)', fontFamily: 'var(--serif)', fontSize: '480px', fontWeight: 300, color: 'rgba(236,237,239,0.06)', lineHeight: 1, userSelect: 'none', pointerEvents: 'none' }}>F</div>}
           <Reveal>
             <div style={{ maxWidth: '820px', margin: '0 auto', textAlign: 'center' }}>
-              <GoldRule center style={{ marginBottom: '48px' }} />
-              <Eyebrow center style={{ marginBottom: '28px' }}>A kezdetek — Almere-Buiten, 2013</Eyebrow>
-              <blockquote style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontWeight: 300, fontSize: 'clamp(22px, 2.4vw, 36px)', lineHeight: 1.55, color: 'var(--cream)', marginBottom: '48px' }}>
+              <GoldRule center style={{ marginBottom: mob ? '28px' : '48px' }} />
+              <Eyebrow center style={{ marginBottom: mob ? '18px' : '28px' }}>A kezdetek — Almere-Buiten, 2013</Eyebrow>
+              <blockquote style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontWeight: 300, fontSize: mob ? 'clamp(19px, 5vw, 26px)' : 'clamp(22px, 2.4vw, 36px)', lineHeight: 1.55, color: 'var(--cream)', marginBottom: mob ? '28px' : '48px' }}>
                 „Almere-Buitenben élve láttuk, hogy a hollandok mennyire vágynak autentikus európai életmódra — míg Magyarországon a legjobb ingatlanok ismeretlenül várnak gazdára."
               </blockquote>
-              <GoldRule center style={{ marginBottom: '28px' }} />
-              <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '10px', letterSpacing: '0.28em', textTransform: 'uppercase', color: 'rgba(74,122,104,0.9)' }}>FODEL INGATLAN — fodel.nl</div>
+              <GoldRule center style={{ marginBottom: '24px' }} />
+              <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '10px', letterSpacing: '0.28em', textTransform: 'uppercase', color: 'rgba(236,237,239,0.9)' }}>FODEL INGATLAN — fodel.nl</div>
             </div>
           </Reveal>
         </section>
 
-        {/* VALUES — 3-column */}
-        <section style={{ padding: '108px 80px', borderBottom: '1px solid var(--border)' }}>
+        {/* VALUES */}
+        <section style={{ padding: mob ? '48px 24px' : '108px 80px', borderBottom: '1px solid var(--border)' }}>
           <Reveal>
-            <div style={{ textAlign: 'center', marginBottom: '80px' }}>
-              <Eyebrow center style={{ marginBottom: '14px' }}>Értékeink</Eyebrow>
-              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(32px, 3.5vw, 54px)', color: 'var(--ink)' }}>Amire minden munkánkban támaszkodunk</h2>
+            <div style={{ textAlign: 'center', marginBottom: mob ? '32px' : '80px' }}>
+              <Eyebrow center style={{ marginBottom: '12px' }}>Értékeink</Eyebrow>
+              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: mob ? 'clamp(24px, 7vw, 34px)' : 'clamp(32px, 3.5vw, 54px)', color: 'var(--ink)' }}>Amire minden munkánkban támaszkodunk</h2>
             </div>
           </Reveal>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : 'repeat(3, 1fr)' }}>
             {[
               { num: '01', title: 'Diszkréció', body: 'Az eladók és vevők adatait a legnagyobb diszkrécióval kezeljük. Az ingatlan és a tulajdonos személyes adatai nem kerülnek illetéktelen kezekbe — ez alapelvünk.' },
               { num: '02', title: 'Átláthatóság', body: 'Nincsenek rejtett díjak, nincsenek meglepetések. A jutalék mértéke előre rögzített; a folyamat minden lépésénél tájékoztatjuk ügyfeleinket.' },
               { num: '03', title: 'Tapasztalat', body: '2013 óta több száz tranzakciót bonyolítottunk le sikeresen. Ismerjük mindkét piac jogi hátterét, szokásait és a külföldi vevők elvárásait.' },
             ].map((v, i) => (
               <Reveal key={v.num} delay={i + 1}>
-                <div style={{ padding: '48px 52px', borderRight: i < 2 ? '1px solid var(--border)' : 'none', borderTop: '2px solid var(--gold)' }}>
-                  <div style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: '52px', color: 'var(--gold)', opacity: 0.45, lineHeight: 1, marginBottom: '28px' }}>{v.num}</div>
-                  <h3 style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '23px', color: 'var(--ink)', marginBottom: '16px' }}>{v.title}</h3>
+                <div style={{ padding: mob ? '24px 0' : '48px 52px', borderRight: (!mob && i < 2) ? '1px solid var(--border)' : 'none', borderTop: '2px solid var(--gold)', ...(mob && i < 2 ? { borderBottom: '1px solid var(--border)' } : {}) }}>
+                  <div style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: mob ? '40px' : '52px', color: 'var(--gold)', opacity: 0.45, lineHeight: 1, marginBottom: mob ? '14px' : '28px' }}>{v.num}</div>
+                  <h3 style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: mob ? '19px' : '23px', color: 'var(--ink)', marginBottom: '12px' }}>{v.title}</h3>
                   <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', lineHeight: 1.85, color: 'var(--taupe)' }}>{v.body}</p>
                 </div>
               </Reveal>
@@ -1327,8 +1476,8 @@
         </section>
 
         {/* STATS */}
-        <section style={{ background: 'var(--linen)', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', padding: '64px 80px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)' }}>
+        <section style={{ background: 'var(--linen)', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', padding: mob ? '36px 24px' : '64px 80px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: mob ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)' }}>
             {[
               { value: '2013', label: 'Alapítva' },
               { value: '9',    label: 'Ország' },
@@ -1336,50 +1485,54 @@
               { value: '13+',  label: 'Év tapasztalat' },
             ].map((s, i) => (
               <Reveal key={s.label} delay={i + 1}>
-                <div style={{ textAlign: 'center', padding: '24px', borderRight: i < 3 ? '1px solid var(--border)' : 'none' }}>
-                  <div style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: 'clamp(44px, 4.5vw, 68px)', color: 'var(--ink)', lineHeight: 1, marginBottom: '10px' }}>{s.value}</div>
-                  <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '10px', letterSpacing: '0.28em', textTransform: 'uppercase', color: 'var(--taupe)' }}>{s.label}</div>
+                <div style={{
+                  textAlign: 'center', padding: mob ? '20px 12px' : '24px',
+                  borderRight: mob ? (i % 2 === 0 ? '1px solid var(--border)' : 'none') : (i < 3 ? '1px solid var(--border)' : 'none'),
+                  borderBottom: mob && i < 2 ? '1px solid var(--border)' : 'none',
+                }}>
+                  <div style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: mob ? 'clamp(36px, 9vw, 52px)' : 'clamp(44px, 4.5vw, 68px)', color: 'var(--ink)', lineHeight: 1, marginBottom: '8px' }}>{s.value}</div>
+                  <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '10px', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'var(--taupe)' }}>{s.label}</div>
                 </div>
               </Reveal>
             ))}
           </div>
         </section>
 
-        {/* STORY / APPROACH — two-column */}
-        <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ padding: '88px 72px 88px 80px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        {/* STORY / APPROACH */}
+        <section style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ padding: mob ? '40px 24px' : '88px 72px 88px 80px', display: 'flex', flexDirection: 'column', justifyContent: 'center', borderBottom: mob ? '1px solid var(--border)' : 'none' }}>
             <Reveal>
-              <Eyebrow style={{ marginBottom: '20px' }}>A mi megközelítésünk</Eyebrow>
-              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(28px, 2.8vw, 42px)', color: 'var(--ink)', lineHeight: 1.2, marginBottom: '28px' }}>
+              <Eyebrow style={{ marginBottom: '16px' }}>A mi megközelítésünk</Eyebrow>
+              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: mob ? 'clamp(24px, 7vw, 34px)' : 'clamp(28px, 2.8vw, 42px)', color: 'var(--ink)', lineHeight: 1.2, marginBottom: mob ? '18px' : '28px' }}>
                 Nem vagyunk nagy iroda.<br /><em style={{ fontStyle: 'italic' }}>Ez az előnyünk.</em>
               </h2>
-              <GoldRule style={{ marginBottom: '28px' }} />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <GoldRule style={{ marginBottom: mob ? '18px' : '28px' }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {[
                   'Minden ügyféllel személyesen foglalkozunk — nincs call center, nincs anonim ügyintézés.',
                   'Mindkét kultúrát belülről ismerjük: holland és magyar szemmel egyaránt értékeljük az ingatlanokat.',
                   'Az ingatlan és a vevő összeillesztése a mi felelősségünk — nem a szerencsén múlik.',
                   'Kizárólagossági szerződés nélkül dolgozunk, mert bízunk abban, hogy eredménnyel bizonyítunk.',
                 ].map((pt, i) => (
-                  <div key={i} style={{ display: 'flex', gap: '18px', alignItems: 'flex-start' }}>
-                    <div style={{ width: '22px', height: '1px', background: 'var(--gold)', marginTop: '11px', flexShrink: 0 }} />
+                  <div key={i} style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
+                    <div style={{ width: '20px', height: '1px', background: 'var(--gold)', marginTop: '11px', flexShrink: 0 }} />
                     <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', lineHeight: 1.8, color: 'var(--taupe)' }}>{pt}</p>
                   </div>
                 ))}
               </div>
             </Reveal>
           </div>
-          <div style={{ background: 'var(--linen)', borderLeft: '1px solid var(--border)', padding: '88px 80px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <div style={{ background: 'var(--linen)', borderLeft: mob ? 'none' : '1px solid var(--border)', padding: mob ? '40px 24px' : '88px 80px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <Reveal>
-              <Eyebrow style={{ marginBottom: '20px' }}>Almere-Buiten, Flevoland</Eyebrow>
-              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(28px, 2.8vw, 42px)', color: 'var(--ink)', lineHeight: 1.2, marginBottom: '28px' }}>
+              <Eyebrow style={{ marginBottom: '16px' }}>Almere-Buiten, Flevoland</Eyebrow>
+              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: mob ? 'clamp(24px, 7vw, 34px)' : 'clamp(28px, 2.8vw, 42px)', color: 'var(--ink)', lineHeight: 1.2, marginBottom: mob ? '18px' : '28px' }}>
                 A híd, amelyet<br /><em style={{ fontStyle: 'italic' }}>megépítettünk</em>
               </h2>
-              <GoldRule style={{ marginBottom: '28px' }} />
-              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', lineHeight: 1.9, color: 'var(--taupe)', marginBottom: '20px' }}>
+              <GoldRule style={{ marginBottom: mob ? '18px' : '28px' }} />
+              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', lineHeight: 1.9, color: 'var(--taupe)', marginBottom: '18px' }}>
                 A FODEL Hollandiában élő magyarok által alapított ingatlanközvetítő iroda. Almere-Buitenben indultunk el 2013-ban, ahol rájöttünk: rengeteg holland és belga érdeklődő szeretne autentikus magyar ingatlant vásárolni — de nem tudja, hogyan fogjon hozzá.
               </p>
-              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', lineHeight: 1.9, color: 'var(--taupe)', marginBottom: '20px' }}>
+              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', lineHeight: 1.9, color: 'var(--taupe)', marginBottom: '18px' }}>
                 Ma 9 országban hirdetünk, 5 nyelven — és minden tranzakciót elejétől a végéig kísérünk. Kétnyelvű adásvételi szerződéssel, meghatalmazásos képviselettel, földhivatali ügyintézéssel.
               </p>
               <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '13px', lineHeight: 1.75, color: 'var(--taupe)', opacity: 0.7 }}>
@@ -1390,23 +1543,24 @@
         </section>
 
         {/* CTA BAND */}
-        <section style={{ background: 'var(--linen)', borderTop: '1px solid var(--border)', padding: '72px 80px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <section style={{ background: 'var(--linen)', borderTop: '1px solid var(--border)', padding: mob ? '44px 24px' : '72px 80px', display: 'flex', flexDirection: mob ? 'column' : 'row', justifyContent: 'space-between', alignItems: mob ? 'stretch' : 'center', gap: mob ? '24px' : '0' }}>
           <Reveal>
             <div>
-              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(26px, 2.8vw, 42px)', color: 'var(--ink)', marginBottom: '10px' }}>Dolgozzunk együtt!</h2>
+              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: mob ? 'clamp(24px, 7vw, 34px)' : 'clamp(26px, 2.8vw, 42px)', color: 'var(--ink)', marginBottom: '8px' }}>Dolgozzunk együtt!</h2>
               <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', color: 'var(--taupe)' }}>Munkanapokon 08:00–18:00 · A visszahívás ingyenes.</p>
             </div>
           </Reveal>
           <Reveal delay={2}>
-            <div style={{ display: 'flex', gap: '16px', flexShrink: 0 }}>
-              <BtnDark onClick={() => navigate('contact')}>Ingyenes visszahívás</BtnDark>
-              <BtnOutline onClick={() => navigate('sellers')}>Hirdessen nálunk</BtnOutline>
+            <div style={{ display: 'flex', flexDirection: mob ? 'column' : 'row', gap: mob ? '12px' : '16px', flexShrink: 0 }}>
+              <BtnDark onClick={() => navigate('contact')} style={mob ? { textAlign: 'center' } : {}}>Ingyenes visszahívás</BtnDark>
+              <BtnOutline onClick={() => navigate('sellers')} style={mob ? { textAlign: 'center' } : {}}>Hirdessen nálunk</BtnOutline>
             </div>
           </Reveal>
         </section>
 
       </main>
-    );
+      );
+    };
 
     /* ═══════════════════════════════════════════════════════════
        APP — Router + Root render
