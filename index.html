@@ -1066,6 +1066,211 @@
     };
 
     /* ═══════════════════════════════════════════════════════════
+       PAGE: VEVŐKNEK (Buyers)
+    ═══════════════════════════════════════════════════════════ */
+
+    const BuyersPage = ({ navigate }) => (
+      <main data-screen-label="Buyers" style={{ paddingTop: '80px' }}>
+
+        {/* HERO — split */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', minHeight: '80vh' }}>
+          <div style={{ padding: '100px 72px 80px 80px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <Reveal>
+              <Eyebrow style={{ marginBottom: '20px' }}>Vevőknek</Eyebrow>
+              <h1 style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: 'clamp(44px, 4.8vw, 76px)', color: 'var(--ink)', lineHeight: 1.04, marginBottom: '28px' }}>
+                Magyar ingatlan,<br /><em style={{ fontStyle: 'italic' }}>közvetlenül<br />a tulajdonostól</em>
+              </h1>
+              <GoldRule style={{ marginBottom: '28px' }} />
+              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '15px', lineHeight: 1.9, color: 'var(--taupe)', maxWidth: '480px', marginBottom: '48px' }}>
+                A FODEL portálon szereplő ingatlanok tulajdonosaival közvetlenül is felvehet kapcsolatot — vagy bízza ránk az egész folyamatot, a megtekintéstől a kulcsátadásig.
+              </p>
+              <div style={{ display: 'flex', gap: '16px' }}>
+                <BtnDark onClick={() => navigate('properties')}>Ingatlanok böngészése</BtnDark>
+                <BtnOutline onClick={() => navigate('contact')}>Kapcsolat</BtnOutline>
+              </div>
+            </Reveal>
+          </div>
+          <div style={{ background: 'var(--linen)', position: 'relative', overflow: 'hidden' }}>
+            <Placeholder type="landscape" style={{ height: '100%', position: 'absolute', inset: 0 }} />
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(253,250,245,0.18) 0%, transparent 30%)' }} />
+            <div style={{ position: 'absolute', bottom: '44px', left: '44px', background: 'rgba(26,22,16,0.78)', backdropFilter: 'blur(12px)', padding: '22px 30px' }}>
+              <Eyebrow style={{ marginBottom: '7px' }}>FODEL</Eyebrow>
+              <div style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '17px', color: 'var(--cream)', marginBottom: '4px' }}>Property Direct From The Owner</div>
+              <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '12px', color: 'rgba(253,250,245,0.6)' }}>Est. 2013 — Almere, Netherlands</div>
+            </div>
+          </div>
+        </div>
+
+        {/* EDITORIAL — ink bg */}
+        <section style={{ background: 'var(--ink)', padding: '128px 80px', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', right: '-60px', top: '50%', transform: 'translateY(-50%)', fontFamily: 'var(--serif)', fontSize: '480px', fontWeight: 300, color: 'rgba(201,168,76,0.04)', lineHeight: 1, userSelect: 'none', pointerEvents: 'none' }}>M</div>
+          <Reveal>
+            <div style={{ maxWidth: '820px', margin: '0 auto', textAlign: 'center' }}>
+              <GoldRule center style={{ marginBottom: '48px' }} />
+              <Eyebrow center style={{ marginBottom: '28px' }}>Miért Magyarország?</Eyebrow>
+              <blockquote style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontWeight: 300, fontSize: 'clamp(22px, 2.4vw, 36px)', lineHeight: 1.55, color: 'var(--cream)', marginBottom: '48px' }}>
+                „A Hollandiában élők egyre növekvő számban döntenek úgy, hogy zaklatott mindennapjaikat egy tágasabb élettérre cserélik: Magyarországra. Itt ugyanis megtalálják azt az Európát, amelyet saját országukban mára elveszítettek."
+              </blockquote>
+              <GoldRule center style={{ marginBottom: '28px' }} />
+              <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '10px', letterSpacing: '0.28em', textTransform: 'uppercase', color: 'rgba(201,168,76,0.75)' }}>FODEL INGATLAN — fodel.nl</div>
+            </div>
+          </Reveal>
+        </section>
+
+        {/* BUYER PROFILES — 4-column */}
+        <section style={{ padding: '108px 80px', borderBottom: '1px solid var(--border)' }}>
+          <Reveal>
+            <div style={{ textAlign: 'center', marginBottom: '80px' }}>
+              <Eyebrow center style={{ marginBottom: '14px' }}>Kik vásárolnak Magyarországon?</Eyebrow>
+              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(32px, 3.5vw, 54px)', color: 'var(--ink)' }}>A FODEL vásárlói</h2>
+            </div>
+          </Reveal>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)' }}>
+            {[
+              { num: '01', title: 'Kisnyugdíjasok', body: 'Alacsonyabb megélhetési költségeket, adókedvezményt a holland nyugdíjra és elérhető egészségügyi ellátást keresnek Magyarországon.' },
+              { num: '02', title: 'Családok', body: 'Teret, természetet és vidéki életet keresnek. Jellemzően farmot, tanyát vagy nyaralót vásárolnak — ahol a gyerekek szabadon nőhetnek fel.' },
+              { num: '03', title: 'Befektetők', body: 'Kereskedelmi ingatlanokat, szőlőbirtokokat és mezőgazdasági területeket keresnek. EU-s állampolgárként akár 300 hektár termőföldet vásárolhatnak.' },
+              { num: '04', title: 'Életstílus-emigránsok', body: 'A magas holland adók, az elszállt ingatlanárak és a zsúfolt városok elől menekülnek — megtalálva azt az Európát, amelyet otthon elveszítettek.' },
+            ].map((b, i) => (
+              <Reveal key={b.num} delay={i + 1}>
+                <div style={{ padding: '44px 40px', borderRight: i < 3 ? '1px solid var(--border)' : 'none', borderTop: '2px solid var(--gold)' }}>
+                  <div style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: '48px', color: 'var(--gold)', opacity: 0.45, lineHeight: 1, marginBottom: '24px' }}>{b.num}</div>
+                  <h3 style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '21px', color: 'var(--ink)', marginBottom: '14px' }}>{b.title}</h3>
+                  <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '13.5px', lineHeight: 1.85, color: 'var(--taupe)' }}>{b.body}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </section>
+
+        {/* PRICE ANCHOR — linen */}
+        <section style={{ background: 'var(--linen)', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', padding: '108px 80px' }}>
+          <Reveal>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '80px', alignItems: 'start', maxWidth: '1100px', margin: '0 auto' }}>
+              <div>
+                <Eyebrow style={{ marginBottom: '14px' }}>Az árak</Eyebrow>
+                <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(28px, 3vw, 48px)', color: 'var(--ink)', lineHeight: 1.15, marginBottom: '28px' }}>
+                  „A hollandok gyakran nem hisznek<br />a szemüknek."
+                </h2>
+                <GoldRule style={{ marginBottom: '28px' }} />
+                <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '15px', lineHeight: 1.9, color: 'var(--taupe)', maxWidth: '480px', marginBottom: '12px' }}>
+                  Magyarországon 50 000 €-ért (≈ 16 millió Ft) már szép, tágas családi ház és mellé 3 hektár föld is vásárolható. Vidéken egy közművesített építési telek négyzetméterenkénti ára megegyezik egy holland csésze kávéval.
+                </p>
+                <p style={{ fontFamily: 'var(--sans)', fontStyle: 'italic', fontWeight: 300, fontSize: '14px', lineHeight: 1.9, color: 'var(--taupe)', maxWidth: '480px', marginBottom: '36px' }}>
+                  Pedig tény.
+                </p>
+                <TextBtn onClick={() => navigate('properties')}>Böngésszen az ingatlanok között</TextBtn>
+              </div>
+              <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: '80px' }}>
+                {[
+                  { value: '€ 50 000', label: 'Ház + 3 ha föld',         note: '≈ 16 millió Ft' },
+                  { value: '4%',       label: 'Közvetítői jutalék',       note: 'min. €2 000 + 21% ÁFA' },
+                  { value: '9',        label: 'Ország, ahol hirdetünk',   note: '5 nyelven egyidejűleg' },
+                ].map((s, i) => (
+                  <div key={s.label} style={{ paddingBottom: i < 2 ? '36px' : '0', marginBottom: i < 2 ? '36px' : '0', borderBottom: i < 2 ? '1px solid var(--border)' : 'none' }}>
+                    <div style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: 'clamp(32px, 3vw, 46px)', color: 'var(--ink)', lineHeight: 1, marginBottom: '6px' }}>{s.value}</div>
+                    <div style={{ fontFamily: 'var(--sans)', fontWeight: 400, fontSize: '10px', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'var(--ink)', marginBottom: '3px' }}>{s.label}</div>
+                    <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '11.5px', color: 'var(--taupe)' }}>{s.note}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Reveal>
+        </section>
+
+        {/* SERVICES + AGRICULTURAL LAND — two-column */}
+        <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ padding: '88px 72px 88px 80px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <Reveal>
+              <Eyebrow style={{ marginBottom: '20px' }}>Mit vállalunk Ön helyett</Eyebrow>
+              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(28px, 2.8vw, 42px)', color: 'var(--ink)', lineHeight: 1.2, marginBottom: '28px' }}>
+                Teljes körű<br /><em style={{ fontStyle: 'italic' }}>ügyintézés</em>
+              </h2>
+              <GoldRule style={{ marginBottom: '28px' }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {[
+                  'Kétnyelvű adásvételi szerződés — magyar, német vagy angol nyelven, igény szerint.',
+                  'Meghatalmazásos képviselet: nem kell Magyarországra utaznia az aláíráshoz.',
+                  'Teljes körű földhivatali ügyintézés és tulajdonjog-bejegyzés.',
+                  'Közüzemi átírás — víz, gáz, villany, minden.',
+                  'Keresési megbízás: off-market, még nem hirdetett ingatlanok felkutatása.',
+                ].map((pt, i) => (
+                  <div key={i} style={{ display: 'flex', gap: '18px', alignItems: 'flex-start' }}>
+                    <div style={{ width: '22px', height: '1px', background: 'var(--gold)', marginTop: '11px', flexShrink: 0 }} />
+                    <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', lineHeight: 1.8, color: 'var(--taupe)' }}>{pt}</p>
+                  </div>
+                ))}
+              </div>
+            </Reveal>
+          </div>
+          <div style={{ background: 'var(--linen)', borderLeft: '1px solid var(--border)', padding: '88px 80px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <Reveal>
+              <Eyebrow style={{ marginBottom: '20px' }}>EU-s állampolgároknak</Eyebrow>
+              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(28px, 2.8vw, 42px)', color: 'var(--ink)', lineHeight: 1.2, marginBottom: '28px' }}>
+                Akár 300 hektár<br /><em style={{ fontStyle: 'italic' }}>termőföld</em>
+              </h2>
+              <GoldRule style={{ marginBottom: '28px' }} />
+              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', lineHeight: 1.9, color: 'var(--taupe)', marginBottom: '20px' }}>
+                Amennyiben Ön uniós állampolgár és agrárvégzettséggel rendelkezik, jogosult akár 300 hektár magyarországi termőföld megvásárlására.
+              </p>
+              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', lineHeight: 1.9, color: 'var(--taupe)', marginBottom: '36px' }}>
+                Ennek a folyamatnak a teljes körű lebonyolítását — jogi képviselettől a földhivatali bejegyzésig — a FODEL vállalja Ön helyett.
+              </p>
+              <TextBtn onClick={() => navigate('contact')}>Érdeklődjön a lehetőségekről</TextBtn>
+            </Reveal>
+          </div>
+        </section>
+
+        {/* HOW IT WORKS FOR BUYERS — 3-column */}
+        <section style={{ padding: '108px 80px', borderBottom: '1px solid var(--border)' }}>
+          <Reveal>
+            <div style={{ textAlign: 'center', marginBottom: '80px' }}>
+              <Eyebrow center style={{ marginBottom: '14px' }}>Lépésről lépésre</Eyebrow>
+              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(32px, 3.5vw, 52px)', color: 'var(--ink)' }}>Így vásárolhat Magyarországon</h2>
+            </div>
+          </Reveal>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)' }}>
+            {[
+              { num: '01', title: 'Válasszon ingatlant', body: 'Böngésszen a portálunkon, vagy adjon keresési megbízást — mi megtaláljuk az Ön igényeire szabott ingatlant, akár a piacon kívülről is.' },
+              { num: '02', title: 'Mi elkísérjük', body: 'A megtekintésen FODEL munkatársunk tolmácsként és tanácsadóként is rendelkezésére áll. Ismerjük a helyi piacot és a jogi tudnivalókat egyaránt.' },
+              { num: '03', title: 'Kulcsrakész ügyintézés', body: 'Kétnyelvű szerződés, meghatalmazásos képviselet, földhivatal, közüzemi átírás — mindent elvégzünk. Önnek nem kell Magyarországra utaznia az aláíráshoz.' },
+            ].map((step, i) => (
+              <Reveal key={step.num} delay={i + 1}>
+                <div style={{ padding: '48px 52px', borderRight: i < 2 ? '1px solid var(--border)' : 'none', borderTop: '2px solid var(--gold)' }}>
+                  <div style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: '52px', color: 'var(--gold)', opacity: 0.45, lineHeight: 1, marginBottom: '28px' }}>{step.num}</div>
+                  <h3 style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '23px', color: 'var(--ink)', marginBottom: '16px' }}>{step.title}</h3>
+                  <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', lineHeight: 1.85, color: 'var(--taupe)' }}>{step.body}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </section>
+
+        {/* CTA BAND — ink */}
+        <section style={{ background: 'var(--ink)', padding: '88px 80px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Reveal>
+            <div>
+              <Eyebrow style={{ marginBottom: '14px' }}>Forduljon hozzánk bizalommal!</Eyebrow>
+              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 300, fontSize: 'clamp(28px, 3vw, 46px)', color: 'var(--cream)', lineHeight: 1.2, marginBottom: '18px' }}>
+                Keressen minket — mi fizetjük<br />a visszahívást
+              </h2>
+              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', color: 'rgba(253,250,245,0.55)', lineHeight: 1.85, maxWidth: '540px' }}>
+                Munkanapokon 08:00–18:00 között elérhet minket telefonon, e-mailben, vagy kérjen ingyenes visszahívást a Kapcsolat oldalunkon. A hívást mi fizetjük — Önnek semmibe nem kerül.
+              </p>
+            </div>
+          </Reveal>
+          <Reveal delay={2}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flexShrink: 0, alignItems: 'stretch' }}>
+              <BtnOutline light onClick={() => navigate('contact')}>Ingyenes visszahívás</BtnOutline>
+              <BtnOutline light onClick={() => navigate('properties')}>Ingatlanok böngészése</BtnOutline>
+            </div>
+          </Reveal>
+        </section>
+
+      </main>
+    );
+
+    /* ═══════════════════════════════════════════════════════════
        PAGE: RÓLUNK (About)
     ═══════════════════════════════════════════════════════════ */
 
@@ -1237,8 +1442,8 @@
           case 'home':       return <HomePage {...pageProps} />;
           case 'properties': return <PropertiesPage {...pageProps} />;
           case 'detail':     return <PropertyDetailPage {...pageProps} />;
-          case 'sellers':
-          case 'buyers':     return <SellersPage {...pageProps} />;
+          case 'sellers':    return <SellersPage {...pageProps} />;
+          case 'buyers':     return <BuyersPage {...pageProps} />;
           case 'about':      return <AboutPage {...pageProps} />;
           case 'contact':    return <ContactPage {...pageProps} />;
           default:           return <HomePage {...pageProps} />;
