@@ -174,6 +174,87 @@
         min-height: clamp(420px, 70vw, 620px);
       }
     }
+
+    /* Property detail hero */
+    .property-detail-hero {
+      position: relative;
+      overflow: hidden;
+      background: #dfe4e7;
+    }
+    .property-detail-hero-media {
+      position: absolute;
+      inset: 0;
+    }
+    .property-detail-hero-media img,
+    .property-detail-hero-media svg {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .property-detail-hero-overlay {
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(180deg, rgba(7, 21, 34, 0.14) 0%, rgba(7, 21, 34, 0.02) 34%, rgba(7, 21, 34, 0.58) 100%);
+      pointer-events: none;
+    }
+    .property-detail-gallery-controls {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      height: 58px;
+      padding: 0 10px;
+      background: rgba(244, 244, 242, 0.12);
+      border: 1px solid rgba(244, 244, 242, 0.24);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+    .property-detail-gallery-count {
+      min-width: 64px;
+      text-align: center;
+      color: rgba(244,244,242,0.9);
+      font-family: var(--sans);
+      font-size: 10px;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .property-detail-nav {
+      appearance: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 42px;
+      height: 42px;
+      background: transparent;
+      color: var(--cream);
+      border: 1px solid transparent;
+      transition: background 0.35s ease, border-color 0.35s ease, transform 0.35s ease;
+    }
+    .property-detail-nav:hover {
+      background: rgba(244, 244, 242, 0.2);
+      border-color: rgba(244, 244, 242, 0.42);
+      transform: translateY(-2px);
+    }
+    .property-detail-nav-arrow {
+      flex-shrink: 0;
+      width: 22px;
+      height: 22px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      line-height: 1;
+    }
+    @media (max-width: 768px) {
+      .property-detail-gallery-controls { height: 54px; }
+      .property-detail-nav {
+        width: 38px;
+        height: 38px;
+        padding: 0;
+      }
+    }
   </style>
 </head>
 <body>
@@ -198,6 +279,13 @@
         beds: 4, baths: 2, area_m2: 210, land_m2: 2400,
         imgType: 'landscape',
         imgSrc: 'assets/hero.png',
+        detailImgSrc: 'assets/propertypage.png',
+        detailGallery: [
+          { src: 'assets/propertypage.png', alt: 'Balatoni Panorámaház külső nézet', label: 'Külső nézet' },
+          { type: 'interior', label: 'Nappali látvány' },
+          { type: 'vineyard', label: 'Szőlőkert látvány' },
+          { type: 'waterfront', label: 'Panoráma terasz' },
+        ],
         featured: true,
         tag: 'Kiemelt',
         desc: 'Lélegzetelállító panorámával rendelkező, teljesen felújított villa a Balaton-felvidéken, magánszőlőskerttel és működő borospincével. Az ingatlan 2022-ben teljes körű felújításon esett át, megtartva eredeti karakterét.',
@@ -1348,7 +1436,17 @@
       const fmt  = n => '€\u00A0' + n.toLocaleString('de-DE');
       const fmtL = m => m >= 10000 ? (m/10000).toFixed(2).replace('.', ',') + ' ha' : m.toLocaleString('de-DE') + ' m²';
       const mob = useIsMobile();
+      const gallery = prop.detailGallery && prop.detailGallery.length
+        ? prop.detailGallery
+        : [{ src: prop.detailImgSrc || prop.imgSrc, alt: prop.title, type: prop.imgType, label: 'Fő nézet' }];
+      const [activeImage, setActiveImage] = React.useState(0);
+      React.useEffect(() => { setActiveImage(0); }, [prop.id]);
+      const currentImage = gallery[activeImage] || gallery[0];
+      const showPrevImage = () => setActiveImage(i => (i - 1 + gallery.length) % gallery.length);
+      const showNextImage = () => setActiveImage(i => (i + 1) % gallery.length);
       const similar = PROPERTIES.filter(p => p.id !== prop.id && (p.region === prop.region || p.type === prop.type)).slice(0, 3);
+      const heroHeight = mob ? '58vw' : '74vh';
+      const heroMinHeight = mob ? '260px' : '560px';
 
       const inputStyle = {
         width: '100%', background: 'rgba(244,244,242,0.06)',
@@ -1369,14 +1467,41 @@
             ))}
           </div>
           {/* Hero image */}
-          <div style={{ height: mob ? '52vw' : '66vh', minHeight: mob ? '200px' : undefined, position: 'relative', overflow: 'hidden' }}>
-            <Placeholder type={prop.imgType} style={{ height: '100%', width: '100%' }} />
-            {prop.tag && (
-              <div style={{ position: 'absolute', top: mob ? '16px' : '36px', left: mob ? '20px' : '80px', background: 'var(--ink)', color: 'var(--cream)', fontFamily: 'var(--sans)', fontSize: '9px', letterSpacing: '0.22em', textTransform: 'uppercase', padding: '6px 14px' }}>{prop.tag}</div>
-            )}
+          <div className="property-detail-hero" style={{ height: heroHeight, minHeight: heroMinHeight }}>
+              <div className="property-detail-hero-media" aria-hidden="true">
+                {currentImage.src ? (
+                  <img src={currentImage.src} alt={currentImage.alt || prop.title} />
+                ) : (
+                  <Placeholder type={currentImage.type || prop.imgType} style={{ height: '100%', width: '100%' }} />
+                )}
+              </div>
+              <div className="property-detail-hero-overlay" />
+              {prop.tag && (
+                <div style={{ position: 'absolute', top: mob ? '16px' : '36px', left: mob ? '20px' : '80px', background: 'rgba(16,42,67,0.82)', color: 'var(--cream)', fontFamily: 'var(--sans)', fontSize: '9px', letterSpacing: '0.22em', textTransform: 'uppercase', padding: '6px 14px', zIndex: 2 }}>{prop.tag}</div>
+              )}
+              <div style={{ position: 'absolute', right: mob ? '16px' : '32px', bottom: mob ? '18px' : '28px', left: mob ? '16px' : '32px', zIndex: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '12px' }}>
+                {!mob && (
+                  <div style={{ color: 'var(--cream)' }}>
+                    <div style={{ fontFamily: 'var(--sans)', fontSize: '9px', letterSpacing: '0.28em', textTransform: 'uppercase', opacity: 0.8, marginBottom: '8px' }}>Ingatlan</div>
+                    <div style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(20px, 2vw, 28px)', lineHeight: 1.05, maxWidth: '420px' }}>{prop.title}</div>
+                  </div>
+                )}
+                <div className="property-detail-gallery-controls" style={{ marginLeft: 'auto' }}>
+                  <button className="property-detail-nav" onClick={showPrevImage} aria-label="Previous image">
+                    <span className="property-detail-nav-arrow" aria-hidden="true">←</span>
+                  </button>
+                  <div className="property-detail-gallery-count">
+                    {String(activeImage + 1).padStart(2, '0')} / {String(gallery.length).padStart(2, '0')}
+                  </div>
+                  <button className="property-detail-nav" onClick={showNextImage} aria-label="Next image">
+                    <span className="property-detail-nav-arrow" aria-hidden="true">→</span>
+                  </button>
+                </div>
+              </div>
           </div>
           {/* Content grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 420px', gap: mob ? '0' : '88px', padding: mob ? '32px 24px 0' : '88px 80px', alignItems: 'start' }}>
+          <div style={{ position: 'relative', zIndex: 2, background: 'linear-gradient(180deg, rgba(244,244,242,0.98) 0%, rgba(244,244,242,1) 108px)', boxShadow: '0 -24px 48px rgba(16,42,67,0.1)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 420px', gap: mob ? '0' : '88px', padding: mob ? '32px 24px 0' : '88px 80px', alignItems: 'start' }}>
             <div style={{ paddingBottom: mob ? '0' : '0' }}>
               <Eyebrow style={{ marginBottom: '12px' }}>{prop.region} — {prop.type}</Eyebrow>
               <h1 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: mob ? 'clamp(28px, 8vw, 44px)' : 'clamp(36px, 3.5vw, 58px)', color: 'var(--ink)', lineHeight: 1.08, marginBottom: '8px' }}>{prop.title}</h1>
@@ -1431,6 +1556,7 @@
                   <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '11px', color: 'rgba(244,244,242,0.3)', textAlign: 'center', marginTop: '16px', lineHeight: 1.7 }}>Ingyenes visszahívást is kérhet<br />+31-644-005-550 · info@fodel.nl</p>
                 </form>
               )}
+            </div>
             </div>
           </div>
           {/* Similar properties */}
