@@ -1963,22 +1963,465 @@
     };
 
     /* ═══════════════════════════════════════════════════════════
+       DATA — Blog Posts
+    ═══════════════════════════════════════════════════════════ */
+
+    const BLOG_POSTS = [
+      {
+        id: 1, category: 'Piacelemzés',
+        title: 'Miért választják egyre több hollandok Magyarországot otthonuknak?',
+        excerpt: 'Az elmúlt évtizedben több ezer holland állampolgár döntött úgy, hogy életét Magyarországon folytatja. Gazdasági, életstílus- és adózási okok egyaránt szerepet játszanak a döntésben.',
+        date: '2026. március 15.', dateISO: '2026-03-15', readTime: '8 perc olvasás',
+        featured: true, imgSrc: 'assets/hero.png', imgAlt: 'Balatoni panoráma', tag: 'Kiemelt',
+        content: [
+          { type: 'lead', text: 'Hollandiában a lakásárak mára elérték a 430 000 eurós átlagot, a nyugdíjasok vásárlóereje csökken, az adóterhek nőnek. Ezzel párhuzamosan Magyarország egyre vonzóbb alternatívát kínál: olcsóbb élet, szebb természet, és ugyanaz az uniós jogi védelem.' },
+          { type: 'h2', text: 'A számok mögött: miért éri meg a váltás?' },
+          { type: 'p', text: 'A hollandok Magyarországra való átköltözésének fő mozgatórugója az életminőség és az anyagi helyzet egyensúlya. Magyarországon egy 160 000 eurós ingatlan már tágas, felújított parasztházat jelent több hektáros kerttel — ugyanennyiért Hollandiában egy kis garzonlakást sem lehetne megvásárolni egy közepes városban.' },
+          { type: 'p', text: 'A FODEL 2013-as alapítása óta több mint 200 sikeres adásvételt bonyolított le holland-magyar relációban. Az elmúlt három évben a kereslet évi 30%-kal nőtt, elsősorban a kisnyugdíjasok és a nagycsaládosok körében.' },
+          { type: 'h2', text: 'Az adózás kérdése: a holland nyugdíjasok különleges helyzete' },
+          { type: 'p', text: 'A holland–magyar kettős adóegyezmény értelmében a Hollandiából érkező állami nyugdíj Magyarországon alacsonyabb adóteher mellett adózik. Ez az egyik leggyakrabban említett ok az átköltözéseknél: egy kisnyugdíjas esetén évi több ezer eurós megtakarítást is jelenthet.' },
+          { type: 'quote', text: '„A hollandok gyakran nem hisznek a szemüknek, amikor megtudják, hogy Magyarországon mit és milyen áron vásárolhatnak." — FODEL Ingatlan' },
+          { type: 'h2', text: 'Életstílus és közösség: a már itt élők tapasztalatai' },
+          { type: 'p', text: 'Csemő, Baranya megye, a Balaton-felvidék — ezek a helyek mára mini holland kolóniákat alkotnak. Ries és Lianne Terheijden 2019-ben vásároltak házat Baranyában. Azóta több szomszédjuk is holland, és az itteni közösség segít az újonnan érkezőknek beilleszkedni.' },
+          { type: 'h2', text: 'Mit kínál a FODEL?' },
+          { type: 'p', text: 'A FODEL egyedülálló modellje révén a holland vevők közvetlenül kapcsolatba léphetnek a magyar tulajdonosokkal. A FODEL biztosítja a kétnyelvű szerződéskötést, a meghatalmazásos képviseletet és az összes adminisztratív feladatot — a vevőnek Magyarországra sem kell utaznia az adásvétel lezárásához.' },
+        ],
+      },
+      {
+        id: 2, category: 'Régiók',
+        title: 'Baranya megye: a holland vevők kedvenc célpontja 2026-ban',
+        excerpt: 'Pécs és környéke az egyik legkeresettebb desztináció a Magyarországra költözni szándékozó hollandok körében. Megnéztük, miért — és mik az aktuális árak.',
+        date: '2026. február 28.', dateISO: '2026-02-28', readTime: '6 perc olvasás',
+        featured: false, imgSrc: 'assets/kuria.jpg', imgAlt: 'Baranyai kúria', tag: null,
+        content: [
+          { type: 'lead', text: 'Baranya megye nem véletlenül szerepel a FODEL hirdetési portfóliójának csúcsán. A Dél-Dunántúl ezen sarka mindent kínál, amit egy holland emigráns kereshet: olcsó ingatlan, mediterrán klíma, közelség Ferihegyhez.' },
+          { type: 'h2', text: 'Miért épp Baranya?' },
+          { type: 'p', text: 'Baranya megye ingatlanpiacán még mindig megvásárolható egy 3-4 hálószobás, felújított parasztház 80 000–120 000 euróért. Összehasonlításképpen: egy hasonló méretű holland ingatlan átlagára ennek 3-4-szerese.' },
+          { type: 'p', text: 'A megye déli elhelyezkedése miatt klímája enyhébb, mint Magyarország többi régiójáé. A nyár hosszabb, a tél kevésbé hideg — ez különösen fontos szempont az idősebb vevők számára.' },
+          { type: 'h2', text: 'Pécs és a nagyváros-közelség előnyei' },
+          { type: 'p', text: 'Pécs — az UNESCO kulturális örökség részét képező óvárossal, kiváló kórházakkal és egy aktív kulturális élettel — komoly vonzerőt jelent. A Pécs körüli falvak ingatlanárai 20-30%-kal alacsonyabbak a városinál, miközben a nagyváros minden szolgáltatása elérhető.' },
+          { type: 'quote', text: '„Ferihegyhez, ill. nemzetközi repterekhez jó közlekedéssel rendelkező ingatlanokat keresünk — Baranya ebben az egyik legjobb választás." — FODEL vevői visszajelzés' },
+          { type: 'h2', text: 'Aktuális ingatlanárak Baranyában (2026)' },
+          { type: 'p', text: 'Eladó ház 80–130 m²: 55 000–95 000 EUR. Kastélystílusú kúria 300–500 m²: 180 000–380 000 EUR. Mezőgazdasági ingatlan 5–15 ha: 100 000–250 000 EUR. Ezek az árak az elmúlt két évben 8–12%-kal emelkedtek.' },
+        ],
+      },
+      {
+        id: 3, category: 'Jogi útmutató',
+        title: 'Ingatlanvásárlás Magyarországon külföldiként: lépésről lépésre',
+        excerpt: 'Hollandként hogyan vásárolhat ingatlant Magyarországon? Az engedélyezési eljárástól a földhivatali bejegyzésig — minden, amit tudnia kell.',
+        date: '2026. február 12.', dateISO: '2026-02-12', readTime: '10 perc olvasás',
+        featured: false, imgSrc: null, imgType: 'interior', imgAlt: 'Belső tér', tag: 'Útmutató',
+        content: [
+          { type: 'lead', text: 'EU-s állampolgárként a hollandok ugyanolyan feltételekkel vásárolhatnak lakóingatlant Magyarországon, mint a magyar állampolgárok. A folyamat azonban eltér a hollandiai gyakorlattól — ebben a cikkben lépésről lépésre végigvezetjük.' },
+          { type: 'h2', text: '1. lépés: Az ingatlan kiválasztása' },
+          { type: 'p', text: 'A FODEL portfólióján szereplő ingatlanok esetén az első lépés a helyszíni megtekintés vagy virtuális bemutató. A FODEL kétnyelvű munkatársai elkísérik a vevőt a helyszínre, és biztosítják a kommunikációt az eladóval.' },
+          { type: 'h2', text: '2. lépés: Az adásvételi szerződés' },
+          { type: 'p', text: 'A FODEL kétnyelvű (magyar–holland, magyar–német vagy magyar–angol) adásvételi szerződést készít. A szerződést ügyvéd ellenjegyzi — ez kötelező a magyarországi ingatlan-adásvételhez. A szerződéskészítés díja 150 EUR-tól kezdődik.' },
+          { type: 'h2', text: '3. lépés: Meghatalmazás és képviselet' },
+          { type: 'p', text: 'Ha a vevő nem tud személyesen Magyarországra utazni az aláíráshoz, meghatalmazással a FODEL képviseli az érdekeit. Ez bevett, jogilag elfogadott megoldás — az aláírás közjegyző előtt, a vevő tartózkodási helye szerinti országban is megtörténhet.' },
+          { type: 'quote', text: '„A vevőnek Magyarországra sem kell utaznia az adásvétel lezárásához — a FODEL mindent elintéz meghatalmazással."' },
+          { type: 'h2', text: '4. lépés: Földhivatali bejegyzés és közüzemi átírás' },
+          { type: 'p', text: 'A szerződés aláírása után a FODEL elvégzi az ingatlan-nyilvántartási bejegyzést a Földhivatalnál, és gondoskodik a közüzemi szolgáltatások (villany, gáz, víz) átírásáról is. Ezzel az ingatlan jogilag is az új tulajdonos nevén van.' },
+        ],
+      },
+      {
+        id: 4, category: 'Életmód',
+        title: 'Csemő, a kis holland kolónia: hogyan élnek a bevándorlók?',
+        excerpt: 'Csemő neve ismerősen csenghet, ha holland-magyar ingatlanügyekkel foglalkozik. Ez a Bács-Kiskun megyei kisváros mára igazi holland közösséget épített ki.',
+        date: '2026. január 30.', dateISO: '2026-01-30', readTime: '7 perc olvasás',
+        featured: false, imgSrc: 'assets/tanya.jpg', imgAlt: 'Alföldi tanya', tag: null,
+        content: [
+          { type: 'lead', text: 'Csemő, egy 5000 lelkes kisváros a Bács-Kiskun megyei Alföldön, mára közismert a magyar-holland ingatlanpiacon. Az itt élő hollandok száma az elmúlt 10 évben megtöbbszöröződött.' },
+          { type: 'h2', text: 'Miért épp Csemő?' },
+          { type: 'p', text: 'Csemő vonzereje kettős: egyrészt közel van Budapesthez (60 km), így a repülőtér könnyen elérhető. Másrészt az ingatlanárak a fővárosi árak töredékét teszik ki, miközben a természet, a csend és a tér adott.' },
+          { type: 'p', text: 'Az itteni holland közösség szervezett: közös rendezvények, nyelvtanulási lehetőségek, és egy informális hálózat, ami segít az újonnan érkezőknek eligazodni.' },
+          { type: 'quote', text: '„Csemő ismert hollandok által kedvelt telepeinek egyike — itt megtalálják azt az Európát, amelyet saját hazájukban elveszítettek." — FODEL Ingatlan' },
+        ],
+      },
+      {
+        id: 5, category: 'Piacelemzés',
+        title: 'Magyar ingatlanárak vs. holland ingatlanárak: a számok magukért beszélnek',
+        excerpt: 'Hollandiában egy átlagos ház ára 430 000 euró. Magyarországon ugyanennyiért egy kastélyt vehet. Részletes ár-összehasonlítás 2026-ra.',
+        date: '2026. január 15.', dateISO: '2026-01-15', readTime: '5 perc olvasás',
+        featured: false, imgSrc: null, imgType: 'vineyard', imgAlt: 'Szőlőbirtok', tag: 'Elemzés',
+        content: [
+          { type: 'lead', text: '2026 elején a hollandiai átlagos lakásár elérte a 430 000 eurót. Ugyanennyiért Magyarországon teljes körűen felújított kastélyt, szőlőbirtokot vagy Balatoni panorámás villát vásárolhat.' },
+          { type: 'h2', text: 'Az összehasonlítás alapjai' },
+          { type: 'p', text: 'Egy 3 hálószobás, 120 m²-es átlagos ház Hollandiában 2026-ban: 380 000–480 000 EUR. Ugyanez Magyarországon vidéken: 45 000–90 000 EUR. A különbség 5–10-szeres.' },
+          { type: 'h2', text: 'Mit kap a holland vevő 100 000 euróért Magyarországon?' },
+          { type: 'p', text: 'Szép, tágas, 3-4 szobás felújított parasztház 2-5 hektár telekkel vidéken. Kisebb nyaraló a Balaton közelében. Renoválandó parasztház önálló gazdasággal. A FODEL portfóliójában jelenleg is találhatók ilyen ingatlanok aktív hirdetéssel.' },
+        ],
+      },
+      {
+        id: 6, category: 'Befektetés',
+        title: 'Mezőgazdasági föld vásárlása Magyarországon: az EU-s polgár lehetőségei',
+        excerpt: '300 hektár — ez a jogszabályban rögzített maximum, amelyet egy EU-s agrárképzettséggel rendelkező vevő megvásárolhat Magyarországon.',
+        date: '2025. december 20.', dateISO: '2025-12-20', readTime: '9 perc olvasás',
+        featured: false, imgSrc: null, imgType: 'aerial', imgAlt: 'Légifotó termőföldről', tag: null,
+        content: [
+          { type: 'lead', text: 'Magyar mezőgazdasági föld vásárlása EU-s állampolgárként lehetséges, de szigorú feltételekhez kötött. A FODEL egyike azon kevés ingatlanközvetítőknek, akik ezt a komplex folyamatot teljes körűen koordinálják.' },
+          { type: 'h2', text: 'Ki vásárolhat mezőgazdasági földet Magyarországon?' },
+          { type: 'p', text: 'EU-s állampolgár, aki agrárképzettséggel rendelkezik, legfeljebb 300 hektár termőföldet vásárolhat. A vásárláshoz helyi hatóságok jóváhagyása szükséges, és az elővásárlási jog érvényesítésére vonatkozó eljárás is lefolytatandó.' },
+          { type: 'h2', text: 'A folyamat lépései' },
+          { type: 'p', text: 'A FODEL a vevő megbízásából koordinálja az egész eljárást: az ingatlan azonosításától a hatósági eljáráson át a Földhivatali bejegyzésig. Ez a teljes körű ügyintézés a FODEL egyik kiemelt specialitása.' },
+          { type: 'quote', text: '„Amennyiben egy uniós állampolgár agrárvégzettséggel rendelkezik, 300 hektár földterület megvásárlására jogosult Magyarországon. Ennek a procedúrának a teljes körű leszervezését a FODEL ingatlan vállalja." — FODEL' },
+        ],
+      },
+    ];
+
+    /* ═══════════════════════════════════════════════════════════
+       COMPONENT: BLOG CARD
+    ═══════════════════════════════════════════════════════════ */
+
+    const BlogCard = ({ post, navigate, featured = false, delay = 0 }) => {
+      const [hov, setHov] = React.useState(false);
+      const mob = useIsMobile();
+      return (
+        <Reveal delay={delay}>
+          <article itemScope itemType="https://schema.org/BlogPosting"
+            onClick={() => navigate('blog-post', post)}
+            onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+            style={featured ? {
+              cursor: 'pointer', display: mob ? 'flex' : 'grid', flexDirection: 'column',
+              gridTemplateColumns: '1fr 1fr', border: '1px solid var(--border)',
+              overflow: 'hidden', background: 'white',
+            } : {
+              cursor: 'pointer', border: '1px solid var(--border)',
+              background: 'white', overflow: 'hidden', display: 'flex', flexDirection: 'column',
+            }}>
+            <div className="card-img-wrap" style={{ position: 'relative', aspectRatio: featured ? (mob ? '16/9' : '4/3') : '16/9', overflow: 'hidden', flexShrink: 0 }}>
+              <div className="card-img-inner" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
+                {post.imgSrc ? (
+                  <img src={post.imgSrc} alt={post.imgAlt || post.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                ) : (
+                  <Placeholder type={post.imgType || 'landscape'} />
+                )}
+              </div>
+              {post.tag && (
+                <div style={{ position: 'absolute', top: '14px', left: '14px', background: 'var(--ink)', color: 'var(--cream)', fontFamily: 'var(--sans)', fontWeight: 400, fontSize: '8.5px', letterSpacing: '0.22em', textTransform: 'uppercase', padding: '5px 12px', zIndex: 1 }}>
+                  {post.tag}
+                </div>
+              )}
+            </div>
+            <div style={{ padding: featured ? (mob ? '28px 24px' : '48px 44px') : '24px 24px 28px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: featured ? 'center' : 'flex-start' }}>
+              <Eyebrow style={{ marginBottom: '10px' }}>{post.category}</Eyebrow>
+              {featured ? (
+                <h2 itemProp="headline" style={{ fontFamily: 'var(--serif)', fontWeight: 700, fontSize: mob ? '22px' : 'clamp(20px, 2vw, 28px)', color: hov ? 'var(--taupe)' : 'var(--ink)', lineHeight: 1.18, marginBottom: '14px', transition: 'color 0.35s ease' }}>
+                  {post.title}
+                </h2>
+              ) : (
+                <h3 itemProp="headline" style={{ fontFamily: 'var(--serif)', fontWeight: 700, fontSize: '18px', color: hov ? 'var(--taupe)' : 'var(--ink)', lineHeight: 1.22, marginBottom: '10px', transition: 'color 0.35s ease', flex: 1 }}>
+                  {post.title}
+                </h3>
+              )}
+              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: featured ? '14px' : '13px', lineHeight: 1.85, color: 'var(--taupe)', marginBottom: featured ? '24px' : '16px', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', maxWidth: featured ? '500px' : '100%' }}>
+                {post.excerpt}
+              </p>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: featured ? '20px' : '14px', marginTop: 'auto' }}>
+                <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '11px', color: 'var(--taupe)', letterSpacing: '0.04em' }}>
+                  <time itemProp="datePublished" dateTime={post.dateISO}>{post.date}</time>
+                  <span style={{ margin: '0 7px', opacity: 0.35 }}>{'·'}</span>
+                  {post.readTime}
+                </div>
+                {featured && (
+                  <TextBtn onClick={(e) => { e.stopPropagation(); navigate('blog-post', post); }}>Elolvasom</TextBtn>
+                )}
+              </div>
+            </div>
+          </article>
+        </Reveal>
+      );
+    };
+
+    /* ═══════════════════════════════════════════════════════════
+       PAGE: BLOG LISTING
+    ═══════════════════════════════════════════════════════════ */
+
+    const BlogPage = ({ navigate }) => {
+      const mob = useIsMobile();
+      const [activeCategory, setActiveCategory] = React.useState('Mind');
+      const [email, setEmail] = React.useState('');
+      const [subscribed, setSubscribed] = React.useState(false);
+      const [loaded, setLoaded] = React.useState(false);
+      React.useEffect(() => { const t = setTimeout(() => setLoaded(true), 80); return () => clearTimeout(t); }, []);
+      const anim = (delay = 0) => ({
+        opacity: loaded ? 1 : 0,
+        transform: loaded ? 'none' : 'translateY(24px)',
+        transition: `opacity 1.1s cubic-bezier(0.25,0.1,0.25,1) ${delay}s, transform 1.1s cubic-bezier(0.25,0.1,0.25,1) ${delay}s`,
+      });
+
+      const categories = ['Mind', 'Piacelemzés', 'Régiók', 'Jogi útmutató', 'Életmód', 'Befektetés'];
+      const featuredPost = BLOG_POSTS.find(p => p.featured);
+      const rest = BLOG_POSTS.filter(p => !p.featured);
+      const filtered = activeCategory === 'Mind' ? rest : rest.filter(p => p.category === activeCategory);
+
+      return (
+        <main data-screen-label="Blog" itemScope itemType="https://schema.org/Blog" style={{ paddingTop: mob ? '57px' : '80px' }}>
+
+          {/* ── Page header ── */}
+          <header style={{ padding: mob ? '52px 24px 44px' : '96px 80px 80px', background: 'linear-gradient(180deg, var(--linen) 0%, var(--cream) 100%)', borderBottom: '1px solid var(--border)' }}>
+            <div style={{ maxWidth: '820px', ...anim(0) }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: mob ? '20px' : '32px' }}>
+                <GoldRule width="32px" />
+                <Eyebrow>Hírek &amp; Elemzések</Eyebrow>
+              </div>
+              <h1 style={{ fontFamily: 'var(--serif)', fontWeight: 700, fontSize: mob ? 'clamp(40px, 12vw, 58px)' : 'clamp(56px, 6vw, 88px)', color: 'var(--ink)', lineHeight: 1.03, marginBottom: '22px' }}>
+                FODEL Blog
+              </h1>
+              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: mob ? '15px' : '16px', lineHeight: 1.85, color: 'var(--taupe)', maxWidth: '640px' }}>
+                Elemzések, útmutatók és riportok a magyar ingatlanpiacról. A holland és nyugat-európai vevők szemszögéből: piaci trendek, jogi kézikönyvek és életmód-cikkek.
+              </p>
+            </div>
+          </header>
+
+          <div style={{ padding: mob ? '40px 24px 80px' : '80px 80px 120px' }}>
+
+            {/* ── Featured post ── */}
+            {featuredPost && (
+              <section aria-label="Kiemelt cikk" style={{ marginBottom: mob ? '52px' : '80px' }}>
+                <Eyebrow style={{ marginBottom: '20px' }}>Kiemelt cikk</Eyebrow>
+                <BlogCard post={featuredPost} navigate={navigate} featured delay={0} />
+              </section>
+            )}
+
+            {/* ── Category filter ── */}
+            <nav aria-label="Kategóriák" style={{ marginBottom: mob ? '36px' : '52px', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+              <div style={{ display: 'flex', gap: '8px', minWidth: 'max-content', paddingBottom: mob ? '4px' : '0' }}>
+                {categories.map(cat => (
+                  <button key={cat} onClick={() => setActiveCategory(cat)} style={{
+                    padding: '10px 22px',
+                    background: activeCategory === cat ? 'var(--ink)' : 'white',
+                    color: activeCategory === cat ? 'var(--cream)' : 'var(--taupe)',
+                    fontFamily: 'var(--sans)', fontWeight: 400, fontSize: '10.5px',
+                    letterSpacing: '0.18em', textTransform: 'uppercase',
+                    border: `1px solid ${activeCategory === cat ? 'var(--ink)' : 'var(--border)'}`,
+                    cursor: 'pointer', transition: 'all 0.28s ease',
+                  }}>{cat}</button>
+                ))}
+              </div>
+            </nav>
+
+            {/* ── Article grid ── */}
+            {filtered.length > 0 ? (
+              <section aria-label="Cikkek" style={{ marginBottom: mob ? '52px' : '96px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: mob ? '28px' : '32px' }}>
+                  {filtered.map((post, i) => <BlogCard key={post.id} post={post} navigate={navigate} delay={i + 1} />)}
+                </div>
+              </section>
+            ) : (
+              <div style={{ border: '1px solid var(--border)', padding: mob ? '40px 28px' : '56px 48px', textAlign: 'center', marginBottom: mob ? '52px' : '96px' }}>
+                <Eyebrow center style={{ marginBottom: '12px' }}>Nincs találat</Eyebrow>
+                <div style={{ fontFamily: 'var(--serif)', fontWeight: 700, fontSize: '22px', color: 'var(--ink)', marginBottom: '8px' }}>Ebben a kategóriában hamarosan megjelennek cikkek</div>
+                <TextBtn onClick={() => setActiveCategory('Mind')} style={{ justifyContent: 'center', marginTop: '18px' }}>Összes cikk megtekintése</TextBtn>
+              </div>
+            )}
+
+            {/* ── Newsletter CTA ── */}
+            <aside aria-label="Hírlevél" style={{ background: 'var(--ink)', padding: mob ? '48px 28px' : '80px 80px', display: 'flex', flexDirection: mob ? 'column' : 'row', alignItems: mob ? 'flex-start' : 'center', justifyContent: 'space-between', gap: mob ? '32px' : '60px' }}>
+              <div style={{ flex: 1 }}>
+                <Eyebrow style={{ marginBottom: '14px', color: 'rgba(244,244,242,0.5)' }}>Iratkozzon fel</Eyebrow>
+                <div style={{ fontFamily: 'var(--serif)', fontWeight: 700, fontSize: mob ? '26px' : '34px', color: 'var(--cream)', lineHeight: 1.12, marginBottom: '12px' }}>Maradjon naprakész</div>
+                <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', lineHeight: 1.85, color: 'rgba(244,244,242,0.48)', maxWidth: '380px' }}>
+                  Piacelemzések, új ingatlanok és jogi útmutatók közvetlenül az email-fiókjába. Kéthetente, zsúfoltság nélkül.
+                </p>
+              </div>
+              <div style={{ flexShrink: 0, width: mob ? '100%' : '360px' }}>
+                {subscribed ? (
+                  <div style={{ padding: '20px 24px', border: '1px solid rgba(244,244,242,0.15)', color: 'rgba(244,244,242,0.65)', fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', lineHeight: 1.75 }}>
+                    Köszönjük feliratkozását. Hamarosan értesítjük legújabb cikkeinkről.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <input type="email" placeholder="email@pelda.hu" value={email} onChange={e => setEmail(e.target.value)} aria-label="Email cím"
+                      style={{ width: '100%', padding: '16px 20px', background: 'rgba(244,244,242,0.07)', border: '1px solid rgba(244,244,242,0.2)', color: 'var(--cream)', fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', outline: 'none' }} />
+                    <BtnOutline light onClick={() => { if (email.includes('@')) setSubscribed(true); }} style={{ width: '100%', textAlign: 'center' }}>
+                      Feliratkozás
+                    </BtnOutline>
+                    <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '11px', color: 'rgba(244,244,242,0.28)', lineHeight: 1.65 }}>
+                      Adatait harmadik félnek nem adjuk át. A GDPR és az adatvédelmi rendelet értelmében bármikor leiratkozhat.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </aside>
+
+          </div>
+        </main>
+      );
+    };
+
+    /* ═══════════════════════════════════════════════════════════
+       PAGE: BLOG POST DETAIL
+    ═══════════════════════════════════════════════════════════ */
+
+    const BlogPostPage = ({ navigate, selectedPost }) => {
+      const mob = useIsMobile();
+      const post = selectedPost || BLOG_POSTS[0];
+      const related = BLOG_POSTS.filter(p => p.id !== post.id && (p.category === post.category || p.featured)).slice(0, 3);
+      const [loaded, setLoaded] = React.useState(false);
+      React.useEffect(() => { setLoaded(false); const t = setTimeout(() => setLoaded(true), 80); return () => clearTimeout(t); }, [post.id]);
+
+      const renderBlock = (block, idx) => {
+        if (block.type === 'lead') return (
+          <p key={idx} style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: mob ? '17px' : '20px', lineHeight: 1.75, color: 'var(--ink)', borderLeft: '3px solid var(--accent)', paddingLeft: '22px', marginBottom: '36px', marginTop: '8px' }}>{block.text}</p>
+        );
+        if (block.type === 'h2') return (
+          <h2 key={idx} style={{ fontFamily: 'var(--serif)', fontWeight: 700, fontSize: mob ? '22px' : '26px', color: 'var(--ink)', lineHeight: 1.2, marginTop: '44px', marginBottom: '14px' }}>{block.text}</h2>
+        );
+        if (block.type === 'p') return (
+          <p key={idx} style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: mob ? '15px' : '16px', lineHeight: 1.95, color: 'var(--taupe)', marginBottom: '20px' }}>{block.text}</p>
+        );
+        if (block.type === 'quote') return (
+          <blockquote key={idx} style={{ margin: '36px 0', padding: mob ? '24px 22px' : '32px 40px', background: 'rgba(236,237,239,0.6)', borderLeft: '3px solid var(--accent)', fontFamily: 'var(--serif)', fontWeight: 400, fontSize: mob ? '16px' : '19px', lineHeight: 1.65, color: 'var(--ink)', fontStyle: 'italic' }}>{block.text}</blockquote>
+        );
+        return null;
+      };
+
+      return (
+        <main data-screen-label="Blog Post" itemScope itemType="https://schema.org/BlogPosting"
+          style={{ paddingTop: mob ? '57px' : '80px', opacity: loaded ? 1 : 0, transition: 'opacity 0.55s ease' }}>
+
+          {/* ── Breadcrumb ── */}
+          <nav aria-label="Navigáció" style={{ padding: mob ? '14px 24px' : '18px 80px', borderBottom: '1px solid var(--border)', background: 'var(--cream)' }}>
+            <ol itemScope itemType="https://schema.org/BreadcrumbList"
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', listStyle: 'none', fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '11px', letterSpacing: '0.06em', color: 'var(--taupe)', flexWrap: 'wrap' }}>
+              <li itemProp="itemListElement" itemScope itemType="https://schema.org/ListItem">
+                <button onClick={() => navigate('home')} itemProp="name" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--taupe)', fontFamily: 'inherit', fontSize: 'inherit', padding: 0 }}>Kezdőlap</button>
+                <meta itemProp="position" content="1" />
+              </li>
+              <li aria-hidden="true" style={{ opacity: 0.35 }}>{'›'}</li>
+              <li itemProp="itemListElement" itemScope itemType="https://schema.org/ListItem">
+                <button onClick={() => navigate('blog')} itemProp="name" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--taupe)', fontFamily: 'inherit', fontSize: 'inherit', padding: 0 }}>Blog</button>
+                <meta itemProp="position" content="2" />
+              </li>
+              <li aria-hidden="true" style={{ opacity: 0.35 }}>{'›'}</li>
+              <li itemProp="itemListElement" itemScope itemType="https://schema.org/ListItem">
+                <span itemProp="name" style={{ color: 'var(--ink)', fontWeight: 400 }}>{post.category}</span>
+                <meta itemProp="position" content="3" />
+              </li>
+            </ol>
+          </nav>
+
+          {/* ── Article header ── */}
+          <header style={{ padding: mob ? '44px 24px 36px' : '80px 80px 56px', borderBottom: '1px solid var(--border)', background: 'linear-gradient(180deg, var(--linen) 0%, var(--cream) 100%)' }}>
+            <div style={{ maxWidth: '820px' }}>
+              <Eyebrow style={{ marginBottom: '16px' }}>{post.category}</Eyebrow>
+              <h1 itemProp="headline"
+                style={{ fontFamily: 'var(--serif)', fontWeight: 700, fontSize: mob ? 'clamp(28px, 9vw, 44px)' : 'clamp(36px, 4vw, 54px)', color: 'var(--ink)', lineHeight: 1.1, marginBottom: '22px' }}>
+                {post.title}
+              </h1>
+              <GoldRule style={{ marginBottom: '22px' }} />
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: mob ? '4px 0' : '0 20px', fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '12px', color: 'var(--taupe)', letterSpacing: '0.04em', alignItems: 'center' }}>
+                <span itemProp="author" itemScope itemType="https://schema.org/Person">
+                  <span itemProp="name">FODEL Szerkesztőség</span>
+                </span>
+                {!mob && <span style={{ opacity: 0.3, margin: '0 4px' }}>{'·'}</span>}
+                {mob && <span style={{ display: 'block', width: '100%', height: '3px' }} />}
+                <time itemProp="datePublished" dateTime={post.dateISO}>{post.date}</time>
+                {!mob && <span style={{ opacity: 0.3, margin: '0 4px' }}>{'·'}</span>}
+                <span>{post.readTime}</span>
+              </div>
+            </div>
+          </header>
+
+          {/* ── Hero image ── */}
+          {(post.imgSrc || post.imgType) && (
+            <div style={{ maxWidth: '920px', margin: '0 auto', padding: mob ? '32px 24px 0' : '60px 80px 0' }}>
+              <div style={{ aspectRatio: '16/9', overflow: 'hidden' }}>
+                {post.imgSrc ? (
+                  <img src={post.imgSrc} alt={post.imgAlt || post.title} itemProp="image"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                ) : (
+                  <Placeholder type={post.imgType || 'landscape'} />
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── Article body ── */}
+          <div itemProp="articleBody" style={{ maxWidth: '760px', margin: '0 auto', padding: mob ? '40px 24px 52px' : '64px 80px 80px' }}>
+            {(post.content || []).map((block, idx) => renderBlock(block, idx))}
+
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: '28px', marginTop: '44px', display: 'flex', flexDirection: mob ? 'column' : 'row', alignItems: mob ? 'flex-start' : 'center', justifyContent: 'space-between', gap: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <Eyebrow>Kategória</Eyebrow>
+                <div style={{ padding: '6px 16px', border: '1px solid var(--border)', fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '12px', color: 'var(--taupe)' }}>{post.category}</div>
+              </div>
+              <TextBtn onClick={() => navigate('blog')}>Vissza a blogra</TextBtn>
+            </div>
+          </div>
+
+          {/* ── Author box ── */}
+          <div style={{ background: 'var(--linen)', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>
+            <div style={{ maxWidth: '760px', margin: '0 auto', padding: mob ? '32px 24px' : '44px 80px', display: 'flex', gap: mob ? '18px' : '28px', alignItems: 'flex-start' }}>
+              <div style={{ flexShrink: 0, width: mob ? '48px' : '58px', height: mob ? '48px' : '58px', background: 'var(--ink)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontFamily: 'var(--serif)', fontWeight: 700, fontSize: mob ? '18px' : '22px', color: 'var(--cream)', letterSpacing: '0.06em' }}>F</span>
+              </div>
+              <div>
+                <div style={{ fontFamily: 'var(--serif)', fontWeight: 700, fontSize: '16px', color: 'var(--ink)', marginBottom: '3px' }}>FODEL Szerkesztőség</div>
+                <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '10.5px', color: 'var(--taupe)', letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: '10px' }}>Almere-Buiten · Est. 2013</div>
+                <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '13px', lineHeight: 1.8, color: 'var(--taupe)', maxWidth: '520px' }}>
+                  A FODEL szerkesztősége 2013 óta közvetít és elemez a holland-magyar ingatlanpiacon. Cikkeink forrásai: saját piaci tapasztalat, ügyfél-visszajelzések és ellenőrzött holland médiaforrások — minden idézett tartalom forrásmegjelöléssel jelenik meg.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Related posts ── */}
+          {related.length > 0 && (
+            <section aria-label="Kapcsolódó cikkek" style={{ padding: mob ? '48px 24px 72px' : '80px 80px 120px' }}>
+              <Reveal>
+                <Eyebrow style={{ marginBottom: '10px' }}>Kapcsolódó cikkek</Eyebrow>
+                <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 700, fontSize: mob ? '26px' : '32px', color: 'var(--ink)', lineHeight: 1.15, marginBottom: mob ? '28px' : '44px' }}>Olvassa tovább</h2>
+              </Reveal>
+              <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: mob ? '24px' : '28px' }}>
+                {related.map((p, i) => <BlogCard key={p.id} post={p} navigate={navigate} delay={i + 1} />)}
+              </div>
+            </section>
+          )}
+
+          {/* ── CTA band ── */}
+          <div style={{ background: 'var(--ink)', padding: mob ? '52px 28px' : '88px 80px', textAlign: mob ? 'left' : 'center' }}>
+            <Reveal>
+              <Eyebrow center={!mob} style={{ marginBottom: '14px', color: 'rgba(244,244,242,0.42)' }}>FODEL INGATLAN</Eyebrow>
+              <div style={{ fontFamily: 'var(--serif)', fontWeight: 700, fontSize: mob ? '26px' : 'clamp(28px, 3.2vw, 44px)', color: 'var(--cream)', lineHeight: 1.12, marginBottom: '14px', maxWidth: '600px', margin: mob ? '0 0 14px' : '0 auto 14px' }}>
+                Kérdése van? Forduljon hozzánk bizalommal.
+              </div>
+              <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', lineHeight: 1.85, color: 'rgba(244,244,242,0.48)', maxWidth: '520px', margin: mob ? '14px 0 32px' : '14px auto 36px' }}>
+                A hívást természetesen mi fizetjük. Munkanapokon 08:00–18:00 között elérhetők vagyunk — telefonon, e-mailben és az ingyenes visszahívási rendszeren keresztül.
+              </p>
+              <div style={{ display: 'flex', flexDirection: mob ? 'column' : 'row', gap: '12px', justifyContent: mob ? 'flex-start' : 'center' }}>
+                <BtnOutline light onClick={() => navigate('contact')} style={mob ? { textAlign: 'center' } : {}}>Ingyenes visszahívás</BtnOutline>
+                <BtnOutline light onClick={() => navigate('properties')} style={mob ? { textAlign: 'center' } : {}}>Ingatlanok böngészése</BtnOutline>
+              </div>
+            </Reveal>
+          </div>
+
+        </main>
+      );
+    };
+
+    /* ═══════════════════════════════════════════════════════════
        APP — Router + Root render
     ═══════════════════════════════════════════════════════════ */
 
     const App = () => {
       const [page, setPage] = React.useState('home');
       const [selectedProp, setSelectedProp] = React.useState(null);
+      const [selectedPost, setSelectedPost] = React.useState(null);
       const [searchFilters, setSearchFilters] = React.useState({});
 
       const navigate = (pg, prop = null, filters = null) => {
         setPage(pg);
-        if (prop !== null) setSelectedProp(prop);
+        if (prop !== null) {
+          if (pg === 'blog-post') setSelectedPost(prop);
+          else setSelectedProp(prop);
+        }
         if (filters !== null) setSearchFilters(filters);
         window.scrollTo({ top: 0 });
       };
 
-      const pageProps = { navigate, currentPage: page, selectedProp, searchFilters };
+      const pageProps = { navigate, currentPage: page, selectedProp, selectedPost, searchFilters };
 
       const renderPage = () => {
         switch (page) {
@@ -1989,7 +2432,8 @@
           case 'buyers':     return <BuyersPage {...pageProps} />;
           case 'about':      return <AboutPage {...pageProps} />;
           case 'contact':    return <ContactPage {...pageProps} />;
-          case 'blog':       return <HomePage {...pageProps} />;
+          case 'blog':       return <BlogPage {...pageProps} />;
+          case 'blog-post':  return <BlogPostPage {...pageProps} />;
           default:           return <HomePage {...pageProps} />;
         }
       };
