@@ -633,6 +633,118 @@
     };
 
     /* ═══════════════════════════════════════════════════════════
+       COMPONENT: PROPERTY SEARCH BAR
+    ═══════════════════════════════════════════════════════════ */
+
+    const PropertySearchSection = ({ navigate, mob, searchFilters = {} }) => {
+      const [type, setType] = React.useState(searchFilters.type || '');
+      const [region, setRegion] = React.useState(searchFilters.region || '');
+      const [price, setPrice] = React.useState(searchFilters.price || '');
+      const [beds, setBeds] = React.useState(searchFilters.beds || '');
+
+      const handleSearch = () => navigate('properties', null, { type, region, price, beds });
+
+      const labelSt = {
+        fontFamily: 'var(--sans)', fontWeight: 400, fontSize: '9px',
+        letterSpacing: '0.26em', textTransform: 'uppercase',
+        color: 'var(--taupe)', display: 'block', marginBottom: '10px',
+      };
+      const selectSt = {
+        width: '100%', background: 'transparent', border: 'none', padding: '0 22px 0 0',
+        fontFamily: 'var(--serif)', fontWeight: 400, fontSize: '15px', color: 'var(--ink)',
+        outline: 'none', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer',
+      };
+      const chev = (
+        <svg style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
+             width="10" height="6" viewBox="0 0 10 6" fill="none">
+          <path d="M1 1l4 4 4-4" stroke="var(--taupe)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      );
+      const div = mob ? { borderBottom: '1px solid var(--border)' } : { borderRight: '1px solid var(--border)' };
+
+      return (
+        <Reveal>
+          <div style={{ marginBottom: mob ? '28px' : '44px' }}>
+            <Eyebrow style={{ marginBottom: '10px' }}>Ingatlan kereső</Eyebrow>
+            <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: mob ? 'clamp(24px, 7vw, 34px)' : 'clamp(26px, 2.6vw, 40px)', color: 'var(--ink)', lineHeight: 1.12 }}>
+              Találja meg álmai ingatlanát
+            </h2>
+          </div>
+          <div style={{ background: 'white', border: '1px solid var(--border)', display: 'flex', flexDirection: mob ? 'column' : 'row', alignItems: 'stretch' }}>
+            <div style={{ flex: 1, padding: mob ? '20px 24px' : '28px 36px', ...div }}>
+              <span style={labelSt}>Ingatlan típusa</span>
+              <div style={{ position: 'relative' }}>
+                <select style={selectSt} value={type} onChange={e => setType(e.target.value)}>
+                  <option value="">Minden típus</option>
+                  <option value="Eladó ház">Eladó ház</option>
+                  <option value="Kastélyok, kúriák">Kastélyok, kúriák</option>
+                  <option value="Eladó tanya">Eladó tanya</option>
+                  <option value="Mezőgazdasági ingatlan">Mezőgazdasági ingatlan</option>
+                  <option value="Eladó nyaraló">Eladó nyaraló</option>
+                </select>
+                {chev}
+              </div>
+            </div>
+            <div style={{ flex: 1, padding: mob ? '20px 24px' : '28px 36px', ...div }}>
+              <span style={labelSt}>Régió</span>
+              <div style={{ position: 'relative' }}>
+                <select style={selectSt} value={region} onChange={e => setRegion(e.target.value)}>
+                  <option value="">Egész Magyarország</option>
+                  <option value="Balaton">Balaton</option>
+                  <option value="Balaton-felvidék">Balaton-felvidék</option>
+                  <option value="Dél-Dunántúl">Dél-Dunántúl</option>
+                  <option value="Alföld">Alföld</option>
+                </select>
+                {chev}
+              </div>
+            </div>
+            <div style={{ flex: 1, padding: mob ? '20px 24px' : '28px 36px', ...div }}>
+              <span style={labelSt}>Árszint</span>
+              <div style={{ position: 'relative' }}>
+                <select style={selectSt} value={price} onChange={e => setPrice(e.target.value)}>
+                  <option value="">Bármely ár</option>
+                  <option value="lt100">100 000 EUR alatt</option>
+                  <option value="100to200">100 000 – 200 000 EUR</option>
+                  <option value="gt200">200 000 EUR felett</option>
+                </select>
+                {chev}
+              </div>
+            </div>
+            <div style={{ flex: 1, padding: mob ? '20px 24px' : '28px 36px', borderBottom: mob ? '1px solid var(--border)' : 'none' }}>
+              <span style={labelSt}>Hálószobák</span>
+              <div style={{ position: 'relative' }}>
+                <select style={selectSt} value={beds} onChange={e => setBeds(e.target.value)}>
+                  <option value="">Bármely szám</option>
+                  <option value="1">1+ szoba</option>
+                  <option value="2">2+ szoba</option>
+                  <option value="3">3+ szoba</option>
+                  <option value="4">4+ szoba</option>
+                  <option value="5">5+ szoba</option>
+                </select>
+                {chev}
+              </div>
+            </div>
+            <button onClick={handleSearch} style={{
+              padding: mob ? '18px 24px' : '0 44px',
+              background: 'var(--ink)', color: 'var(--cream)',
+              fontFamily: 'var(--sans)', fontWeight: 400, fontSize: '10.5px',
+              letterSpacing: '0.26em', textTransform: 'uppercase',
+              border: 'none', cursor: 'pointer', flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
+              transition: 'opacity 0.3s',
+            }}>
+              Keresés
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="M21 21l-4.35-4.35"/>
+              </svg>
+            </button>
+          </div>
+        </Reveal>
+      );
+    };
+
+    /* ═══════════════════════════════════════════════════════════
        PAGE: HOME
     ═══════════════════════════════════════════════════════════ */
 
@@ -675,19 +787,13 @@
                 <BtnDark onClick={() => navigate('properties')} style={mob ? { width: '100%', textAlign: 'center' } : {}}>Ingatlanok</BtnDark>
                 <BtnOutline onClick={() => navigate('sellers')} style={mob ? { width: '100%', textAlign: 'center' } : {}}>Hirdessen nálunk</BtnOutline>
               </div>
-              {!mob && (
-                <div style={{ position: 'absolute', bottom: '44px', left: '80px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', ...anim(1.1) }}>
-                  <div style={{ width: '1px', height: '44px', background: 'var(--taupe)', animation: 'scrollPulse 2.2s ease infinite' }} />
-                  <span style={{ fontFamily: 'var(--sans)', fontSize: '8.5px', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'var(--taupe)', writingMode: 'vertical-rl' }}>Görgessen</span>
-                </div>
-              )}
             </div>
             {!mob && (
               <div style={{ flex: '0 0 46%', position: 'relative', overflow: 'hidden', opacity: loaded ? 1 : 0, transition: 'opacity 1.6s ease 0.15s' }}>
                 <img src="assets/hero.png" alt="Balatoni Panorámaház" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                 <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(244,244,242,0.25) 0%, transparent 30%)' }} />
                 <div style={{ position: 'absolute', bottom: '44px', left: '44px', background: 'rgba(16,42,67,0.82)', backdropFilter: 'blur(12px)', padding: '22px 30px' }}>
-                  <Eyebrow style={{ marginBottom: '7px' }}>Kiemelt Ingatlan</Eyebrow>
+                  <Eyebrow style={{ marginBottom: '7px', color: 'var(--cream)' }}>Kiemelt Ingatlan</Eyebrow>
                   <div style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '19px', color: 'var(--cream)', marginBottom: '5px' }}>Balatoni Panorámaház</div>
                   <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '12px', color: 'rgba(244,244,242,0.6)', marginBottom: '18px' }}>Badacsony · € 178 000</div>
                   <TextBtn light onClick={() => navigate('detail', PROPERTIES[0])}>Megtekintés</TextBtn>
@@ -697,13 +803,18 @@
             {mob && (
               <div style={{ margin: '0 24px 32px', background: 'rgba(16,42,67,0.92)', padding: '18px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <Eyebrow style={{ marginBottom: '4px' }}>Kiemelt Ingatlan</Eyebrow>
+                  <Eyebrow style={{ marginBottom: '4px', color: 'var(--cream)' }}>Kiemelt Ingatlan</Eyebrow>
                   <div style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '16px', color: 'var(--cream)' }}>Balatoni Panorámaház</div>
                   <div style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '11px', color: 'rgba(244,244,242,0.6)', marginTop: '2px' }}>Badacsony · € 178 000</div>
                 </div>
                 <TextBtn light onClick={() => navigate('detail', PROPERTIES[0])}>Megtekintés</TextBtn>
               </div>
             )}
+          </section>
+
+          {/* PROPERTY SEARCH */}
+          <section style={{ borderTop: '1px solid var(--border)', padding: mob ? '44px 24px' : '72px 80px' }}>
+            <PropertySearchSection navigate={navigate} mob={mob} searchFilters={{}} />
           </section>
 
           {/* DUAL AUDIENCE */}
@@ -850,7 +961,7 @@
        PAGE: PROPERTY DETAIL
     ═══════════════════════════════════════════════════════════ */
 
-    const PropertiesPagePremium = ({ navigate }) => {
+    const PropertiesPagePremium = ({ navigate, searchFilters = {} }) => {
       const mob = useIsMobile();
       const t = {
         all: 'Mind',
@@ -888,8 +999,14 @@
         personalSearch: 'Szem\u00E9lyes keres\u00E9s',
       };
 
-      const filterDefaults = { type: t.all, region: t.all, price: t.all, area: t.all, land: t.all, curated: t.all };
-      const [filters, setFilters] = React.useState(filterDefaults);
+      const filterDefaults = { type: t.all, region: t.all, price: t.all, area: t.all, land: t.all, curated: t.all, beds: '' };
+      const [filters, setFilters] = React.useState(() => ({
+        ...filterDefaults,
+        ...(searchFilters.type ? { type: searchFilters.type } : {}),
+        ...(searchFilters.region ? { region: searchFilters.region } : {}),
+        ...(searchFilters.price ? { price: searchFilters.price } : {}),
+        ...(searchFilters.beds ? { beds: searchFilters.beds } : {}),
+      }));
       const [sortBy, setSortBy] = React.useState('featured');
       const typeOptions = [{ value: t.all, label: t.all }, ...Array.from(new Set(PROPERTIES.map(p => p.type))).map(type => ({ value: type, label: type }))];
       const regionOptions = [t.all, ...Array.from(new Set(PROPERTIES.map(p => p.region)))];
@@ -936,6 +1053,7 @@
         if (filters.curated === 'featured' && !p.featured) return false;
         if (filters.curated === 'character' && !(p.type.includes('Kast') || p.type.includes('tanya') || p.type.includes('Mez'))) return false;
         if (filters.curated === 'lifestyle' && !(p.type.includes('nyar') || /Balaton/i.test(p.region) || (p.tag && p.tag.includes('part')))) return false;
+        if (filters.beds && !(p.beds >= Number(filters.beds))) return false;
         return true;
       });
 
@@ -954,6 +1072,7 @@
         filters.area !== t.all ? areaOptions.find(o => o.value === filters.area)?.label : null,
         filters.land !== t.all ? landOptions.find(o => o.value === filters.land)?.label : null,
         filters.curated !== t.all ? curatedOptions.find(o => o.value === filters.curated)?.label : null,
+        filters.beds ? `${filters.beds}+ szoba` : null,
       ].filter(Boolean);
 
       const FilterSection = ({ title, children, noBorder = false }) => (
@@ -1014,6 +1133,7 @@
                   <FilterSection title={t.price}><div style={{ display: 'grid', gap: '8px' }}>{priceOptions.map(option => <PillButton key={option.value} active={filters.price === option.value} onClick={() => setFilter('price', option.value)} wide>{option.label}</PillButton>)}</div></FilterSection>
                   <FilterSection title={t.area}><div style={{ display: 'grid', gap: '8px' }}>{areaOptions.map(option => <PillButton key={option.value} active={filters.area === option.value} onClick={() => setFilter('area', option.value)} wide>{option.label}</PillButton>)}</div></FilterSection>
                   <FilterSection title={t.land}><div style={{ display: 'grid', gap: '8px' }}>{landOptions.map(option => <PillButton key={option.value} active={filters.land === option.value} onClick={() => setFilter('land', option.value)} wide>{option.label}</PillButton>)}</div></FilterSection>
+                  <FilterSection title="Hálószobák"><div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>{[{ value: '', label: 'Mind' }, { value: '1', label: '1+' }, { value: '2', label: '2+' }, { value: '3', label: '3+' }, { value: '4', label: '4+' }, { value: '5', label: '5+' }].map(o => <PillButton key={o.value} active={filters.beds === o.value} onClick={() => setFilter('beds', o.value)}>{o.label}</PillButton>)}</div></FilterSection>
                   <FilterSection title={t.curated} noBorder>
                     <div style={{ display: 'grid', gap: '8px', marginBottom: '18px' }}>{curatedOptions.map(option => <PillButton key={option.value} active={filters.curated === option.value} onClick={() => setFilter('curated', option.value)} wide>{option.label}</PillButton>)}</div>
                     <div style={{ padding: '16px', background: 'rgba(16,42,67,0.05)', border: '1px solid rgba(16,42,67,0.08)' }}>
@@ -1773,14 +1893,16 @@
     const App = () => {
       const [page, setPage] = React.useState('home');
       const [selectedProp, setSelectedProp] = React.useState(null);
+      const [searchFilters, setSearchFilters] = React.useState({});
 
-      const navigate = (pg, prop = null) => {
+      const navigate = (pg, prop = null, filters = null) => {
         setPage(pg);
         if (prop !== null) setSelectedProp(prop);
+        if (filters !== null) setSearchFilters(filters);
         window.scrollTo({ top: 0 });
       };
 
-      const pageProps = { navigate, currentPage: page, selectedProp };
+      const pageProps = { navigate, currentPage: page, selectedProp, searchFilters };
 
       const renderPage = () => {
         switch (page) {
