@@ -102,6 +102,47 @@
       0%,100% { opacity: 0.3; transform: scaleY(1); }
       50%      { opacity: 0.8; transform: scaleY(0.6); }
     }
+
+    /* ── Parallax CTA ── */
+    .parallax-cta {
+      position: relative;
+      aspect-ratio: 16 / 9;
+      min-height: 320px;
+      background-image: url('assets/cta.png');
+      background-attachment: fixed;
+      background-position: center center;
+      background-size: cover;
+      background-repeat: no-repeat;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .parallax-cta-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.42);
+      z-index: 1;
+    }
+    .parallax-cta-content {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 80px 24px;
+      width: 100%;
+      max-width: 820px;
+      text-align: center;
+    }
+    /* Mobile: fixed attachment not supported on iOS/Android */
+    @media (max-width: 768px) {
+      .parallax-cta { background-attachment: scroll; }
+    }
+    @supports (-webkit-overflow-scrolling: touch) {
+      .parallax-cta { background-attachment: scroll; }
+    }
   </style>
 </head>
 <body>
@@ -125,6 +166,7 @@
         price_huf: '64 000 000 Ft',
         beds: 4, baths: 2, area_m2: 210, land_m2: 2400,
         imgType: 'landscape',
+        imgSrc: 'assets/hero.png',
         featured: true,
         tag: 'Kiemelt',
         desc: 'Lélegzetelállító panorámával rendelkező, teljesen felújított villa a Balaton-felvidéken, magánszőlőskerttel és működő borospincével. Az ingatlan 2022-ben teljes körű felújításon esett át, megtartva eredeti karakterét.',
@@ -140,6 +182,7 @@
         price_huf: '115 200 000 Ft',
         beds: 7, baths: 4, area_m2: 480, land_m2: 32000,
         imgType: 'castle',
+        imgSrc: 'assets/kuria.jpg',
         featured: true,
         tag: 'Exkluzív',
         desc: 'Historizáló stílusú, 19. századi kúria teljesen restaurálva. 3,2 hektáros angolparkkal, önálló vendégházzal és lovardával. Kiváló befektetési vagy turisztikai lehetőség.',
@@ -155,6 +198,7 @@
         price_huf: '30 600 000 Ft',
         beds: 3, baths: 1, area_m2: 140, land_m2: 80000,
         imgType: 'aerial',
+        imgSrc: 'assets/tanya.jpg',
         featured: true,
         tag: null,
         desc: 'Autentikus alföldi tanya gazdag gyümölcsössel, kertészettel és gazdasági épületekkel. 8 hektár termőfölddel, saját kúttal. Csemő ismert hollandok által kedvelt telepeinek egyike.',
@@ -349,7 +393,7 @@
     // Sotheby's-style property card
     const PropertyCard = ({ property, onClick, delay = 0 }) => {
       const [hov, setHov] = React.useState(false);
-      const { title, location, region, type, price_eur, area_m2, land_m2, imgType, tag, beds } = property;
+      const { title, location, region, type, price_eur, area_m2, land_m2, imgType, imgSrc, tag, beds } = property;
       const fmt    = n => '€\u00A0' + n.toLocaleString('de-DE');
       const fmtL   = m => m >= 10000
         ? (m / 10000).toFixed(2).replace('.', ',') + '\u00A0ha'
@@ -361,7 +405,11 @@
                style={{ cursor: 'pointer', userSelect: 'none' }}>
             <div className="card-img-wrap" style={{ position: 'relative', aspectRatio: '4/3' }}>
               <div className="card-img-inner" style={{ height: '100%' }}>
-                <Placeholder type={imgType} />
+                {imgSrc ? (
+                  <img src={imgSrc} alt={title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                ) : (
+                  <Placeholder type={imgType} />
+                )}
               </div>
               {tag && (
                 <div style={{
@@ -467,11 +515,13 @@
       React.useEffect(() => { setMenuOpen(false); }, [currentPage]);
 
       const links = [
+        { label: 'Kezdőlap',    page: 'home'       },
         { label: 'Ingatlanok', page: 'properties' },
         { label: 'Eladóknak',  page: 'sellers'    },
         { label: 'Vevőknek',   page: 'buyers'     },
         { label: 'Rólunk',     page: 'about'      },
         { label: 'Kapcsolat',  page: 'contact'    },
+        { label: 'Blog',       page: 'blog'       },
       ];
 
       const navPad = mob ? '13px 20px' : (scrolled ? '16px 64px' : '28px 64px');
@@ -584,11 +634,13 @@
             </div>
             {[
               { heading: 'Navigáció', items: [
+                { label: 'Kezdőlap',    page: 'home'       },
                 { label: 'Ingatlanok', page: 'properties' },
                 { label: 'Eladóknak',  page: 'sellers'    },
                 { label: 'Vevőknek',   page: 'buyers'     },
                 { label: 'Rólunk',     page: 'about'      },
                 { label: 'Kapcsolat',  page: 'contact'    },
+                { label: 'Blog',       page: 'blog'       },
               ]},
               { heading: 'Kategóriák', items: [
                 'Eladó ház','Kastélyok, kúriák','Eladó tanya',
@@ -772,7 +824,7 @@
             <div style={{ flex: mob ? 'none' : '0 0 54%', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: mob ? '36px 24px 32px' : '140px 72px 80px 80px', position: 'relative' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: mob ? '20px' : '36px', ...anim(0.1) }}>
                 <div style={{ width: '32px', height: '1px', background: 'var(--accent)', flexShrink: 0 }} />
-                <span style={{ fontFamily: 'var(--sans)', fontWeight: 400, fontSize: '9.5px', letterSpacing: '0.24em', textTransform: 'uppercase', color: 'var(--accent)', background: 'rgba(16,42,67,0.06)', border: '1px solid rgba(16,42,67,0.12)', padding: '7px 12px 7px 14px' }}>
+                <span style={{ fontFamily: 'var(--sans)', fontWeight: 400, fontSize: '9.5px', letterSpacing: '0.24em', textTransform: 'uppercase', color: 'var(--accent)' }}>
                   Est. 2013 — Almere, Hollandia
                 </span>
               </div>
@@ -860,7 +912,6 @@
 
           {/* EDITORIAL QUOTE */}
           <section data-bg="dark" style={{ background: 'var(--ink)', padding: mob ? '64px 24px' : '128px 80px', position: 'relative', overflow: 'hidden' }}>
-            {!mob && <div style={{ position: 'absolute', right: '-60px', top: '50%', transform: 'translateY(-50%)', fontFamily: 'var(--serif)', fontSize: '480px', fontWeight: 300, color: 'rgba(236,237,239,0.07)', lineHeight: 1, userSelect: 'none', pointerEvents: 'none' }}>F</div>}
             <Reveal>
               <div style={{ maxWidth: '820px', margin: '0 auto', textAlign: 'center' }}>
                 <GoldRule center style={{ marginBottom: mob ? '32px' : '48px' }} />
@@ -895,20 +946,47 @@
             <Reveal><div style={{ textAlign: 'center', marginTop: mob ? '36px' : '68px' }}><BtnDark onClick={() => navigate('sellers')} style={mob ? { width: '100%' } : {}}>Tudjon meg többet</BtnDark></div></Reveal>
           </section>
 
-          {/* CTA BAND */}
-          <section style={{ background: 'var(--linen)', borderTop: '1px solid var(--border)', padding: mob ? '44px 24px' : '72px 80px', display: 'flex', flexDirection: mob ? 'column' : 'row', justifyContent: 'space-between', alignItems: mob ? 'stretch' : 'center', gap: mob ? '24px' : '0' }}>
-            <Reveal>
-              <div>
-                <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: mob ? 'clamp(24px, 7vw, 34px)' : 'clamp(26px, 2.8vw, 42px)', color: 'var(--ink)', marginBottom: '8px' }}>Forduljon hozzánk bizalommal!</h2>
-                <p style={{ fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px', color: 'var(--taupe)' }}>Munkanapokon 08:00–18:00 · A visszahívás ingyenes.</p>
-              </div>
-            </Reveal>
-            <Reveal delay={2}>
-              <div style={{ display: 'flex', flexDirection: mob ? 'column' : 'row', gap: mob ? '12px' : '16px', flexShrink: 0 }}>
-                <BtnDark onClick={() => navigate('contact')} style={mob ? { width: '100%', textAlign: 'center' } : {}}>Ingyenes visszahívás</BtnDark>
-                <BtnOutline onClick={() => navigate('properties')} style={mob ? { width: '100%', textAlign: 'center' } : {}}>Ingatlanok böngészése</BtnOutline>
-              </div>
-            </Reveal>
+          {/* CTA BAND — Parallax */}
+          <section className="parallax-cta">
+            <div className="parallax-cta-overlay" />
+            <div className="parallax-cta-content">
+              <Reveal>
+                <Eyebrow center style={{ marginBottom: '20px', color: 'rgba(244,244,242,0.65)', letterSpacing: '0.38em' }}>
+                  Lépjen kapcsolatba velünk
+                </Eyebrow>
+              </Reveal>
+              <Reveal delay={1}>
+                <h2 style={{
+                  fontFamily: 'var(--serif)', fontWeight: 400,
+                  fontSize: mob ? 'clamp(28px, 8vw, 44px)' : 'clamp(36px, 3.8vw, 60px)',
+                  color: '#F4F4F2', lineHeight: 1.08,
+                  marginBottom: mob ? '14px' : '18px',
+                }}>Forduljon hozzánk<br /><em style={{ opacity: 0.85 }}>bizalommal!</em></h2>
+              </Reveal>
+              <Reveal delay={2}>
+                <p style={{
+                  fontFamily: 'var(--sans)', fontWeight: 300, fontSize: '14px',
+                  color: 'rgba(244,244,242,0.65)', letterSpacing: '0.04em',
+                  marginBottom: mob ? '36px' : '52px',
+                }}>Munkanapokon 08:00–18:00&nbsp;·&nbsp;A visszahívás ingyenes.</p>
+              </Reveal>
+              <Reveal delay={3}>
+                <div style={{ display: 'flex', flexDirection: mob ? 'column' : 'row', gap: mob ? '12px' : '16px', justifyContent: 'center', width: mob ? '100%' : 'auto' }}>
+                  <BtnDark
+                    onClick={() => navigate('contact')}
+                    style={Object.assign(
+                      { background: '#F4F4F2', color: 'var(--ink)' },
+                      mob ? { width: '100%', textAlign: 'center' } : {}
+                    )}
+                  >Ingyenes visszahívás</BtnDark>
+                  <BtnOutline
+                    light
+                    onClick={() => navigate('properties')}
+                    style={mob ? { width: '100%', textAlign: 'center' } : {}}
+                  >Ingatlanok böngészése</BtnOutline>
+                </div>
+              </Reveal>
+            </div>
           </section>
         </main>
       );
@@ -1541,7 +1619,6 @@
 
         {/* EDITORIAL — ink bg */}
         <section data-bg="dark" style={{ background: 'var(--ink)', padding: mob ? '56px 24px' : '128px 80px', position: 'relative', overflow: 'hidden' }}>
-          {!mob && <div style={{ position: 'absolute', right: '-60px', top: '50%', transform: 'translateY(-50%)', fontFamily: 'var(--serif)', fontSize: '480px', fontWeight: 300, color: 'rgba(236,237,239,0.06)', lineHeight: 1, userSelect: 'none', pointerEvents: 'none' }}>M</div>}
           <Reveal>
             <div style={{ maxWidth: '820px', margin: '0 auto', textAlign: 'center' }}>
               <GoldRule center style={{ marginBottom: mob ? '28px' : '48px' }} />
@@ -1760,7 +1837,6 @@
 
         {/* EDITORIAL ORIGIN — ink bg */}
         <section data-bg="dark" style={{ background: 'var(--ink)', padding: mob ? '56px 24px' : '128px 80px', position: 'relative', overflow: 'hidden' }}>
-          {!mob && <div style={{ position: 'absolute', right: '-60px', top: '50%', transform: 'translateY(-50%)', fontFamily: 'var(--serif)', fontSize: '480px', fontWeight: 300, color: 'rgba(236,237,239,0.06)', lineHeight: 1, userSelect: 'none', pointerEvents: 'none' }}>F</div>}
           <Reveal>
             <div style={{ maxWidth: '820px', margin: '0 auto', textAlign: 'center' }}>
               <GoldRule center style={{ marginBottom: mob ? '28px' : '48px' }} />
@@ -1913,6 +1989,7 @@
           case 'buyers':     return <BuyersPage {...pageProps} />;
           case 'about':      return <AboutPage {...pageProps} />;
           case 'contact':    return <ContactPage {...pageProps} />;
+          case 'blog':       return <HomePage {...pageProps} />;
           default:           return <HomePage {...pageProps} />;
         }
       };
