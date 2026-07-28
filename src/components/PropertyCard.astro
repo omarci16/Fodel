@@ -1,0 +1,193 @@
+---
+/**
+ * Property card, ported from the prototype.
+ *
+ * Two changes beyond styling: the whole card is a real <a> (crawlable,
+ * shareable, middle-clickable), and the reference number is shown — sellers
+ * and buyers quote it on the phone, and the prototype omitted it entirely.
+ *
+ * `data-*` attributes carry the filterable values so the properties page can
+ * filter pre-rendered markup without re-rendering anything.
+ */
+import { Image } from 'astro:assets';
+import Eyebrow from './Eyebrow.astro';
+import { categoryLabel, type Locale, type CategoryKey, UI } from '~/i18n/ui';
+import { text, url as propertyUrl, type Property } from '~/lib/properties';
+import { eur, area, floorArea } from '~/lib/format';
+
+interface Props {
+  property: Property;
+  locale: Locale;
+  /** Above-the-fold cards skip lazy-loading so the LCP image is not delayed. */
+  eager?: boolean;
+  class?: string;
+}
+
+const { property, locale, eager = false, class: className } = Astro.props;
+const d = property.data;
+const ui = UI[locale];
+
+const href = propertyUrl(property, locale);
+const title = text(d.title, locale);
+const tag = d.tag ? text(d.tag, locale) : null;
+const category = categoryLabel(d.category as CategoryKey, locale);
+const heroAlt = text(d.media.heroAlt, locale);
+
+const specs = [
+  d.rooms ? `${d.rooms.bedrooms} ${locale === 'hu' ? 'szoba' : 'slk.'}` : null,
+  d.areas.floorM2 ? floorArea(d.areas.floorM2) : null,
+  area(d.areas.plotM2, locale),
+]
+  .filter(Boolean)
+  .join(' · ');
+---
+
+<article
+  class:list={['prop-card', className]}
+  data-property
+  data-category={d.category}
+  data-region={d.location.region}
+  data-county={d.location.county}
+  data-price={d.price.eur}
+  data-floor={d.areas.floorM2 ?? 0}
+  data-plot={d.areas.plotM2}
+  data-beds={d.rooms?.bedrooms ?? 0}
+  data-featured={d.listing.featured ? '1' : '0'}
+  data-published={d.listing.publishedAt.getTime()}
+>
+  <a class="card-link" href={href}>
+    <div class="card-img-wrap">
+      <div class="card-img-inner">
+        <Image
+          src={d.media.hero}
+          alt={heroAlt}
+          widths={[400, 600, 800]}
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 45vw, 30vw"
+          loading={eager ? 'eager' : 'lazy'}
+          fetchpriority={eager ? 'high' : 'auto'}
+          class="card-img"
+        />
+      </div>
+      {tag && <span class="tag">{tag}</span>}
+      {
+        d.status !== 'active' && (
+          <span class="status">
+            {d.status === 'sold' ? ui.property.sold : ui.property.reserved}
+          </span>
+        )
+      }
+    </div>
+
+    <div class="card-body">
+      <Eyebrow space="7px">{d.location.region} — {category}</Eyebrow>
+      <h3 class="card-title">{title}</h3>
+      <p class="card-location">
+        {d.location.settlement}, {d.location.county}
+        <span class="ref">· {ui.property.reference} {d.ref}</span>
+      </p>
+      <div class="card-foot">
+        <span class="price">{eur(d.price.eur)}</span>
+        <span class="specs">{specs}</span>
+      </div>
+    </div>
+  </a>
+</article>
+
+<style>
+  .prop-card {
+    position: relative;
+  }
+  .card-link {
+    display: block;
+  }
+  .card-img-wrap {
+    position: relative;
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+    background: var(--mist);
+  }
+  .card-img-inner {
+    height: 100%;
+  }
+  .card-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .tag,
+  .status {
+    position: absolute;
+    top: 14px;
+    font-family: var(--sans);
+    font-weight: var(--fw-regular);
+    /* ADJUSTED: 8.5px in the prototype. */
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    padding: 5px 11px;
+  }
+  .tag {
+    left: 14px;
+    background: var(--ink);
+    color: var(--cream);
+  }
+  .status {
+    right: 14px;
+    background: var(--cream);
+    color: var(--ink);
+  }
+
+  .card-body {
+    padding-top: 18px;
+  }
+  .card-title {
+    font-family: var(--serif);
+    font-weight: var(--fw-medium);
+    font-size: 21px;
+    line-height: 1.15;
+    color: var(--ink);
+    margin-bottom: 5px;
+    transition: color var(--dur-fast) ease;
+  }
+  .card-link:hover .card-title {
+    color: var(--taupe);
+  }
+  .card-location {
+    font-family: var(--sans);
+    font-weight: var(--fw-light);
+    font-size: var(--fs-small);
+    line-height: 1.5;
+    color: var(--taupe);
+    letter-spacing: 0.04em;
+    margin-bottom: 14px;
+  }
+  .ref {
+    /* was opacity .75 → 2.83:1 */
+    white-space: nowrap;
+  }
+  .card-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+  .price {
+    font-family: var(--serif);
+    font-weight: var(--fw-medium);
+    font-size: 19px;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+  .specs {
+    font-family: var(--sans);
+    font-weight: var(--fw-light);
+    /* ADJUSTED: 11px in the prototype. */
+    font-size: var(--fs-micro);
+    color: var(--taupe);
+    text-align: right;
+  }
+</style>

@@ -1,0 +1,113 @@
+---
+/**
+ * 404. Bilingual, because a visitor arriving on a dead link may be coming from
+ * either market — and because the old fodel.nl URLs will send traffic here
+ * until the redirect map is in place.
+ */
+import Base from '~/layouts/Base.astro';
+import Eyebrow from '~/components/Eyebrow.astro';
+import GoldRule from '~/components/GoldRule.astro';
+import Button from '~/components/Button.astro';
+import { path } from '~/i18n/ui';
+import { COMPANY } from '~/config/company';
+---
+
+<Base
+  locale="nl"
+  title="404 — Pagina niet gevonden / Az oldal nem található"
+  description="De opgevraagde pagina bestaat niet. A keresett oldal nem található."
+  noindex
+>
+  <section class="notfound">
+    <Eyebrow center space="20px">404</Eyebrow>
+    <h1>Pagina niet gevonden<br /><em>Az oldal nem található</em></h1>
+    <GoldRule center space="52px" />
+
+    <div class="cols">
+      <div class="col">
+        <p lang="nl">
+          De pagina die u zocht bestaat niet of is verplaatst. Bekijk ons aanbod,
+          of neem contact met ons op.
+        </p>
+        <div class="actions">
+          <Button variant="dark" href={path('nl', 'properties')}>Ons aanbod</Button>
+          <Button variant="outline" href={path('nl', 'contact')}>Contact</Button>
+        </div>
+      </div>
+
+      <div class="col">
+        <p lang="hu">
+          A keresett oldal nem létezik, vagy áthelyeztük. Nézze meg a kínálatunkat,
+          vagy vegye fel velünk a kapcsolatot.
+        </p>
+        <div class="actions">
+          <Button variant="dark" href={path('hu', 'properties')}>Ingatlanok</Button>
+          <Button variant="outline" href={path('hu', 'contact')}>Kapcsolat</Button>
+        </div>
+      </div>
+    </div>
+
+    <p class="phone">
+      {COMPANY.phones[0].display} · {COMPANY.phones[1].display} ·
+      <a href={`mailto:${COMPANY.email.primary}`}>{COMPANY.email.primary}</a>
+    </p>
+  </section>
+</Base>
+
+<style>
+  .notfound {
+    max-width: 900px;
+    margin-inline: auto;
+    padding: 100px var(--pad-x) var(--section-y);
+    text-align: center;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-weight: var(--fw-display);
+    font-size: clamp(32px, 4.4vw, 62px);
+    line-height: 1.1;
+    color: var(--ink);
+    margin-bottom: 32px;
+  }
+  h1 em {
+    font-style: italic;
+    color: var(--taupe);
+  }
+  .cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 48px;
+    text-align: left;
+    margin-bottom: 52px;
+  }
+  .col p {
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    color: var(--taupe);
+    margin-bottom: 24px;
+  }
+  .actions {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .phone {
+    font-size: var(--fs-small);
+    color: var(--taupe);
+    padding-top: 28px;
+    border-top: 1px solid var(--border);
+  }
+  .phone a {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  @media (max-width: 768px) {
+    .notfound {
+      padding: 56px var(--pad-x-mob) var(--section-y-mob);
+    }
+    .cols {
+      grid-template-columns: 1fr;
+      gap: 36px;
+    }
+  }
+</style>

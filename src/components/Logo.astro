@@ -1,0 +1,60 @@
+---
+/** FODEL wordmark. Ported from the prototype; the sub-label localises. */
+import { BRAND, type Locale } from '~/i18n/ui';
+
+interface Props {
+  locale: Locale;
+  light?: boolean;
+  href?: string;
+}
+
+const { locale, light = false, href = `/${locale}/` } = Astro.props;
+
+/** "INGATLAN" in Hungarian, "VASTGOED" in Dutch — their own market names. */
+const subLabel = BRAND[locale].name.replace('FODEL', '').trim() || 'VASTGOED';
+---
+
+<a class="logo" class:list={{ light }} href={href} aria-label={BRAND[locale].name}>
+  <span class="word">FODEL</span>
+  <span class="rule" aria-hidden="true"></span>
+  <span class="sub">{subLabel}</span>
+</a>
+
+<style>
+  .logo {
+    display: block;
+    line-height: 1;
+    user-select: none;
+  }
+  .word {
+    display: block;
+    font-family: var(--serif);
+    font-weight: var(--fw-medium);
+    font-size: 20px;
+    letter-spacing: 0.38em;
+    color: var(--ink);
+    text-transform: uppercase;
+  }
+  .rule {
+    display: block;
+    height: 1px;
+    background: var(--accent);
+    margin: 5px 0 4px;
+  }
+  .sub {
+    display: block;
+    font-family: var(--sans);
+    font-weight: 200;
+    /* ADJUSTED: 7.5px in the prototype — below the threshold of legibility. */
+    font-size: 9px;
+    letter-spacing: 0.42em;
+    color: var(--taupe);
+    text-transform: uppercase;
+  }
+  .light .word {
+    color: var(--cream);
+  }
+  .light .sub {
+    color: var(--on-dark-muted);
+  }
+</style>

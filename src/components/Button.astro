@@ -1,0 +1,133 @@
+---
+/**
+ * The prototype's BtnDark / BtnOutline / TextBtn, unified.
+ *
+ * Renders <a> when given an href and <button> otherwise. The prototype used
+ * <button onClick> for navigation everywhere, which meant no crawlable links,
+ * no middle-click, and no hover preview.
+ */
+interface Props {
+  variant?: 'dark' | 'outline' | 'text';
+  href?: string;
+  type?: 'button' | 'submit';
+  light?: boolean;
+  block?: boolean;
+  class?: string;
+  id?: string;
+  'data-testid'?: string;
+}
+
+const {
+  variant = 'dark',
+  href,
+  type = 'button',
+  light = false,
+  block = false,
+  class: className,
+  ...rest
+} = Astro.props;
+
+const Tag = href ? 'a' : 'button';
+const classes = ['btn', `btn-${variant}`, { light, block }, className];
+---
+
+<Tag class:list={classes} href={href} type={href ? undefined : type} {...rest}>
+  <slot />
+  {variant === 'text' && <span class="arrow" aria-hidden="true">→</span>}
+</Tag>
+
+<style>
+  .btn {
+    display: inline-block;
+    font-family: var(--sans);
+    font-weight: var(--fw-regular);
+    /* ADJUSTED: 10.5px in the prototype. */
+    font-size: var(--fs-micro);
+    letter-spacing: var(--ls-button);
+    text-transform: uppercase;
+    text-align: center;
+    cursor: pointer;
+    transition:
+      background 0.4s,
+      color 0.4s,
+      border-color 0.4s;
+  }
+
+  .btn-dark,
+  .btn-outline {
+    padding: 15px 38px;
+  }
+
+  .btn-dark {
+    background: var(--ink);
+    color: var(--cream);
+    border: 1px solid var(--ink);
+  }
+  .btn-dark:hover {
+    background: var(--cream);
+    color: var(--ink);
+  }
+  .btn-dark.light {
+    background: var(--cream);
+    color: var(--ink);
+    border-color: var(--cream);
+  }
+  .btn-dark.light:hover {
+    background: transparent;
+    color: var(--cream);
+  }
+
+  .btn-outline {
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid var(--ink);
+  }
+  .btn-outline:hover {
+    background: var(--linen);
+  }
+  .btn-outline.light {
+    color: var(--cream);
+    border-color: rgba(244, 244, 242, 0.55);
+  }
+  .btn-outline.light:hover {
+    background: rgba(244, 244, 242, 0.12);
+  }
+
+  .btn-text {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 0;
+    background: none;
+    border: none;
+    letter-spacing: 0.22em;
+    color: var(--taupe);
+  }
+  .btn-text:hover {
+    color: var(--ink);
+  }
+  /* ADJUSTED: was rgba(cream,.7) on ink — this clears AA. */
+  .btn-text.light {
+    color: var(--on-dark-body);
+  }
+  .btn-text.light:hover {
+    color: var(--cream);
+  }
+  .arrow {
+    font-size: 15px;
+    letter-spacing: 0;
+    transition: transform 0.35s var(--ease);
+  }
+  .btn-text:hover .arrow {
+    transform: translateX(4px);
+  }
+
+  .block {
+    display: block;
+    width: 100%;
+  }
+  .btn-text.block {
+    display: flex;
+    justify-content: center;
+  }
+</style>

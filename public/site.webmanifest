@@ -1,0 +1,9 @@
+{
+  "name": "FODEL — Magyar ingatlanok Nyugat-Európában",
+  "short_name": "FODEL",
+  "start_url": "/",
+  "display": "browser",
+  "background_color": "#F4F4F2",
+  "theme_color": "#102A43",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

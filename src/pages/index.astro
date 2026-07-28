@@ -1,0 +1,48 @@
+---
+/**
+ * Root. Sends visitors to a locale rather than serving content at `/`, so no
+ * page is reachable at two URLs.
+ *
+ * Dutch is x-default: FODEL's buyer demand is Dutch and Belgian, and the
+ * Hungarian side arrives through fodel.hu and direct links.
+ */
+export const prerender = true;
+---
+
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FODEL — Kies uw taal / Válasszon nyelvet</title>
+    <meta name="description" content="Kies uw taal om verder te gaan: Nederlands of Hongaars. Válasszon nyelvet a folytatáshoz." />
+    <meta name="robots" content="noindex, follow" />
+    <link rel="canonical" href="https://fodel.nl/nl/" />
+    <link rel="alternate" hreflang="nl" href="https://fodel.nl/nl/" />
+    <link rel="alternate" hreflang="hu" href="https://fodel.nl/hu/" />
+    <link rel="alternate" hreflang="x-default" href="https://fodel.nl/nl/" />
+    <meta http-equiv="refresh" content="0; url=/nl/" />
+    <script is:inline>
+      // Prefer the visitor's own language when we publish it.
+      (function () {
+        var supported = ['nl', 'hu'];
+        var languages = navigator.languages || [navigator.language || 'nl'];
+        var match = 'nl';
+        for (var i = 0; i < languages.length; i++) {
+          var code = String(languages[i]).slice(0, 2).toLowerCase();
+          if (supported.indexOf(code) !== -1) {
+            match = code;
+            break;
+          }
+        }
+        location.replace('/' + match + '/');
+      })();
+    </script>
+  </head>
+  <body>
+    <p>
+      <a href="/nl/">Ga verder in het Nederlands</a> ·
+      <a href="/hu/">Tovább magyarul</a>
+    </p>
+  </body>
+</html>

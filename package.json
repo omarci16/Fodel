@@ -1,0 +1,28 @@
+{
+  "name": "fodel-website",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "FODEL Ingatlan / FODEL Vastgoed \u2014 Hungarian property advertised across Western Europe",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build && node scripts/prune-assets.mjs",
+    "preview": "node scripts/preview.mjs",
+    "check": "astro check",
+    "verify:ssg": "node scripts/verify-ssg.mjs",
+    "verify:contrast": "node scripts/verify-contrast.mjs",
+    "verify": "npm run build && npm run verify:ssg && npm run verify:contrast",
+    "verify:dev": "npm run build && node scripts/verify-ssg.mjs --allow-missing-kvk && npm run verify:contrast",
+    "og": "node scripts/build-og.mjs"
+  },
+  "dependencies": {
+    "@astrojs/netlify": "^6.5.13",
+    "@astrojs/sitemap": "^3.6.0",
+    "@fontsource-variable/jost": "^5.3.0",
+    "@fontsource/dm-sans": "^5.3.0",
+    "astro": "^5.16.2",
+    "resend": "^6.1.2",
+    "sharp": "^0.34.4"
+  }
+}

@@ -1,0 +1,728 @@
+---
+/**
+ * Property detail. Ported from the prototype, plus the fields it was missing:
+ * FODEL reference number, EPC class (legally required in EU property ads),
+ * coordinates and a map link, features, video, and — most importantly — the
+ * owner's own contact details where the seller has agreed to publish them.
+ * That last block is FODEL's actual differentiator, expressed as data.
+ */
+import { Image, getImage } from 'astro:assets';
+import Base from '~/layouts/Base.astro';
+import Eyebrow from '~/components/Eyebrow.astro';
+import GoldRule from '~/components/GoldRule.astro';
+import Button from '~/components/Button.astro';
+import PropertyCard from '~/components/PropertyCard.astro';
+import FormShell from '~/components/forms/FormShell.astro';
+import Field from '~/components/forms/Field.astro';
+import { UI, categoryLabel, path, type Locale, type CategoryKey } from '~/i18n/ui';
+import { COMPANY } from '~/config/company';
+import { featureLabel } from '~/data/features';
+import { activeProperties, similarTo, text, url as propUrl, type Property } from '~/lib/properties';
+import { propertyAlternates, crumbs } from '~/lib/page';
+import { propertySchema, breadcrumbSchema } from '~/lib/seo';
+import { eur, huf, area, floorArea, epcLabel, formatDate } from '~/lib/format';
+
+interface Props {
+  locale: Locale;
+  property: Property;
+}
+
+const { locale, property } = Astro.props;
+const d = property.data;
+const ui = UI[locale];
+
+const title = text(d.title, locale);
+const subtitle = d.subtitle ? text(d.subtitle, locale) : '';
+const description = text(d.description, locale);
+const category = categoryLabel(d.category as CategoryKey, locale);
+const tag = d.tag ? text(d.tag, locale) : null;
+
+const gallery = [
+  { src: d.media.hero, alt: text(d.media.heroAlt, locale), label: null as string | null },
+  ...d.media.gallery.map((g) => ({
+    src: g.src,
+    alt: text(g.alt, locale),
+    label: g.label ? text(g.label, locale) : null,
+  })),
+];
+
+const HERO_WIDTHS = [900, 1400, 1920];
+const HERO_SIZES = '100vw';
+
+// Structured data and Open Graph get a right-sized variant, not the source
+// file. Using `.src` of the original would point crawlers and social scrapers
+// at a multi-megabyte PNG — and would force the originals to ship in dist.
+const shareImage = await getImage({
+  src: gallery[0].src,
+  width: 1200,
+  height: 630,
+  fit: 'cover',
+  // 'jpg', not 'jpeg' — the build accepts both, the dev image endpoint only
+  // accepts 'jpg' and 500s otherwise.
+  format: 'jpg',
+  quality: 80,
+});
+
+const pageUrl = propUrl(property, locale);
+const epc = epcLabel(d.building.epcClass, { epcMissing: ui.property.epcMissing });
+
+const specs = [
+  d.rooms && { label: ui.property.beds, value: String(d.rooms.bedrooms) },
+  d.rooms && { label: ui.property.baths, value: String(d.rooms.bathrooms) },
+  d.areas.floorM2 && { label: ui.property.area, value: floorArea(d.areas.floorM2) },
+  { label: ui.property.land, value: area(d.areas.plotM2, locale) },
+  { label: ui.property.epc, value: epc.value },
+  d.building.yearBuilt && { label: ui.property.yearBuilt, value: String(d.building.yearBuilt) },
+].filter(Boolean) as { label: string; value: string }[];
+
+const all = await activeProperties();
+const similar = similarTo(property, all, 3);
+
+const trail = crumbs(locale, [
+  { name: ui.nav.properties, url: path(locale, 'properties') },
+  { name: d.location.region, url: path(locale, 'properties') },
+  { name: title, url: pageUrl },
+]);
+
+const mapUrl = `https://www.openstreetmap.org/?mlat=${d.location.lat}&mlon=${d.location.lng}#map=13/${d.location.lat}/${d.location.lng}`;
+
+const metaDescription = `${title} — ${d.location.settlement}, ${d.location.county}. ${eur(
+  d.price.eur
+)}${d.areas.floorM2 ? `, ${floorArea(d.areas.floorM2)}` : ''}, ${area(d.areas.plotM2, locale)}. ${
+  locale === 'hu' ? 'Azonosító' : 'Referentie'
+} ${d.ref}.`;
+---
+
+<Base
+  locale={locale}
+  title={`${title} — ${d.location.settlement}`}
+  description={metaDescription}
+  alternates={propertyAlternates(d.category as CategoryKey, d.ref)}
+  ogType="article"
+  ogImage={shareImage.src}
+  schema={[
+    propertySchema(property, locale, pageUrl, shareImage.src),
+    breadcrumbSchema(trail),
+  ]}
+>
+  <nav class="crumbs no-print" aria-label={ui.a11y.breadcrumb}>
+    <ol>
+      {
+        trail.map((c, i) => (
+          <li>
+            {i < trail.length - 1 ? <a href={c.url}>{c.name}</a> : <span aria-current="page">{c.name}</span>}
+          </li>
+        ))
+      }
+    </ol>
+  </nav>
+
+  {/* ── Gallery hero ── */}
+  <div class="property-detail-hero" id="gallery">
+    {
+      gallery.map((image, i) => (
+        <div class="property-detail-hero-media gallery-slide" data-slide={i} hidden={i !== 0}>
+          <Image
+            src={image.src}
+            alt={image.alt}
+            widths={HERO_WIDTHS}
+            sizes={HERO_SIZES}
+            loading={i === 0 ? 'eager' : 'lazy'}
+            fetchpriority={i === 0 ? 'high' : 'auto'}
+          />
+        </div>
+      ))
+    }
+    <div class="property-detail-hero-overlay"></div>
+
+    {tag && <span class="hero-tag">{tag}</span>}
+
+    <div class="hero-foot">
+      <div class="hero-title">
+        <span class="hero-kicker">{category}</span>
+        <span class="hero-name">{title}</span>
+      </div>
+
+      {
+        gallery.length > 1 && (
+          <div class="property-detail-gallery-controls no-print">
+            <button class="property-detail-nav" type="button" id="gal-prev" aria-label={ui.property.prevImage} aria-controls="gallery">
+              <span class="property-detail-nav-arrow" aria-hidden="true">←</span>
+            </button>
+            <p class="property-detail-gallery-count" id="gal-count" role="status">
+              01 / {String(gallery.length).padStart(2, '0')}
+            </p>
+            <button class="property-detail-nav" type="button" id="gal-next" aria-label={ui.property.nextImage} aria-controls="gallery">
+              <span class="property-detail-nav-arrow" aria-hidden="true">→</span>
+            </button>
+          </div>
+        )
+      }
+    </div>
+  </div>
+
+  {/* ── Body ── */}
+  <div class="body">
+    <div class="main">
+      <Eyebrow space="12px">{d.location.region} — {category}</Eyebrow>
+      <h1>{title}</h1>
+      {subtitle && <p class="subtitle">{subtitle}</p>}
+
+      <p class="location">
+        {d.location.settlement}, {d.location.county}
+        <a class="map-link no-print" href={mapUrl} target="_blank" rel="noopener">
+          {locale === 'hu' ? 'Térképen' : 'Op de kaart'}
+        </a>
+      </p>
+
+      <div class="price-row">
+        <span class="price">{eur(d.price.eur)}</span>
+        <span class="price-huf">{huf(d.price.huf, locale)}</span>
+        <span class="price-asof">
+          {locale === 'hu' ? 'Árfolyam' : 'Koers'}: {formatDate(d.price.asOf, locale)}
+        </span>
+      </div>
+
+      <dl class="specs">
+        {
+          specs.map((s) => (
+            <div class="spec">
+              <dd>{s.value}</dd>
+              <dt>{s.label}</dt>
+            </div>
+          ))
+        }
+      </dl>
+
+      <div class="ref-row">
+        <span>{ui.property.reference} <strong>{d.ref}</strong></span>
+        <button type="button" class="print-btn no-print" id="print-btn">
+          {locale === 'hu' ? 'Nyomtatás' : 'Afdrukken'}
+        </button>
+      </div>
+
+      <div class="prose">
+        <h2 class="sr-heading">{ui.property.description}</h2>
+        <p class="lead">{description}</p>
+        <slot />
+      </div>
+
+      {
+        d.features.length > 0 && (
+          <section class="features">
+            <Eyebrow space="14px">{ui.property.features}</Eyebrow>
+            <ul>
+              {d.features.map((f) => <li>{featureLabel(f, locale)}</li>)}
+            </ul>
+          </section>
+        )
+      }
+
+      {
+        d.media.videoUrl && (
+          <section class="video no-print">
+            <Eyebrow space="14px">{ui.property.video}</Eyebrow>
+            <a href={d.media.videoUrl} target="_blank" rel="noopener">{d.media.videoUrl}</a>
+          </section>
+        )
+      }
+
+      <GoldRule class="prose-rule" />
+
+      {/* FODEL's actual USP, as a data-driven block rather than a slogan. */}
+      {
+        d.seller.contactVisible && d.seller.name && (
+          <aside class="owner">
+            <Eyebrow space="10px">{ui.property.ownerContact}</Eyebrow>
+            <p class="owner-note">{ui.property.ownerContactNote}</p>
+            <p class="owner-name">{d.seller.name}</p>
+            {d.seller.phone && (
+              <p class="owner-phone">
+                <a href={`tel:${d.seller.phone.replace(/\s/g, '')}`}>{d.seller.phone}</a>
+              </p>
+            )}
+            {d.seller.speaks.length > 0 && (
+              <p class="owner-speaks">
+                {locale === 'hu' ? 'Beszélt nyelvek' : 'Spreekt'}:{' '}
+                {d.seller.speaks.map((s) => s.toUpperCase()).join(' · ')}
+              </p>
+            )}
+          </aside>
+        )
+      }
+
+      <aside class="guarantee">
+        <Eyebrow space="8px">
+          {locale === 'hu' ? 'FODEL Garancia' : 'De FODEL-garantie'}
+        </Eyebrow>
+        <p>
+          {
+            locale === 'hu'
+              ? 'Minden hirdető azonosítása megtörtént. Kétnyelvű adásvételi szerződés, meghatalmazásos képviselet és földhivatali ügyintézés igény szerint elérhető.'
+              : 'Elke adverteerder is door ons geïdentificeerd. Tweetalige koopovereenkomst, vertegenwoordiging met volmacht en inschrijving bij het kadaster zijn op verzoek beschikbaar.'
+          }
+        </p>
+      </aside>
+    </div>
+
+    {/* ── Enquiry ── */}
+    <aside class="enquiry no-print" data-bg="dark">
+      <Eyebrow space="10px">{ui.property.enquire}</Eyebrow>
+      <h2 class="enq-title">{ui.property.enquireTitle}</h2>
+
+      <FormShell
+        locale={locale}
+        endpoint="/api/enquiry"
+        formId="enquiry"
+        onDark
+        meta={{ propertyRef: d.ref, propertyTitle: title }}
+      >
+        <Field locale={locale} name="name" label={ui.form.name} required autocomplete="name" span="full" onDark />
+        <Field locale={locale} name="email" label={ui.form.email} type="email" required autocomplete="email" span="full" onDark />
+        <Field locale={locale} name="phone" label={ui.form.phone} type="tel" autocomplete="tel" span="full" onDark />
+        <Field
+          locale={locale}
+          name="message"
+          label={ui.form.message}
+          type="textarea"
+          placeholder={ui.form.messagePlaceholder}
+          span="full"
+          onDark
+        />
+      </FormShell>
+
+      <p class="enq-alt">
+        {locale === 'hu' ? 'Vagy hívjon minket' : 'Of bel ons'}:<br />
+        {
+          COMPANY.phones.slice(0, 2).map((p) => (
+            <a href={p.href}>{p.display}</a>
+          ))
+        }
+      </p>
+    </aside>
+  </div>
+
+  {/* ── Similar ── */}
+  {
+    similar.length > 0 && (
+      <section class="similar no-print">
+        <Eyebrow space="12px">{ui.property.similar}</Eyebrow>
+        <h2>{ui.property.similarInRegion}</h2>
+        <div class="sim-grid">
+          {similar.map((p) => <PropertyCard property={p} locale={locale} class="reveal" />)}
+        </div>
+      </section>
+    )
+  }
+</Base>
+
+<script>
+  // Gallery: click, keyboard arrows and swipe. The prototype had click only.
+  const root = document.getElementById('gallery');
+  if (root) {
+    const slides = Array.from(root.querySelectorAll<HTMLElement>('.gallery-slide'));
+    const counter = document.getElementById('gal-count');
+    let index = 0;
+
+    const show = (next: number) => {
+      index = (next + slides.length) % slides.length;
+      slides.forEach((slide, i) => slide.toggleAttribute('hidden', i !== index));
+      if (counter) {
+        counter.textContent = `${String(index + 1).padStart(2, '0')} / ${String(slides.length).padStart(2, '0')}`;
+      }
+    };
+
+    document.getElementById('gal-prev')?.addEventListener('click', () => show(index - 1));
+    document.getElementById('gal-next')?.addEventListener('click', () => show(index + 1));
+
+    root.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') { e.preventDefault(); show(index - 1); }
+      if (e.key === 'ArrowRight') { e.preventDefault(); show(index + 1); }
+    });
+
+    let startX = 0;
+    root.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; }, { passive: true });
+    root.addEventListener('touchend', (e) => {
+      const delta = e.changedTouches[0].clientX - startX;
+      if (Math.abs(delta) > 48) show(delta < 0 ? index + 1 : index - 1);
+    }, { passive: true });
+  }
+
+  document.getElementById('print-btn')?.addEventListener('click', () => window.print());
+</script>
+
+<style>
+  .crumbs {
+    padding: 18px var(--pad-x);
+    border-bottom: 1px solid var(--border);
+  }
+  .crumbs ol {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    list-style: none;
+    font-size: var(--fs-micro);
+    color: var(--taupe);
+  }
+  .crumbs li + li::before {
+    content: '/';
+    margin-right: 8px;
+    color: var(--border);
+  }
+  .crumbs [aria-current] {
+    color: var(--ink);
+  }
+
+  .property-detail-hero {
+    height: 74vh;
+    min-height: 560px;
+  }
+  .gallery-slide[hidden] {
+    display: none;
+  }
+  .hero-tag {
+    position: absolute;
+    top: 36px;
+    left: var(--pad-x);
+    z-index: 2;
+    background: rgba(16, 42, 67, 0.86);
+    color: var(--cream);
+    font-family: var(--sans);
+    font-size: var(--fs-eyebrow);
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+  }
+  .hero-foot {
+    position: absolute;
+    left: 32px;
+    right: 32px;
+    bottom: 28px;
+    z-index: 2;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .hero-title {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    color: var(--cream);
+    max-width: 30ch;
+  }
+  .hero-kicker {
+    font-size: var(--fs-eyebrow);
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    opacity: 0.85;
+  }
+  .hero-name {
+    font-family: var(--serif);
+    font-weight: var(--fw-regular);
+    font-size: clamp(22px, 2.2vw, 30px);
+    line-height: 1.05;
+  }
+
+  .body {
+    display: grid;
+    grid-template-columns: 1fr 420px;
+    gap: 88px;
+    padding: 80px var(--pad-x);
+    align-items: start;
+  }
+
+  h1 {
+    font-family: var(--serif);
+    font-weight: var(--fw-display);
+    font-size: clamp(34px, 3.5vw, 58px);
+    line-height: 1.08;
+    color: var(--ink);
+    margin-bottom: 8px;
+  }
+  .subtitle {
+    font-size: var(--fs-lead);
+    color: var(--taupe);
+    margin-bottom: 12px;
+  }
+  .location {
+    font-size: var(--fs-body);
+    color: var(--taupe);
+    margin-bottom: 36px;
+  }
+  .map-link {
+    margin-left: 12px;
+    font-size: var(--fs-micro);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+
+  .price-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px 24px;
+    padding: 20px 0;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 44px;
+  }
+  .price {
+    font-family: var(--serif);
+    font-weight: var(--fw-medium);
+    font-size: 38px;
+    color: var(--ink);
+  }
+  .price-huf {
+    font-size: var(--fs-body);
+    color: var(--taupe);
+  }
+  .price-asof {
+    font-size: var(--fs-micro);
+    color: var(--taupe);
+    /* was opacity .85 → 3.9:1 */
+    margin-left: auto;
+  }
+
+  .specs {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    border: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+  .spec {
+    padding: 22px 20px;
+    text-align: center;
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .spec dd {
+    font-family: var(--serif);
+    font-weight: var(--fw-medium);
+    font-size: 24px;
+    color: var(--ink);
+    margin-bottom: 4px;
+  }
+  .spec dt {
+    font-family: var(--sans);
+    font-size: var(--fs-eyebrow);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--taupe);
+  }
+
+  .ref-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    font-size: var(--fs-small);
+    color: var(--taupe);
+    margin-bottom: 36px;
+  }
+  .print-btn {
+    font-size: var(--fs-micro);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--taupe);
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+
+  .sr-heading {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .prose .lead {
+    font-size: var(--fs-lead);
+    line-height: 1.95;
+    color: var(--taupe);
+    margin-bottom: 28px;
+  }
+  .prose :global(p) {
+    font-size: var(--fs-body);
+    line-height: 1.9;
+    color: var(--taupe);
+    margin-bottom: 18px;
+  }
+  .prose :global(blockquote) {
+    border-left: 2px solid var(--accent);
+    padding: 4px 0 4px 20px;
+    margin: 24px 0;
+    font-style: italic;
+    color: var(--ink);
+  }
+  :global(.prose-rule) {
+    margin: 36px 0;
+  }
+
+  .features {
+    margin-bottom: 36px;
+  }
+  .features ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    list-style: none;
+  }
+  .features li {
+    font-size: var(--fs-small);
+    color: var(--ink);
+    border: 1px solid var(--border);
+    padding: 7px 14px;
+  }
+  .video a {
+    font-size: var(--fs-small);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .owner {
+    background: var(--linen);
+    border-left: 2px solid var(--accent);
+    padding: 26px 28px;
+    margin-bottom: 24px;
+  }
+  .owner-note {
+    font-size: var(--fs-small);
+    line-height: 1.8;
+    color: var(--taupe);
+    margin-bottom: 16px;
+  }
+  .owner-name {
+    font-family: var(--serif);
+    font-weight: var(--fw-medium);
+    font-size: 19px;
+    color: var(--ink);
+  }
+  .owner-phone a {
+    font-size: var(--fs-lead);
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+  .owner-speaks {
+    font-size: var(--fs-micro);
+    letter-spacing: 0.1em;
+    color: var(--taupe);
+    margin-top: 8px;
+  }
+
+  .guarantee {
+    background: var(--linen);
+    border-left: 2px solid var(--accent);
+    padding: 24px 28px;
+  }
+  .guarantee p {
+    font-size: var(--fs-small);
+    line-height: 1.8;
+    color: var(--taupe);
+  }
+
+  .enquiry {
+    position: sticky;
+    top: calc(var(--nav-h) + 20px);
+    background: var(--ink);
+    padding: 44px;
+  }
+  .enq-title {
+    font-family: var(--serif);
+    font-weight: var(--fw-regular);
+    font-size: 24px;
+    line-height: 1.35;
+    color: var(--cream);
+    margin-bottom: 28px;
+  }
+  .enq-alt {
+    font-size: var(--fs-small);
+    line-height: 1.9;
+    color: var(--on-dark-muted);
+    text-align: center;
+    margin-top: 20px;
+  }
+  .enq-alt a {
+    color: var(--cream);
+    display: inline-block;
+    margin: 0 6px;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .similar {
+    padding: 80px var(--pad-x) 108px;
+    border-top: 1px solid var(--border);
+  }
+  .similar h2 {
+    font-family: var(--serif);
+    font-weight: var(--fw-display);
+    font-size: clamp(28px, 3vw, 44px);
+    color: var(--ink);
+    margin-bottom: 52px;
+  }
+  .sim-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 36px;
+  }
+
+  @media (max-width: 1100px) {
+    .body {
+      grid-template-columns: 1fr;
+      gap: 48px;
+    }
+    .enquiry {
+      position: static;
+    }
+  }
+  @media (max-width: 768px) {
+    .crumbs {
+      padding: 12px var(--pad-x-mob);
+    }
+    .property-detail-hero {
+      height: 58vw;
+      min-height: 260px;
+    }
+    .hero-tag {
+      top: 16px;
+      left: var(--pad-x-mob);
+    }
+    .hero-foot {
+      left: 16px;
+      right: 16px;
+      bottom: 18px;
+    }
+    .hero-title {
+      display: none;
+    }
+    .body {
+      padding: 32px var(--pad-x-mob) 48px;
+    }
+    .specs {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    .price-asof {
+      margin-left: 0;
+      width: 100%;
+    }
+    .enquiry {
+      padding: 28px 24px;
+      margin-inline: calc(var(--pad-x-mob) * -1);
+    }
+    .similar {
+      padding: 40px var(--pad-x-mob) 60px;
+    }
+    .similar h2 {
+      margin-bottom: 28px;
+    }
+    .sim-grid {
+      grid-template-columns: 1fr;
+      gap: 28px;
+    }
+  }
+</style>

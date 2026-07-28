@@ -1,0 +1,146 @@
+---
+/**
+ * Cookie consent — opt-in, with genuine reject parity.
+ *
+ * The site currently sets no non-essential cookies at all, so nothing is
+ * gated behind this yet. It exists because the moment analytics is added,
+ * ePrivacy requires prior consent, and retrofitting a compliant banner is
+ * how sites end up with dark patterns. Accept and reject are the same size,
+ * the same weight, and the same distance from the user's thumb.
+ */
+import Button from './Button.astro';
+import { path, type Locale } from '~/i18n/ui';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+
+const copy = {
+  hu: {
+    title: 'Sütik',
+    body: 'Ez az oldal csak a működéshez feltétlenül szükséges sütiket használja. Statisztikai célú mérést csak az Ön kifejezett hozzájárulásával végzünk.',
+    accept: 'Elfogadom',
+    reject: 'Elutasítom',
+    more: 'Részletek',
+  },
+  nl: {
+    title: 'Cookies',
+    body: 'Deze site gebruikt alleen cookies die noodzakelijk zijn om te functioneren. Statistieken meten wij uitsluitend met uw uitdrukkelijke toestemming.',
+    accept: 'Akkoord',
+    reject: 'Weigeren',
+    more: 'Meer informatie',
+  },
+}[locale];
+---
+
+<aside
+  class="cookie-consent"
+  id="cookie-consent"
+  role="dialog"
+  aria-labelledby="cookie-title"
+  aria-describedby="cookie-body"
+  hidden
+>
+  <div class="inner">
+    <div class="text">
+      <h2 id="cookie-title">{copy.title}</h2>
+      <p id="cookie-body">
+        {copy.body}
+        <a href={path(locale, 'cookies')}>{copy.more}</a>
+      </p>
+    </div>
+    <div class="actions">
+      <Button variant="outline" light id="cookie-reject">{copy.reject}</Button>
+      <Button variant="dark" light id="cookie-accept">{copy.accept}</Button>
+    </div>
+  </div>
+</aside>
+
+<script>
+  const KEY = 'fodel:consent';
+  const banner = document.getElementById('cookie-consent');
+
+  if (banner && !localStorage.getItem(KEY)) {
+    // Deferred so the banner never competes with the LCP element.
+    requestIdleCallback?.(() => banner.removeAttribute('hidden')) ??
+      setTimeout(() => banner.removeAttribute('hidden'), 800);
+  }
+
+  const decide = (value: 'granted' | 'denied') => {
+    localStorage.setItem(KEY, JSON.stringify({ analytics: value, at: Date.now() }));
+    banner?.setAttribute('hidden', '');
+    // When analytics is added, it initialises here — and only here.
+    document.dispatchEvent(new CustomEvent('fodel:consent', { detail: { analytics: value } }));
+  };
+
+  document.getElementById('cookie-accept')?.addEventListener('click', () => decide('granted'));
+  document.getElementById('cookie-reject')?.addEventListener('click', () => decide('denied'));
+</script>
+
+<style>
+  .cookie-consent {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 1200;
+    background: var(--ink);
+    color: var(--cream);
+    border-top: 1px solid var(--on-dark-rule);
+  }
+  .cookie-consent[hidden] {
+    display: none;
+  }
+  .inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 32px;
+    padding: 22px var(--pad-x);
+    max-width: 1400px;
+    margin-inline: auto;
+  }
+  h2 {
+    font-family: var(--serif);
+    font-size: var(--fs-body-lg);
+    font-weight: var(--fw-display);
+    margin-bottom: 4px;
+  }
+  p {
+    font-size: var(--fs-small);
+    line-height: 1.7;
+    color: var(--on-dark-body);
+    max-width: 78ch;
+  }
+  p a {
+    color: var(--cream);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .actions {
+    display: flex;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+  /* Equal weight by design — no visual nudge toward accepting. */
+  .actions :global(.btn) {
+    min-width: 148px;
+    padding-inline: 24px;
+  }
+
+  @media (max-width: 860px) {
+    .inner {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 18px;
+      padding: 20px var(--pad-x-mob);
+    }
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+    }
+    .actions :global(.btn) {
+      min-width: 0;
+    }
+  }
+</style>

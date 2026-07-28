@@ -1,0 +1,241 @@
+---
+/**
+ * Editorial index. FODEL publish long-form pieces on why Dutch buyers move to
+ * Hungary; that content is a genuine organic-search asset for the Dutch market.
+ */
+import { Image } from 'astro:assets';
+import { getCollection } from 'astro:content';
+import Base from '~/layouts/Base.astro';
+import PageHeader from '~/components/PageHeader.astro';
+import Eyebrow from '~/components/Eyebrow.astro';
+import Button from '~/components/Button.astro';
+import { UI, path, type Locale } from '~/i18n/ui';
+import { alternatesFor } from '~/lib/page';
+import { formatDate } from '~/lib/format';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const ui = UI[locale];
+const hu = locale === 'hu';
+
+const posts = (await getCollection('articles', (a) => a.data.locale === locale)).sort(
+  (a, b) => b.data.publishedAt.getTime() - a.data.publishedAt.getTime()
+);
+
+const [lead, ...rest] = posts;
+
+const t = hu
+  ? {
+      metaTitle: 'Hírek és cikkek — Piac, migráció, tanácsok',
+      metaDescription:
+        'Elemzések a magyar ingatlanpiacról és a nyugat-európai vevőkről: miért költöznek a hollandok Magyarországra, és mit jelent ez az eladóknak.',
+      eyebrow: 'Hírek és cikkek',
+      title: 'Piac,',
+      titleEm: 'háttér, tanácsok',
+      intro: 'Amit a magyar ingatlanpiacról és a nyugat-európai vevőkről érdemes tudni.',
+      empty: 'Hamarosan új cikkekkel jelentkezünk.',
+    }
+  : {
+      metaTitle: 'Nieuws en achtergrond — Markt, emigratie, advies',
+      metaDescription:
+        'Analyses over de Hongaarse vastgoedmarkt en West-Europese kopers: waarom Nederlanders naar Hongarije verhuizen, en wat dat betekent.',
+      eyebrow: 'Nieuws',
+      title: 'Markt,',
+      titleEm: 'achtergrond, advies',
+      intro: 'Wat u moet weten over de Hongaarse vastgoedmarkt en de kopers uit West-Europa.',
+      empty: 'Binnenkort verschijnen hier nieuwe artikelen.',
+    };
+---
+
+<Base
+  locale={locale}
+  title={t.metaTitle}
+  description={t.metaDescription}
+  alternates={alternatesFor('blog')}
+>
+  <PageHeader eyebrow={t.eyebrow} title={t.title} titleEm={t.titleEm} body={t.intro} compact />
+
+  <div class="blog">
+    {posts.length === 0 && <p class="empty">{t.empty}</p>}
+
+    {
+      lead && (
+        <article class="lead">
+          <a href={`${path(locale, 'blog')}${lead.id.split('/').pop()}/`}>
+            {lead.data.cover && (
+              <div class="lead-media">
+                <Image
+                  src={lead.data.cover}
+                  alt={lead.data.coverAlt ?? ''}
+                  widths={[600, 900, 1400]}
+                  sizes="(max-width: 900px) 100vw, 60vw"
+                  loading="eager"
+                />
+              </div>
+            )}
+            <div class="lead-copy">
+              <Eyebrow space="12px">{lead.data.category}</Eyebrow>
+              <h2>{lead.data.title}</h2>
+              <p class="excerpt">{lead.data.excerpt}</p>
+              <p class="meta">
+                <time datetime={lead.data.publishedAt.toISOString()}>
+                  {formatDate(lead.data.publishedAt, locale)}
+                </time>
+                <span aria-hidden="true">·</span>
+                <span>{lead.data.readingMinutes} {hu ? 'perc olvasás' : 'min. lezen'}</span>
+              </p>
+              <span class="more">{ui.cta.readMore} <span aria-hidden="true">→</span></span>
+            </div>
+          </a>
+        </article>
+      )
+    }
+
+    {
+      rest.length > 0 && (
+        <div class="grid">
+          {rest.map((post) => (
+            <article class="card reveal">
+              <a href={`${path(locale, 'blog')}${post.id.split('/').pop()}/`}>
+                {post.data.cover && (
+                  <div class="card-media">
+                    <Image
+                      src={post.data.cover}
+                      alt={post.data.coverAlt ?? ''}
+                      widths={[400, 700]}
+                      sizes="(max-width: 900px) 100vw, 32vw"
+                      loading="lazy"
+                    />
+                  </div>
+                )}
+                <Eyebrow space="12px">{post.data.category}</Eyebrow>
+                <h3>{post.data.title}</h3>
+                <p class="excerpt">{post.data.excerpt}</p>
+                <p class="meta">
+                  <time datetime={post.data.publishedAt.toISOString()}>
+                    {formatDate(post.data.publishedAt, locale)}
+                  </time>
+                  <span aria-hidden="true">·</span>
+                  <span>{post.data.readingMinutes} {hu ? 'perc' : 'min.'}</span>
+                </p>
+              </a>
+            </article>
+          ))}
+        </div>
+      )
+    }
+  </div>
+</Base>
+
+<style>
+  .blog {
+    padding: 8px var(--pad-x) var(--section-y);
+  }
+  .empty {
+    font-size: var(--fs-body);
+    color: var(--taupe);
+    padding: 40px 0;
+  }
+
+  .lead {
+    padding-bottom: 56px;
+    margin-bottom: 56px;
+    border-bottom: 1px solid var(--border);
+  }
+  .lead a {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 48px;
+    align-items: center;
+  }
+  .lead-media :global(img),
+  .card-media :global(img) {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .lead-media {
+    aspect-ratio: 3 / 2;
+    overflow: hidden;
+    background: var(--mist);
+  }
+  .lead h2 {
+    font-family: var(--serif);
+    font-weight: var(--fw-display);
+    font-size: clamp(26px, 3vw, 42px);
+    line-height: 1.15;
+    color: var(--ink);
+    margin-bottom: 16px;
+  }
+  .excerpt {
+    font-size: var(--fs-body);
+    line-height: 1.85;
+    color: var(--taupe);
+    margin-bottom: 16px;
+  }
+  .meta {
+    display: flex;
+    gap: 8px;
+    font-size: var(--fs-micro);
+    letter-spacing: 0.08em;
+    color: var(--taupe);
+    margin-bottom: 20px;
+  }
+  .more {
+    display: inline-flex;
+    gap: 10px;
+    font-size: var(--fs-micro);
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+  .lead a:hover .more {
+    text-decoration: underline;
+    text-underline-offset: 5px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 44px 36px;
+  }
+  .card-media {
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+    background: var(--mist);
+    margin-bottom: 18px;
+  }
+  .card h3 {
+    font-family: var(--serif);
+    font-weight: var(--fw-display);
+    font-size: 21px;
+    line-height: 1.25;
+    color: var(--ink);
+    margin-bottom: 10px;
+    transition: color var(--dur-fast) ease;
+  }
+  .card a:hover h3 {
+    color: var(--taupe);
+  }
+  .card .excerpt {
+    font-size: var(--fs-small);
+  }
+
+  @media (max-width: 900px) {
+    .blog {
+      padding: 8px var(--pad-x-mob) var(--section-y-mob);
+    }
+    .lead a {
+      grid-template-columns: 1fr;
+      gap: 24px;
+    }
+    .grid {
+      grid-template-columns: 1fr;
+      gap: 32px;
+    }
+  }
+</style>

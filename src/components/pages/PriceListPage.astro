@@ -1,0 +1,491 @@
+---
+/**
+ * Price list — FODEL's published tariff, which the prototype omitted entirely
+ * (its Sellers page ended at "Árlista kérése" → a generic contact form).
+ *
+ * Figures are exactly those on fodel.hu/arlista: €69 / €129 / €179, €25 per
+ * language, €15 and €25 per month for highlighting, €36 video, €30 retro
+ * photos, €25 renewal. All prices include 21% Dutch VAT.
+ */
+import Base from '~/layouts/Base.astro';
+import PageHeader from '~/components/PageHeader.astro';
+import Eyebrow from '~/components/Eyebrow.astro';
+import GoldRule from '~/components/GoldRule.astro';
+import Button from '~/components/Button.astro';
+import { UI, path, type Locale } from '~/i18n/ui';
+import { COMMISSION, CONTRACT_PRICES } from '~/config/company';
+import { alternatesFor } from '~/lib/page';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const ui = UI[locale];
+const hu = locale === 'hu';
+
+const t = hu
+  ? {
+      metaTitle: 'Árlista — Hirdetési díjak 69 €-tól',
+      metaDescription:
+        'FODEL hirdetési árlista: 6 hónapos hirdetés 69 €, 12 hónapos 129 € vagy 179 €. Fordítás 25 €/nyelv, kiemelés 15–25 €/hó. Minden ár tartalmazza a 21% holland áfát.',
+      eyebrow: 'Árlista',
+      title: 'Átlátható díjak,',
+      titleEm: 'rejtett költségek nélkül',
+      body: 'Minden ár tartalmazza a 21%-os holland áfát. A hirdetési díj egyszeri, előre fizetendő banki átutalással. Jutalékot csak akkor számítunk fel, ha mi hozzuk a vevőt.',
+      packagesHead: 'Hirdetési csomagok',
+      extrasHead: 'Kiegészítő szolgáltatások',
+      contractsHead: 'Kétnyelvű adásvételi szerződés',
+      commissionHead: 'Közvetítői jutalék',
+      vatNote: 'Az árak tartalmazzák a 21%-os holland áfát.',
+      per: { language: '/ nyelv', month: '/ hó', once: 'egyszeri' },
+      cta: 'Hirdetés feladása',
+      ctaNote: 'A hirdetésfeladás után díjbekérőt küldünk e-mailben.',
+      packages: [
+        {
+          name: 'Olcsó hirdetés',
+          price: '69 €',
+          duration: '6 hónap',
+          features: [
+            'Legfeljebb 20 kép',
+            'A képek az eredeti állapotban jelennek meg',
+            'A szöveg a beküldött formában jelenik meg',
+            'Igény szerint idegen nyelvű fordítás (25 €/nyelv)',
+            'Kiemelés és videó külön kérhető',
+          ],
+        },
+        {
+          name: 'Normál hirdetés',
+          price: '129 €',
+          priceAlt: '179 €',
+          priceAltNote: '150 millió Ft feletti ingatlan esetén',
+          duration: '12 hónap',
+          featured: true,
+          features: [
+            'Korlátlan számú kép',
+            'A képeket szakszerűen feldolgozzuk',
+            'A szöveget szakszerűen megszerkesztjük',
+            'Igény szerint idegen nyelvű fordítás (25 €/nyelv)',
+            'Kiemelés és videó külön kérhető',
+          ],
+        },
+      ],
+      extras: [
+        { name: 'Idegen nyelvű szöveg (holland, német, angol, francia)', price: '25 €', unit: '/ nyelv' },
+        { name: 'Kategórián belüli kiemelés (min. 3 hónap)', price: '15 €', unit: '/ hó' },
+        { name: 'Főoldali kiemelés (min. 3 hónap)', price: '25 €', unit: '/ hó' },
+        { name: 'Videó megjelenítése', price: '36 €', unit: 'egyszeri' },
+        { name: 'Utólagos képfeltöltés', price: '30 €', unit: 'egyszeri' },
+        { name: 'Olcsó hirdetés megújítása 6 hónapra', price: '25 €', unit: 'egyszeri' },
+      ],
+      services: [
+        'Épületenergetikai tanúsítvány beszerzése',
+        'Professzionális ingatlanfotózás',
+        'Drónfelvétel',
+      ],
+      servicesHead: 'További szolgáltatások',
+      servicesNote: 'Ezekre egyedi árajánlatot adunk — kérdezzen bátran.',
+      contractNote: 'Szerződésfordítás nyelvpáronként, tájékoztató jellegű ártól.',
+      commissionBody:
+        'Jutalékot kizárólag akkor számítunk fel, ha a vevőt a FODEL hozta, írásos adásvételi szerződés jött létre és a foglaló megfizetésre került. Ha a vevő közvetlenül Önnél jelentkezik és nincs szükség a segítségünkre, a hirdetési díjon felül semmilyen más díjat nem kell fizetnie.',
+    }
+  : {
+      metaTitle: 'Tarieven — Adverteren vanaf € 69',
+      metaDescription:
+        'Tarieven van FODEL: advertentie van 6 maanden € 69, 12 maanden € 129 of € 179. Vertaling € 25 per taal, uitlichten € 15–25 per maand. Alle prijzen inclusief 21% btw.',
+      eyebrow: 'Tarieven',
+      title: 'Heldere tarieven,',
+      titleEm: 'geen verborgen kosten',
+      body: 'Alle prijzen zijn inclusief 21% Nederlandse btw. De advertentiekosten betaalt u eenmalig vooraf per bankoverschrijving. Courtage rekenen wij alleen wanneer wij de koper aanbrengen.',
+      packagesHead: 'Advertentiepakketten',
+      extrasHead: 'Aanvullende opties',
+      contractsHead: 'Tweetalige koopovereenkomst',
+      commissionHead: 'Courtage',
+      vatNote: 'Alle prijzen zijn inclusief 21% Nederlandse btw.',
+      per: { language: '/ taal', month: '/ maand', once: 'eenmalig' },
+      cta: 'Advertentie plaatsen',
+      ctaNote: 'Na aanmelding ontvangt u per e-mail een betaalverzoek.',
+      packages: [
+        {
+          name: 'Voordelige advertentie',
+          price: '€ 69',
+          duration: '6 maanden',
+          features: [
+            'Maximaal 20 foto’s',
+            'Foto’s worden ongewijzigd geplaatst',
+            'Tekst wordt geplaatst zoals aangeleverd',
+            'Vertaling op verzoek (€ 25 per taal)',
+            'Uitlichten en video op verzoek',
+          ],
+        },
+        {
+          name: 'Normale advertentie',
+          price: '€ 129',
+          priceAlt: '€ 179',
+          priceAltNote: 'bij een vraagprijs boven 150 miljoen HUF',
+          duration: '12 maanden',
+          featured: true,
+          features: [
+            'Onbeperkt aantal foto’s',
+            'Foto’s worden professioneel bewerkt',
+            'Tekst wordt professioneel geredigeerd',
+            'Vertaling op verzoek (€ 25 per taal)',
+            'Uitlichten en video op verzoek',
+          ],
+        },
+      ],
+      extras: [
+        { name: 'Vertaling (Nederlands, Duits, Engels, Frans)', price: '€ 25', unit: '/ taal' },
+        { name: 'Uitlichten binnen de categorie (min. 3 maanden)', price: '€ 15', unit: '/ maand' },
+        { name: 'Uitlichten op de homepage (min. 3 maanden)', price: '€ 25', unit: '/ maand' },
+        { name: 'Video plaatsen', price: '€ 36', unit: 'eenmalig' },
+        { name: 'Foto’s achteraf toevoegen', price: '€ 30', unit: 'eenmalig' },
+        { name: 'Verlenging voordelige advertentie, 6 maanden', price: '€ 25', unit: 'eenmalig' },
+      ],
+      services: [
+        'Aanvragen van het energieprestatiecertificaat',
+        'Professionele vastgoedfotografie',
+        'Drone-opnamen',
+      ],
+      servicesHead: 'Overige diensten',
+      servicesNote: 'Hiervoor maken wij een offerte op maat — vraag het ons gerust.',
+      contractNote: 'Vertaling van de koopovereenkomst per talencombinatie, vanafprijs.',
+      commissionBody:
+        'Courtage brengen wij uitsluitend in rekening wanneer FODEL de koper heeft aangebracht, er een schriftelijke koopovereenkomst is en de aanbetaling is voldaan. Neemt de koper rechtstreeks contact met u op en heeft u onze hulp niet nodig, dan betaalt u niets bovenop de advertentiekosten.',
+    };
+
+const contractLabels: Record<string, { hu: string; nl: string }> = {
+  hu: { hu: 'Magyar', nl: 'Hongaars' },
+  'de-hu': { hu: 'Német–magyar', nl: 'Duits–Hongaars' },
+  'en-hu': { hu: 'Angol–magyar', nl: 'Engels–Hongaars' },
+  'nl-hu': { hu: 'Holland–magyar', nl: 'Nederlands–Hongaars' },
+};
+---
+
+<Base
+  locale={locale}
+  title={t.metaTitle}
+  description={t.metaDescription}
+  alternates={alternatesFor('priceList')}
+>
+  <PageHeader
+    eyebrow={t.eyebrow}
+    title={t.title}
+    titleEm={t.titleEm}
+    body={t.body}
+    compact
+    primary={{ label: t.cta, href: path(locale, 'submitAd') }}
+  />
+
+  {/* ── Packages ── */}
+  <section class="packages">
+    <Eyebrow space="24px">{t.packagesHead}</Eyebrow>
+    <div class="package-grid">
+      {
+        t.packages.map((pkg: any) => (
+          <article class:list={['package', { featured: pkg.featured }]}>
+            <header>
+              <h2>{pkg.name}</h2>
+              <p class="duration">{pkg.duration}</p>
+            </header>
+            <p class="price">{pkg.price}</p>
+            {pkg.priceAlt && (
+              <p class="price-alt">
+                <strong>{pkg.priceAlt}</strong> — {pkg.priceAltNote}
+              </p>
+            )}
+            <GoldRule class="pkg-rule" />
+            <ul>
+              {pkg.features.map((f: string) => (
+                <li>
+                  <span class="dash" aria-hidden="true" />
+                  <span>{f}</span>
+                </li>
+              ))}
+            </ul>
+            <Button variant={pkg.featured ? 'dark' : 'outline'} href={path(locale, 'submitAd')} block>
+              {t.cta}
+            </Button>
+          </article>
+        ))
+      }
+    </div>
+    <p class="vat">{t.vatNote}</p>
+  </section>
+
+  {/* ── Extras ── */}
+  <section class="extras">
+    <Eyebrow space="24px">{t.extrasHead}</Eyebrow>
+    <table>
+      <tbody>
+        {
+          t.extras.map((extra: any) => (
+            <tr>
+              <th scope="row">{extra.name}</th>
+              <td class="amount">{extra.price}</td>
+              <td class="unit">{extra.unit}</td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+  </section>
+
+  {/* ── Contracts + services ── */}
+  <div class="two-col">
+    <section class="contracts">
+      <Eyebrow space="24px">{t.contractsHead}</Eyebrow>
+      <table>
+        <tbody>
+          {
+            CONTRACT_PRICES.map((cp) => (
+              <tr>
+                <th scope="row">{contractLabels[cp.id][locale]}</th>
+                <td class="amount">
+                  {locale === 'hu' ? `${cp.fromEur} €-tól` : `vanaf € ${cp.fromEur}`}
+                </td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+      <p class="note">{t.contractNote}</p>
+    </section>
+
+    <section class="services">
+      <Eyebrow space="24px">{t.servicesHead}</Eyebrow>
+      <ul>
+        {
+          t.services.map((s: string) => (
+            <li>
+              <span class="dash" aria-hidden="true" />
+              <span>{s}</span>
+            </li>
+          ))
+        }
+      </ul>
+      <p class="note">{t.servicesNote}</p>
+    </section>
+  </div>
+
+  {/* ── Commission ── */}
+  <section class="commission" data-bg="dark">
+    <div class="commission-copy">
+      <Eyebrow space="24px">{t.commissionHead}</Eyebrow>
+      <h2>
+        {
+          locale === 'hu'
+            ? `${COMMISSION.percent}% nettó, min. ${COMMISSION.minimumEur} €`
+            : `${COMMISSION.percent}% netto, min. € ${COMMISSION.minimumEur}`
+        }
+      </h2>
+      <p>{t.commissionBody}</p>
+    </div>
+    <div class="commission-cta">
+      <Button variant="dark" light href={path(locale, 'submitAd')}>{t.cta}</Button>
+      <p class="cta-note">{t.ctaNote}</p>
+    </div>
+  </section>
+</Base>
+
+<style>
+
+  .packages {
+    padding: 24px var(--pad-x) 64px;
+  }
+  .package-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+  }
+  .package {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border);
+    padding: 40px;
+  }
+  .package.featured {
+    background: var(--linen);
+    border-color: var(--ink);
+  }
+  .package h2 {
+    font-family: var(--serif);
+    font-weight: var(--fw-display);
+    font-size: 26px;
+    color: var(--ink);
+  }
+  .duration {
+    font-size: var(--fs-eyebrow);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--taupe);
+    margin-top: 6px;
+  }
+  .price {
+    font-family: var(--serif);
+    font-weight: var(--fw-light);
+    font-size: clamp(44px, 5vw, 68px);
+    line-height: 1;
+    color: var(--ink);
+    margin: 24px 0 8px;
+  }
+  .price-alt {
+    font-size: var(--fs-small);
+    line-height: 1.7;
+    color: var(--taupe);
+    /* Reserved on both cards so the rules and feature lists line up, whether
+       or not the package has a second price tier. */
+    min-height: 2.6em;
+  }
+  .package:not(:has(.price-alt)) .pkg-rule {
+    margin-top: calc(24px + 2.6em);
+  }
+  :global(.pkg-rule) {
+    margin: 24px 0;
+  }
+  .package ul,
+  .services ul {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    list-style: none;
+    margin-bottom: 32px;
+    flex: 1;
+  }
+  .package li,
+  .services li {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    font-size: var(--fs-body);
+    line-height: 1.75;
+    color: var(--taupe);
+  }
+  .dash {
+    width: 16px;
+    height: 1px;
+    background: var(--accent);
+    margin-top: 13px;
+    flex-shrink: 0;
+  }
+  .vat {
+    font-size: var(--fs-small);
+    color: var(--taupe);
+    margin-top: 24px;
+  }
+
+  .extras {
+    padding: 64px var(--pad-x);
+    background: var(--linen);
+    border-block: 1px solid var(--border);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  th,
+  td {
+    text-align: left;
+    padding: 18px 0;
+    border-bottom: 1px solid var(--border);
+    font-weight: var(--fw-light);
+    font-size: var(--fs-body);
+    line-height: 1.6;
+    color: var(--taupe);
+    vertical-align: baseline;
+  }
+  th {
+    color: var(--ink);
+  }
+  .amount {
+    font-family: var(--serif);
+    font-weight: var(--fw-medium);
+    font-size: var(--fs-lead);
+    color: var(--ink);
+    text-align: right;
+    white-space: nowrap;
+    padding-left: 24px;
+  }
+  .unit {
+    text-align: right;
+    white-space: nowrap;
+    font-size: var(--fs-small);
+    padding-left: 12px;
+    width: 1%;
+  }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 64px;
+    padding: 64px var(--pad-x);
+  }
+  .note {
+    font-size: var(--fs-small);
+    line-height: 1.75;
+    color: var(--taupe);
+    margin-top: 16px;
+  }
+
+  .commission {
+    background: var(--ink);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 48px;
+    padding: 80px var(--pad-x);
+  }
+  .commission h2 {
+    font-family: var(--serif);
+    font-weight: var(--fw-display);
+    font-size: clamp(28px, 3.2vw, 46px);
+    color: var(--cream);
+    margin-bottom: 16px;
+  }
+  .commission p {
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    color: var(--on-dark-body);
+    max-width: 62ch;
+  }
+  .commission-cta {
+    flex-shrink: 0;
+    text-align: right;
+  }
+  .cta-note {
+    font-size: var(--fs-micro);
+    color: var(--on-dark-muted);
+    margin-top: 12px;
+    max-width: 28ch;
+  }
+
+  @media (max-width: 900px) {
+    .packages {
+      padding: 16px var(--pad-x-mob) 44px;
+    }
+    .package-grid,
+    .two-col {
+      grid-template-columns: 1fr;
+      gap: 28px;
+    }
+    .package {
+      padding: 28px 24px;
+    }
+    .extras,
+    .two-col,
+    .commission {
+      padding: 44px var(--pad-x-mob);
+    }
+    .commission {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 28px;
+    }
+    .commission-cta {
+      text-align: left;
+    }
+    .unit {
+      display: none;
+    }
+  }
+</style>

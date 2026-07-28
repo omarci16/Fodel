@@ -1,0 +1,259 @@
+---
+/**
+ * Kerestető / Zoekdienst — FODEL's free search service, absent from the
+ * prototype. It is their highest-intent lead capture: the visitor states what
+ * they want, FODEL hunt for it including off-market, and it costs the visitor
+ * nothing. "Plaats een GRATIS zoekopdracht" is their own framing.
+ */
+import Base from '~/layouts/Base.astro';
+import PageHeader from '~/components/PageHeader.astro';
+import Eyebrow from '~/components/Eyebrow.astro';
+import FormShell from '~/components/forms/FormShell.astro';
+import Field from '~/components/forms/Field.astro';
+import { UI, CATEGORIES, path, type Locale, type CategoryKey } from '~/i18n/ui';
+import { alternatesFor } from '~/lib/page';
+import { serviceSchema } from '~/lib/seo';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const ui = UI[locale];
+const hu = locale === 'hu';
+
+const t = hu
+  ? {
+      metaTitle: 'Kerestető — Ingyenes ingatlankeresés',
+      metaDescription:
+        'Nem találta meg, amit keres? Adja meg az igényeit, és megkeressük Önnek — a hirdetéseinken kívüli kínálatból is. A szolgáltatás ingyenes.',
+      eyebrow: 'Kerestető',
+      title: 'Mondja el, mit keres —',
+      titleEm: 'mi megkeressük',
+      body: 'Ha a kínálatunkban nem talált megfelelőt, adja meg az igényeit. Magyar partnerhálózatunkon keresztül olyan ingatlanokat is elérünk, amelyek még nem szerepelnek a weboldalon. A szolgáltatás díjmentes.',
+      howHead: 'Hogyan működik?',
+      steps: [
+        { n: '01', t: 'Kitölti az űrlapot', b: 'Megadja a típust, a régiót, a keretösszeget és az elvárásait.' },
+        { n: '02', t: 'Keresünk', b: 'Partnereinkkel átnézzük a kínálatot, a nem hirdetett ingatlanokat is.' },
+        { n: '03', t: 'Értesítjük', b: 'E-mailben küldjük az Ön feltételeinek megfelelő ingatlanokat.' },
+        { n: '04', t: 'Kísérjük', b: 'Megtekintés, áralku, kétnyelvű szerződés — végig Ön mellett vagyunk.' },
+      ],
+      formHead: 'Ingyenes keresési megbízás',
+      free: 'Díjmentes',
+      submit: 'Kerestetés elküldése',
+      successTitle: 'Köszönjük!',
+      successBody:
+        'Megkaptuk a keresési igényét. Amint találunk az Ön feltételeinek megfelelő ingatlant, e-mailben értesítjük.',
+    }
+  : {
+      metaTitle: 'Zoekdienst — Gratis zoekopdracht in Hongarije',
+      metaDescription:
+        'Niet gevonden wat u zoekt? Geef uw wensen door en wij gaan voor u op zoek — ook buiten ons eigen aanbod. De zoekdienst is gratis.',
+      eyebrow: 'Zoekdienst',
+      title: 'Vertel ons wat u zoekt —',
+      titleEm: 'wij gaan op zoek',
+      body: 'Staat het juiste pand niet bij ons aanbod? Geef uw wensen door. Via ons Hongaarse partnernetwerk bereiken wij ook woningen die nog niet online staan. De dienst is gratis.',
+      howHead: 'Hoe werkt het?',
+      steps: [
+        { n: '01', t: 'U vult het formulier in', b: 'Type, streek, budget en uw specifieke wensen.' },
+        { n: '02', t: 'Wij zoeken', b: 'Samen met onze partners, ook buiten het geadverteerde aanbod om.' },
+        { n: '03', t: 'U hoort van ons', b: 'U ontvangt per e-mail wat aan uw criteria voldoet.' },
+        { n: '04', t: 'Wij begeleiden', b: 'Bezichtiging, onderhandeling en tweetalig contract — wij blijven erbij.' },
+      ],
+      formHead: 'Gratis zoekopdracht',
+      free: 'Gratis',
+      submit: 'Zoekopdracht versturen',
+      successTitle: 'Dank u wel!',
+      successBody:
+        'Wij hebben uw zoekopdracht ontvangen. Zodra wij iets vinden dat aan uw criteria voldoet, nemen wij per e-mail contact op.',
+    };
+
+const categoryOptions = (Object.keys(CATEGORIES) as CategoryKey[]).map((key) => ({
+  value: key,
+  label: CATEGORIES[key][locale].label,
+}));
+---
+
+<Base
+  locale={locale}
+  title={t.metaTitle}
+  description={t.metaDescription}
+  alternates={alternatesFor('searchRequest')}
+  schema={[serviceSchema(locale, t.eyebrow, t.metaDescription)]}
+>
+  <PageHeader eyebrow={t.eyebrow} title={t.title} titleEm={t.titleEm} body={t.body} compact />
+
+  <section class="how">
+    <Eyebrow space="24px">{t.howHead}</Eyebrow>
+    <ol>
+      {
+        t.steps.map((s: any) => (
+          <li>
+            <span class="n">{s.n}</span>
+            <h2>{s.t}</h2>
+            <p>{s.b}</p>
+          </li>
+        ))
+      }
+    </ol>
+  </section>
+
+  <section class="form-section">
+    <div class="form-inner">
+      <div class="form-head">
+        <span class="badge">{t.free}</span>
+        <h2>{t.formHead}</h2>
+      </div>
+
+      <FormShell
+        locale={locale}
+        endpoint="/api/search-request"
+        formId="search-request"
+        submitLabel={t.submit}
+        successTitle={t.successTitle}
+        successBody={t.successBody}
+      >
+        <Field locale={locale} name="name" label={ui.form.name} required autocomplete="name" span="half" />
+        <Field locale={locale} name="email" label={ui.form.email} type="email" required autocomplete="email" span="half" />
+        <Field locale={locale} name="phone" label={ui.form.phone} type="tel" autocomplete="tel" span="half" />
+        <Field
+          locale={locale}
+          name="propertyType"
+          label={hu ? 'Keresett ingatlantípus' : 'Gezocht type'}
+          type="select"
+          required
+          options={categoryOptions}
+          span="half"
+        />
+        <Field
+          locale={locale}
+          name="region"
+          label={hu ? 'Régió, megye vagy település' : 'Streek, comitaat of plaats'}
+          placeholder={hu ? 'pl. Balaton, Zala megye' : 'bijv. Balaton, comitaat Zala'}
+          span="full"
+        />
+        <Field
+          locale={locale}
+          name="budgetMin"
+          label={hu ? 'Keret-tól (€)' : 'Budget vanaf (€)'}
+          type="number"
+          min={0}
+          span="half"
+        />
+        <Field
+          locale={locale}
+          name="budgetMax"
+          label={hu ? 'Keret-ig (€)' : 'Budget tot (€)'}
+          type="number"
+          min={0}
+          span="half"
+        />
+        <Field
+          locale={locale}
+          name="requirements"
+          label={hu ? 'Elvárások, kívánságok' : 'Wensen en eisen'}
+          type="textarea"
+          rows={6}
+          hint={
+            hu
+              ? 'Például: vízközelség, erdőszél, kilátás, állattartás lehetősége, kiadhatóság, jó internet, repülőtér közelsége.'
+              : 'Bijvoorbeeld: nabij water, aan de bosrand, uitzicht, ruimte voor dieren, verhuurbaarheid, goed internet, afstand tot een luchthaven.'
+          }
+          span="full"
+        />
+      </FormShell>
+    </div>
+  </section>
+</Base>
+
+<style>
+
+  .how {
+    padding: 16px var(--pad-x) 64px;
+    border-bottom: 1px solid var(--border);
+  }
+  .how ol {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 32px;
+    list-style: none;
+  }
+  .how li {
+    border-top: 2px solid var(--accent);
+    padding-top: 20px;
+  }
+  .n {
+    display: block;
+    font-family: var(--serif);
+    font-weight: var(--fw-light);
+    font-size: 34px;
+    line-height: 1;
+    color: var(--accent);
+    opacity: 0.62; /* was .45 — 2.64:1, below the 3:1 large-text floor */
+    margin-bottom: 14px;
+  }
+  .how h2 {
+    font-family: var(--serif);
+    font-weight: var(--fw-display);
+    font-size: 19px;
+    color: var(--ink);
+    margin-bottom: 8px;
+  }
+  .how p {
+    font-size: var(--fs-small);
+    line-height: 1.8;
+    color: var(--taupe);
+  }
+
+  .form-section {
+    padding: 64px var(--pad-x) var(--section-y);
+    background: var(--linen);
+  }
+  .form-inner {
+    max-width: 760px;
+    margin-inline: auto;
+    background: var(--cream);
+    border: 1px solid var(--border);
+    padding: 48px;
+  }
+  .form-head {
+    margin-bottom: 36px;
+  }
+  .badge {
+    display: inline-block;
+    background: var(--ink);
+    color: var(--cream);
+    font-size: var(--fs-eyebrow);
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    padding: 5px 12px;
+    margin-bottom: 16px;
+  }
+  .form-head h2 {
+    font-family: var(--serif);
+    font-weight: var(--fw-display);
+    font-size: clamp(26px, 3vw, 40px);
+    color: var(--ink);
+  }
+
+  @media (max-width: 1000px) {
+    .how ol {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  @media (max-width: 700px) {
+    .how {
+      padding: 8px var(--pad-x-mob) 44px;
+    }
+    .how ol {
+      grid-template-columns: 1fr;
+      gap: 24px;
+    }
+    .form-section {
+      padding: 44px var(--pad-x-mob) var(--section-y-mob);
+    }
+    .form-inner {
+      padding: 28px 24px;
+    }
+  }
+</style>

@@ -1,0 +1,288 @@
+---
+/**
+ * Footer, ported from the prototype.
+ *
+ * Adds what was legally missing: registered address, VAT and KvK, plus links
+ * to the privacy, terms, cookie and accessibility pages. Dutch law requires
+ * the KvK number on the site; while it is unset the block renders a visible
+ * placeholder and the build's preflight check fails, so it cannot ship
+ * forgotten.
+ */
+import Logo from './Logo.astro';
+import Eyebrow from './Eyebrow.astro';
+import { COMPANY, formatHours } from '~/config/company';
+import { UI, BRAND, CATEGORIES, path, type Locale, type CategoryKey } from '~/i18n/ui';
+import { slugify } from '~/lib/properties';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const ui = UI[locale];
+const brand = BRAND[locale];
+const year = new Date().getFullYear();
+
+const navItems = [
+  { key: 'properties', label: ui.nav.properties },
+  { key: 'sellers', label: ui.nav.sellers },
+  { key: 'buyers', label: ui.nav.buyers },
+  { key: 'about', label: ui.nav.about },
+  { key: 'blog', label: ui.nav.blog },
+  { key: 'contact', label: ui.nav.contact },
+] as const;
+
+const legalItems = [
+  { key: 'imprint', label: locale === 'hu' ? 'Impresszum' : 'Colofon' },
+  { key: 'privacy', label: locale === 'hu' ? 'Adatvédelem' : 'Privacy' },
+  { key: 'terms', label: locale === 'hu' ? 'ÁSZF' : 'Voorwaarden' },
+  { key: 'cookies', label: locale === 'hu' ? 'Sütik' : 'Cookies' },
+  { key: 'accessibility', label: locale === 'hu' ? 'Akadálymentesítés' : 'Toegankelijkheid' },
+] as const;
+
+const featuredCategories: CategoryKey[] = [
+  'house',
+  'mansion',
+  'farm',
+  'holiday',
+  'agricultural',
+  'land',
+];
+---
+
+<footer class="footer" data-bg="dark">
+  <div class="grid">
+    <div class="brand">
+      <Logo locale={locale} light href={`/${locale}/`} />
+      <p class="tagline">{brand.tagline}</p>
+      <p class="founded">
+        {
+          locale === 'hu'
+            ? `Alapítva ${COMPANY.founded}-ban, ${COMPANY.foundedIn}.`
+            : `Opgericht in ${COMPANY.founded} te ${COMPANY.foundedIn}.`
+        }
+      </p>
+    </div>
+
+    <nav class="col" aria-label={ui.footer.navigation}>
+      <Eyebrow space="18px">{ui.footer.navigation}</Eyebrow>
+      <ul>
+        {
+          navItems.map((item) => (
+            <li>
+              <a href={path(locale, item.key)}>{item.label}</a>
+            </li>
+          ))
+        }
+      </ul>
+    </nav>
+
+    <nav class="col" aria-label={ui.footer.categories}>
+      <Eyebrow space="18px">{ui.footer.categories}</Eyebrow>
+      <ul>
+        {
+          featuredCategories.map((key) => (
+            <li>
+              <a href={`${path(locale, 'properties')}${slugify(CATEGORIES[key][locale].slug)}/`}>
+                {CATEGORIES[key][locale].label}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </nav>
+
+    <div class="col">
+      <Eyebrow space="18px">{ui.footer.contact}</Eyebrow>
+      <ul class="contact">
+        {
+          COMPANY.phones.map((p) => (
+            <li>
+              <a href={p.href}>{p.display}</a>
+            </li>
+          ))
+        }
+        <li>
+          <a href={`mailto:${COMPANY.email.primary}`}>{COMPANY.email.primary}</a>
+        </li>
+      </ul>
+      <p class="hours">
+        {formatHours(locale)}<br />
+        {
+          locale === 'hu'
+            ? `Visszahívás ${COMPANY.hours.callback.to}-ig, hétvégén is.`
+            : `Terugbellen tot ${COMPANY.hours.callback.to} uur, ook in het weekend.`
+        }
+      </p>
+      <p class="callback-note">{ui.footer.callbackNote}</p>
+    </div>
+  </div>
+
+  <div class="legal-block">
+    <div class="legal-details">
+      <Eyebrow space="18px">{ui.footer.companyDetails}</Eyebrow>
+      <p>
+        {COMPANY.names.legal} · {COMPANY.address.oneLine}
+      </p>
+      <p>
+        {locale === 'hu' ? 'Holland adószám' : 'BTW-nummer'}: {COMPANY.registration.vat}
+        {' · '}
+        KvK: {
+          COMPANY.registration.kvk ?? (
+            <span class="missing" title="Not yet supplied by the client">
+              —
+            </span>
+          )
+        }
+      </p>
+    </div>
+
+    <nav class="legal-links" aria-label={ui.footer.legal}>
+      <ul>
+        {
+          legalItems.map((item) => (
+            <li>
+              <a href={path(locale, item.key)}>{item.label}</a>
+            </li>
+          ))
+        }
+      </ul>
+    </nav>
+  </div>
+
+  <div class="baseline">
+    <p>© {COMPANY.founded}–{year} {COMPANY.names.legal} · {COMPANY.network.slice(0, 3).join(' · ')}</p>
+    <p class="signature">{brand.signature}</p>
+  </div>
+</footer>
+
+<style>
+  .footer {
+    background: var(--ink);
+    color: var(--cream);
+    padding: 88px var(--pad-x) 52px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr 1fr 1.2fr;
+    gap: 56px;
+    padding-bottom: 56px;
+    border-bottom: 1px solid var(--on-dark-rule);
+  }
+
+  .tagline {
+    /* ADJUSTED: was rgba(cream,.45) — 3.8:1, below AA. */
+    color: var(--on-dark-muted);
+    font-size: var(--fs-small);
+    line-height: 1.85;
+    margin-top: 20px;
+    max-width: 26ch;
+  }
+  .founded {
+    color: var(--on-dark-faint);
+    font-size: var(--fs-micro);
+    line-height: 1.8;
+    margin-top: 12px;
+    max-width: 26ch;
+  }
+
+  .col ul {
+    list-style: none;
+  }
+  .col li {
+    margin-bottom: 10px;
+  }
+  .col a {
+    font-size: var(--fs-small);
+    color: var(--on-dark-muted);
+    transition: color var(--dur-fast) ease;
+  }
+  .col a:hover {
+    color: var(--cream);
+  }
+
+  .contact a {
+    font-variant-numeric: tabular-nums;
+  }
+  .hours,
+  .callback-note {
+    font-size: var(--fs-micro);
+    line-height: 1.8;
+    color: var(--on-dark-faint);
+    margin-top: 18px;
+  }
+  .callback-note {
+    margin-top: 8px;
+  }
+
+  .legal-block {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 32px;
+    padding: 36px 0;
+    border-bottom: 1px solid var(--on-dark-rule);
+  }
+  .legal-details p {
+    font-size: var(--fs-micro);
+    line-height: 1.9;
+    color: var(--on-dark-faint);
+  }
+  .missing {
+    color: #e9b8b8;
+    font-weight: var(--fw-medium);
+  }
+  .legal-links ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 22px;
+    list-style: none;
+  }
+  .legal-links a {
+    font-size: var(--fs-micro);
+    letter-spacing: 0.08em;
+    color: var(--on-dark-muted);
+  }
+  .legal-links a:hover {
+    color: var(--cream);
+  }
+
+  .baseline {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding-top: 28px;
+  }
+  .baseline p {
+    /* ADJUSTED: was rgba(cream,.25) — 2.0:1. */
+    font-size: var(--fs-micro);
+    color: var(--on-dark-faint);
+    letter-spacing: 0.05em;
+  }
+  .signature {
+    font-family: var(--serif);
+  }
+
+  @media (max-width: 900px) {
+    .grid {
+      grid-template-columns: 1fr 1fr;
+      gap: 36px 24px;
+    }
+    .brand {
+      grid-column: 1 / -1;
+    }
+    .footer {
+      padding: 52px var(--pad-x-mob) 36px;
+    }
+  }
+  @media (max-width: 560px) {
+    .baseline {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+    }
+  }
+</style>

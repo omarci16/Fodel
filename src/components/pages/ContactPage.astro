@@ -1,0 +1,225 @@
+---
+/**
+ * Contact. Ported from the prototype's split layout.
+ *
+ * The form now reaches a real inbox. Hours are corrected to FODEL's published
+ * 09:00–18:00, and the free callback running to 21:00 including weekends is
+ * surfaced — the prototype discarded it, and it is a genuine selling point.
+ */
+import Base from '~/layouts/Base.astro';
+import Eyebrow from '~/components/Eyebrow.astro';
+import GoldRule from '~/components/GoldRule.astro';
+import FormShell from '~/components/forms/FormShell.astro';
+import Field from '~/components/forms/Field.astro';
+import { UI, type Locale } from '~/i18n/ui';
+import { COMPANY, formatHours } from '~/config/company';
+import { copy } from '~/data/copy';
+import { alternatesFor } from '~/lib/page';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const ui = UI[locale];
+const c = copy(locale).contact;
+const hu = locale === 'hu';
+---
+
+<Base
+  locale={locale}
+  title={c.meta.title}
+  description={c.meta.description}
+  alternates={alternatesFor('contact')}
+>
+  <div class="contact">
+    {/* ── Details ── */}
+    <section class="details">
+      <Eyebrow space="14px">{c.hero.eyebrow}</Eyebrow>
+      <h1>
+        {c.hero.title}<br /><em>{c.hero.titleEm}</em>
+      </h1>
+      <GoldRule space="40px" />
+
+      <dl class="channels">
+        {
+          COMPANY.phones.map((p) => (
+            <div class="channel">
+              <dt>{p.label[locale]}</dt>
+              <dd><a href={p.href}>{p.display}</a></dd>
+              <dd class="note">{p.note[locale]}</dd>
+            </div>
+          ))
+        }
+        <div class="channel">
+          <dt>{hu ? 'E-mail' : 'E-mail'}</dt>
+          <dd><a href={`mailto:${COMPANY.email.primary}`}>{COMPANY.email.primary}</a></dd>
+        </div>
+        <div class="channel">
+          <dt>{ui.footer.hours}</dt>
+          <dd>{formatHours(locale)}</dd>
+          <dd class="note">
+            {
+              hu
+                ? `Visszahívás ${COMPANY.hours.callback.to}-ig, hétvégén is.`
+                : `Terugbellen tot ${COMPANY.hours.callback.to} uur, ook in het weekend.`
+            }
+          </dd>
+        </div>
+        <div class="channel">
+          <dt>{hu ? 'Cím' : 'Adres'}</dt>
+          <dd class="address">
+            {COMPANY.names.legal}<br />
+            {COMPANY.address.street}<br />
+            {COMPANY.address.postalCode} {COMPANY.address.city}<br />
+            {COMPANY.address.country}
+          </dd>
+        </div>
+      </dl>
+
+      <p class="callback-note">{c.note}</p>
+    </section>
+
+    {/* ── Form ── */}
+    <section class="form-side">
+      <h2>{c.formTitle}</h2>
+
+      <FormShell locale={locale} endpoint="/api/callback" formId="callback">
+        <Field locale={locale} name="name" label={ui.form.name} required autocomplete="name" span="half" />
+        <Field locale={locale} name="phone" label={ui.form.phone} type="tel" autocomplete="tel" span="half" />
+        <Field locale={locale} name="email" label={ui.form.email} type="email" required autocomplete="email" span="full" />
+        <Field
+          locale={locale}
+          name="subject"
+          label={ui.form.subject}
+          type="select"
+          options={c.subjects.map((s: string) => ({ value: s, label: s }))}
+          span="full"
+        />
+        <Field
+          locale={locale}
+          name="callTime"
+          label={hu ? 'Mikor hívhatjuk?' : 'Wanneer kunnen wij u bellen?'}
+          placeholder={hu ? 'pl. hétköznap délután' : 'bijv. doordeweeks in de middag'}
+          span="full"
+        />
+        <Field
+          locale={locale}
+          name="message"
+          label={ui.form.message}
+          type="textarea"
+          placeholder={ui.form.messagePlaceholder}
+          rows={5}
+          span="full"
+        />
+      </FormShell>
+    </section>
+  </div>
+</Base>
+
+<style>
+  .contact {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    min-height: calc(100vh - var(--nav-h));
+  }
+
+  .details {
+    background: var(--linen);
+    border-right: 1px solid var(--border);
+    padding: 88px 72px 80px var(--pad-x);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-weight: var(--fw-display);
+    font-size: clamp(36px, 4vw, 64px);
+    line-height: 1.08;
+    color: var(--ink);
+    margin-bottom: 32px;
+  }
+  h1 em {
+    font-style: italic;
+  }
+
+  .channel {
+    padding: 22px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .channel dt {
+    font-family: var(--sans);
+    font-size: var(--fs-eyebrow);
+    letter-spacing: var(--ls-label);
+    text-transform: uppercase;
+    color: var(--taupe);
+    margin-bottom: 6px;
+  }
+  .channel dd {
+    font-family: var(--serif);
+    font-weight: var(--fw-medium);
+    font-size: 21px;
+    color: var(--ink);
+  }
+  .channel dd a:hover {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+  .note {
+    font-family: var(--sans) !important;
+    font-weight: var(--fw-light) !important;
+    font-size: var(--fs-small) !important;
+    line-height: 1.6;
+    color: var(--taupe) !important;
+    margin-top: 5px;
+  }
+  .address {
+    font-family: var(--sans) !important;
+    font-weight: var(--fw-light) !important;
+    font-size: var(--fs-body) !important;
+    line-height: 1.75;
+  }
+
+  .callback-note {
+    font-size: var(--fs-small);
+    line-height: 1.8;
+    color: var(--taupe);
+    margin-top: 28px;
+  }
+
+  .form-side {
+    padding: 88px var(--pad-x);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  h2 {
+    font-family: var(--serif);
+    font-weight: var(--fw-display);
+    font-size: clamp(24px, 2.6vw, 34px);
+    color: var(--ink);
+    margin-bottom: 40px;
+  }
+
+  @media (max-width: 900px) {
+    .contact {
+      grid-template-columns: 1fr;
+      min-height: 0;
+    }
+    .details {
+      border-right: none;
+      border-bottom: 1px solid var(--border);
+      padding: 36px var(--pad-x-mob) 32px;
+    }
+    h1 {
+      margin-bottom: 20px;
+    }
+    .form-side {
+      padding: 36px var(--pad-x-mob) 48px;
+    }
+    h2 {
+      margin-bottom: 28px;
+    }
+  }
+</style>

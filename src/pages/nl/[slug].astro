@@ -1,0 +1,33 @@
+---
+/**
+ * Property detail routes.
+ *
+ * Slug mirrors FODEL's existing pattern (fodel.nl/woonhuis-te-koop-1550), so
+ * when their real inventory migrates the 301 map is mechanical.
+ */
+import type { GetStaticPaths } from 'astro';
+import { render } from 'astro:content';
+import PropertyDetailPage from '~/components/pages/PropertyDetailPage.astro';
+import { activeProperties } from '~/lib/properties';
+import { CATEGORIES, ROUTES } from '~/i18n/ui';
+
+export const getStaticPaths: GetStaticPaths = async () => {
+  const properties = await activeProperties();
+  return properties.map((property) => ({
+    params: {
+      slug: ROUTES['nl'].detail(
+        CATEGORIES[property.data.category as keyof typeof CATEGORIES]['nl'].slug,
+        property.data.ref
+      ),
+    },
+    props: { property },
+  }));
+};
+
+const { property } = Astro.props;
+const { Content } = await render(property);
+---
+
+<PropertyDetailPage locale="nl" property={property}>
+  <Content />
+</PropertyDetailPage>

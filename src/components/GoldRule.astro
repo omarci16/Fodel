@@ -1,0 +1,31 @@
+---
+interface Props {
+  width?: string;
+  center?: boolean;
+  class?: string;
+  /** Bottom margin, e.g. "28px". See the note in Eyebrow.astro on why this is
+   *  a prop and not a class from the parent. */
+  space?: string;
+}
+
+const { width = '48px', center = false, class: className, space } = Astro.props;
+---
+
+<div
+  class:list={['gold-rule', { center }, className]}
+  style={`--rule-w:${width}${space ? `;--rule-space:${space}` : ''}`}
+  aria-hidden="true"
+>
+</div>
+
+<style>
+  .gold-rule {
+    margin-bottom: var(--rule-space, 0);
+    width: var(--rule-w, 48px);
+    height: 1px;
+    background: var(--accent);
+  }
+  .center {
+    margin-inline: auto;
+  }
+</style>

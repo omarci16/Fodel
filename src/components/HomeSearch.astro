@@ -1,0 +1,146 @@
+---
+/**
+ * Homepage search bar. Ported from the prototype's PropertySearchSection.
+ *
+ * Submits as a GET to the properties page, so a search produces a real,
+ * shareable, indexable URL instead of React state.
+ */
+import Button from './Button.astro';
+import Eyebrow from './Eyebrow.astro';
+import { UI, CATEGORIES, path, type Locale, type CategoryKey } from '~/i18n/ui';
+import { PRICE_BANDS, priceBandLabel } from '~/lib/properties';
+
+interface Props {
+  locale: Locale;
+  regions: string[];
+  categories: CategoryKey[];
+}
+
+const { locale, regions, categories } = Astro.props;
+const ui = UI[locale];
+const action = path(locale, 'properties');
+---
+
+<form class="search" method="GET" action={action} role="search">
+  <Eyebrow space="20px">{ui.filters.title}</Eyebrow>
+
+  <div class="row">
+    <div class="cell">
+      <label for="s-type">{ui.filters.type}</label>
+      <select id="s-type" name="type">
+        <option value="">{ui.filters.all}</option>
+        {
+          categories.map((key) => (
+            <option value={key}>{CATEGORIES[key][locale].label}</option>
+          ))
+        }
+      </select>
+    </div>
+
+    <div class="cell">
+      <label for="s-region">{ui.filters.region}</label>
+      <select id="s-region" name="region">
+        <option value="">{ui.filters.all}</option>
+        {regions.map((r) => <option value={r}>{r}</option>)}
+      </select>
+    </div>
+
+    <div class="cell">
+      <label for="s-price">{ui.filters.price}</label>
+      <select id="s-price" name="price">
+        <option value="">{ui.filters.all}</option>
+        {
+          PRICE_BANDS.map((band) => (
+            <option value={band.id}>{priceBandLabel(band)}</option>
+          ))
+        }
+      </select>
+    </div>
+
+    <div class="cell">
+      <label for="s-beds">{ui.filters.beds}</label>
+      <select id="s-beds" name="beds">
+        <option value="">{ui.filters.any}</option>
+        {[2, 3, 4, 5].map((n) => <option value={String(n)}>{n}+</option>)}
+      </select>
+    </div>
+
+    <div class="cell cell-action">
+      <Button variant="dark" type="submit" block>{ui.filters.search}</Button>
+    </div>
+  </div>
+</form>
+
+<style>
+  .row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr) auto;
+    border: 1px solid var(--border);
+  }
+  .cell {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 18px 22px;
+    border-right: 1px solid var(--border);
+    /* Grid items are min-width:auto by default; a <select> with a long option
+       then refuses to shrink and widens the whole document. */
+    min-width: 0;
+  }
+  .cell:last-child {
+    border-right: none;
+  }
+  .cell-action {
+    padding: 0;
+    justify-content: stretch;
+  }
+  .cell-action :global(.btn) {
+    height: 100%;
+    padding-inline: 34px;
+    white-space: nowrap;
+  }
+
+  label {
+    font-family: var(--sans);
+    font-size: var(--fs-eyebrow);
+    letter-spacing: var(--ls-label);
+    text-transform: uppercase;
+    color: var(--taupe);
+  }
+  select {
+    width: 100%;
+    appearance: none;
+    border: none;
+    background: transparent;
+    font-size: var(--fs-body);
+    font-weight: var(--fw-light);
+    color: var(--ink);
+    cursor: pointer;
+    padding-right: 22px;
+    background-image: linear-gradient(45deg, transparent 50%, var(--taupe) 50%),
+      linear-gradient(135deg, var(--taupe) 50%, transparent 50%);
+    background-position: 100% calc(50% + 2px), calc(100% + 5px) calc(50% + 2px);
+    background-size: 5px 5px;
+    background-repeat: no-repeat;
+  }
+
+  @media (max-width: 900px) {
+    .row {
+      grid-template-columns: 1fr 1fr;
+    }
+    .cell {
+      border-bottom: 1px solid var(--border);
+    }
+    .cell:nth-child(2n) {
+      border-right: none;
+    }
+    .cell-action {
+      grid-column: 1 / -1;
+      border-bottom: none;
+      padding: 0;
+    }
+    .cell-action :global(.btn) {
+      padding-block: 16px;
+    }
+  }
+</style>

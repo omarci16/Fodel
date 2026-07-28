@@ -1,0 +1,488 @@
+---
+/**
+ * Sellers. Ported from the prototype, with the commission band now pointing at
+ * a real price list and a real order form instead of a generic contact link.
+ *
+ * The argument sequence (cash buyers → serious intent → €200–300 to view) is
+ * FODEL's strongest sales asset and is kept exactly as the prototype ordered it.
+ */
+import Base from '~/layouts/Base.astro';
+import PageHeader from '~/components/PageHeader.astro';
+import Eyebrow from '~/components/Eyebrow.astro';
+import GoldRule from '~/components/GoldRule.astro';
+import Button from '~/components/Button.astro';
+import { UI, path, type Locale } from '~/i18n/ui';
+import { COMMISSION, LISTING_PACKAGES } from '~/config/company';
+import { copy } from '~/data/copy';
+import { alternatesFor } from '~/lib/page';
+import { serviceSchema, faqSchema } from '~/lib/seo';
+import { faqFor, faqAnswerText } from '~/data/faq';
+import vineyard from '~/assets/properties/vineyard.png';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const ui = UI[locale];
+const c = copy(locale).sellers;
+const steps = copy(locale).steps;
+
+const cheapest = LISTING_PACKAGES[0].priceEur;
+
+// The seller FAQ doubles as FAQPage markup — this is the content answer
+// engines quote when someone asks how selling to foreign buyers works.
+const sellerFaq = faqFor(locale, 'seller').slice(0, 8);
+---
+
+<Base
+  locale={locale}
+  title={c.meta.title}
+  description={c.meta.description}
+  alternates={alternatesFor('sellers')}
+  schema={[
+    serviceSchema(locale, c.hero.title, c.meta.description),
+    faqSchema(sellerFaq.map((e) => ({ question: e.question, answer: faqAnswerText(e) }))),
+  ]}
+>
+  <PageHeader
+    eyebrow={c.hero.eyebrow}
+    title={c.hero.title}
+    titleEm={c.hero.titleEm}
+    body={c.hero.body}
+    image={vineyard}
+    imageAlt={locale === 'hu' ? 'Szőlőbirtok a Dunántúlon' : 'Wijngaard in Transdanubië'}
+    primary={{ label: c.hero.cta, href: path(locale, 'submitAd') }}
+    secondary={{ label: c.hero.secondary, href: path(locale, 'priceList') }}
+  />
+
+  {/* ── Benefits + buyer personas ── */}
+  <div class="split">
+    <section class="benefits reveal">
+      <Eyebrow space="16px">{c.benefits.eyebrow}</Eyebrow>
+      <h2>{c.benefits.title}</h2>
+      <GoldRule space="28px" />
+      <ul class="points">
+        {
+          c.benefits.points.map((point: string) => (
+            <li>
+              <span class="dash" aria-hidden="true"></span>
+              <span>{point}</span>
+            </li>
+          ))
+        }
+      </ul>
+    </section>
+
+    <section class="personas reveal">
+      <Eyebrow space="16px">{c.personas.eyebrow}</Eyebrow>
+      <h2>{c.personas.title}</h2>
+      <GoldRule space="28px" />
+      <dl>
+        {
+          c.personas.items.map((p: any) => (
+            <div class="persona">
+              <dt>{p.title}</dt>
+              <dd>{p.body}</dd>
+            </div>
+          ))
+        }
+      </dl>
+    </section>
+  </div>
+
+  {/* ── Three-step model ── */}
+  <section class="how">
+    <div class="how-head reveal">
+      <Eyebrow center space="16px">{c.how.eyebrow}</Eyebrow>
+      <h2>{c.how.title}</h2>
+    </div>
+    <ol class="steps">
+      {
+        steps.map((step: any) => (
+          <li class="step reveal">
+            <span class="step-num">{step.num}</span>
+            <h3>{step.title}</h3>
+            <p>{step.body}</p>
+          </li>
+        ))
+      }
+    </ol>
+  </section>
+
+  {/* ── Pricing summary ── */}
+  <section class="pricing reveal">
+    <div class="pricing-inner">
+      <Eyebrow space="16px">{c.commission.eyebrow}</Eyebrow>
+      <h2>
+        {
+          locale === 'hu'
+            ? `Hirdetés már ${cheapest} €-tól`
+            : `Adverteren vanaf € ${cheapest}`
+        }
+      </h2>
+      <GoldRule space="28px" />
+      <p class="pricing-body">
+        {
+          locale === 'hu'
+            ? 'A hirdetési díj tartalmazza a szöveg szerkesztését, a képfeldolgozást és a hirdetés összeállítását. Idegen nyelvű fordítás nyelvenként 25 €.'
+            : 'De advertentieprijs omvat het redigeren van de tekst, de beeldbewerking en het opmaken van de advertentie. Vertaling kost € 25 per taal.'
+        }
+      </p>
+      <div class="pricing-actions">
+        <Button variant="dark" href={path(locale, 'priceList')}>{c.commission.cta}</Button>
+        <Button variant="outline" href={path(locale, 'submitAd')}>{ui.cta.submitAd}</Button>
+      </div>
+    </div>
+  </section>
+
+  {/* ── Commission band ── */}
+  <section class="commission" data-bg="dark">
+    <div class="commission-copy reveal">
+      <Eyebrow space="16px">{c.commission.eyebrow}</Eyebrow>
+      <h2>{c.commission.title}</h2>
+      <p>{c.commission.body}</p>
+    </div>
+    <div class="commission-figure reveal">
+      <span class="pct">{COMMISSION.percent}%</span>
+      <span class="pct-note">
+        {locale === 'hu' ? `min. ${COMMISSION.minimumEur} € + ${COMMISSION.vatPercent}% áfa` : `min. € ${COMMISSION.minimumEur} + ${COMMISSION.vatPercent}% btw`}
+      </span>
+    </div>
+  </section>
+
+  {/* ── Seller FAQ ── */}
+  <section class="faq">
+    <div class="faq-head reveal">
+      <Eyebrow center space="16px">{locale === 'hu' ? 'Gyakori kérdések' : 'Veelgestelde vragen'}</Eyebrow>
+      <h2>{locale === 'hu' ? 'Amit az eladók kérdezni szoktak' : 'Wat verkopers ons vragen'}</h2>
+    </div>
+
+    <div class="faq-list">
+      {
+        sellerFaq.map((entry) => (
+          <details class="faq-item">
+            <summary>
+              <span>{entry.question}</span>
+              <span class="chev" aria-hidden="true">+</span>
+            </summary>
+            <div class="faq-answer">
+              {entry.answer.map((para) =>
+                para.startsWith('- ') ? <p class="bullet">{para.slice(2)}</p> : <p>{para}</p>
+              )}
+            </div>
+          </details>
+        ))
+      }
+    </div>
+
+    <div class="faq-more reveal">
+      <Button variant="text" href={path(locale, 'faq')}>
+        {locale === 'hu' ? 'Összes kérdés és válasz' : 'Alle vragen en antwoorden'}
+      </Button>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-top: 1px solid var(--border);
+  }
+  .benefits,
+  .personas {
+    padding: 88px var(--pad-x);
+  }
+  .personas {
+    background: var(--linen);
+    border-left: 1px solid var(--border);
+  }
+  h2 {
+    font-family: var(--serif);
+    font-weight: var(--fw-display);
+    font-size: clamp(26px, 2.8vw, 42px);
+    line-height: 1.2;
+    color: var(--ink);
+    margin-bottom: 28px;
+    white-space: pre-line;
+  }
+
+  .points {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    list-style: none;
+  }
+  .points li {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    font-size: var(--fs-body);
+    line-height: 1.8;
+    color: var(--taupe);
+  }
+  .dash {
+    width: 20px;
+    height: 1px;
+    background: var(--accent);
+    margin-top: 13px;
+    flex-shrink: 0;
+  }
+
+  .persona {
+    padding-bottom: 20px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .persona:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+  }
+  .persona dt {
+    font-family: var(--serif);
+    font-weight: var(--fw-medium);
+    font-size: 18px;
+    color: var(--ink);
+    margin-bottom: 5px;
+  }
+  .persona dd {
+    font-size: var(--fs-small);
+    line-height: 1.8;
+    color: var(--taupe);
+  }
+
+  .how {
+    padding: var(--section-y) var(--pad-x);
+    border-top: 1px solid var(--border);
+  }
+  .how-head {
+    text-align: center;
+    margin-bottom: 80px;
+  }
+  .how-head h2 {
+    font-size: clamp(30px, 3.5vw, 52px);
+  }
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    list-style: none;
+  }
+  .step {
+    padding: 48px 52px;
+    border-top: 2px solid var(--accent);
+  }
+  .step + .step {
+    border-left: 1px solid var(--border);
+  }
+  .step-num {
+    display: block;
+    font-family: var(--serif);
+    font-weight: var(--fw-light);
+    font-size: 52px;
+    line-height: 1;
+    color: var(--accent);
+    opacity: 0.62; /* was .45 — 2.64:1, below the 3:1 large-text floor */
+    margin-bottom: 28px;
+  }
+  .step h3 {
+    font-family: var(--serif);
+    font-weight: var(--fw-display);
+    font-size: 23px;
+    color: var(--ink);
+    margin-bottom: 12px;
+  }
+  .step p {
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    color: var(--taupe);
+  }
+
+  .pricing {
+    background: var(--linen);
+    border-block: 1px solid var(--border);
+    padding: 72px var(--pad-x);
+    text-align: center;
+  }
+  .pricing-inner {
+    max-width: 60ch;
+    margin-inline: auto;
+  }
+  .pricing :global(.eyebrow),
+  .pricing .s-rule {
+    margin-inline: auto;
+  }
+  .pricing h2 {
+    font-size: clamp(28px, 3.2vw, 46px);
+  }
+  .pricing-body {
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    color: var(--taupe);
+    margin-bottom: 32px;
+  }
+  .pricing-actions {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .commission {
+    background: var(--ink);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 48px;
+    padding: 88px var(--pad-x);
+  }
+  .commission h2 {
+    color: var(--cream);
+    font-size: clamp(26px, 3vw, 46px);
+    margin-bottom: 16px;
+  }
+  .commission p {
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    /* ADJUSTED: was rgba(cream,.55) — this is a key sales paragraph. */
+    color: var(--on-dark-body);
+    max-width: 58ch;
+  }
+  .commission-figure {
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .pct {
+    display: block;
+    font-family: var(--serif);
+    font-weight: var(--fw-light);
+    font-size: clamp(64px, 9vw, 128px);
+    line-height: 1;
+    color: var(--cream);
+  }
+  .pct-note {
+    font-size: var(--fs-small);
+    color: var(--on-dark-muted);
+    letter-spacing: 0.06em;
+  }
+
+  .faq {
+    padding: var(--section-y) var(--pad-x);
+  }
+  .faq-head {
+    text-align: center;
+    margin-bottom: 52px;
+  }
+  .faq-head h2 {
+    font-size: clamp(28px, 3.2vw, 46px);
+  }
+  .faq-list {
+    max-width: 78ch;
+    margin-inline: auto;
+    border-top: 1px solid var(--border);
+  }
+  .faq-item {
+    border-bottom: 1px solid var(--border);
+  }
+  summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 24px;
+    padding: 22px 0;
+    cursor: pointer;
+    font-family: var(--serif);
+    font-weight: var(--fw-medium);
+    font-size: var(--fs-lead);
+    line-height: 1.5;
+    color: var(--ink);
+    list-style: none;
+  }
+  summary::-webkit-details-marker {
+    display: none;
+  }
+  .chev {
+    font-size: 20px;
+    line-height: 1;
+    color: var(--accent);
+    flex-shrink: 0;
+    transition: transform var(--dur-fast) ease;
+  }
+  .faq-item[open] .chev {
+    transform: rotate(45deg);
+  }
+  .faq-answer {
+    padding-bottom: 24px;
+  }
+  .faq-answer p {
+    font-size: var(--fs-body);
+    line-height: 1.9;
+    color: var(--taupe);
+    margin-bottom: 12px;
+  }
+  .faq-answer p:last-child {
+    margin-bottom: 0;
+  }
+  .bullet {
+    padding-left: 18px;
+    position: relative;
+    margin-bottom: 6px;
+  }
+  .bullet::before {
+    content: '·';
+    position: absolute;
+    left: 4px;
+    color: var(--accent);
+  }
+  .faq-more {
+    text-align: center;
+    margin-top: 40px;
+  }
+
+  @media (max-width: 900px) {
+    .split,
+    .steps {
+      grid-template-columns: 1fr;
+    }
+    .benefits,
+    .personas {
+      padding: 44px var(--pad-x-mob);
+    }
+    .personas {
+      border-left: none;
+      border-top: 1px solid var(--border);
+    }
+    .how,
+    .faq {
+      padding: var(--section-y-mob) var(--pad-x-mob);
+    }
+    .how-head {
+      margin-bottom: 36px;
+    }
+    .step {
+      padding: 28px 0;
+    }
+    .step + .step {
+      border-left: none;
+    }
+    .step-num {
+      font-size: 40px;
+      margin-bottom: 16px;
+    }
+    .pricing,
+    .commission {
+      padding: 44px var(--pad-x-mob);
+    }
+    .commission {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 28px;
+    }
+    .commission-figure {
+      text-align: left;
+    }
+    .pricing-actions {
+      flex-direction: column;
+    }
+  }
+</style>

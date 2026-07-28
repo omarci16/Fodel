@@ -1,0 +1,18 @@
+# build output
+dist/
+.netlify/
+
+# generated types
+.astro/
+
+# dependencies
+node_modules/
+
+# secrets
+.env
+.env.production
+.env.local
+
+# macOS / OneDrive
+.DS_Store
+Icon?

@@ -1,0 +1,111 @@
+---
+/**
+ * Sold archive.
+ *
+ * FODEL already have an "Eladva" category. A visible record of completed sales
+ * is the cheapest trust signal available to an agency, and it was missing from
+ * the prototype. Empty until listings are marked `status: sold` — the page is
+ * noindexed while it has nothing to show, so we never serve a thin page.
+ */
+import Base from '~/layouts/Base.astro';
+import PageHeader from '~/components/PageHeader.astro';
+import GoldRule from '~/components/GoldRule.astro';
+import Button from '~/components/Button.astro';
+import PropertyCard from '~/components/PropertyCard.astro';
+import { UI, path, type Locale } from '~/i18n/ui';
+import { soldProperties } from '~/lib/properties';
+import { alternatesFor } from '~/lib/page';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const ui = UI[locale];
+const hu = locale === 'hu';
+const sold = await soldProperties();
+
+const t = hu
+  ? {
+      metaTitle: 'Eladva — Sikeres tranzakcióink',
+      metaDescription: 'Ingatlanok, amelyeket a FODEL közvetítésével értékesítettünk nyugat-európai vevőknek.',
+      eyebrow: 'Eladva',
+      title: 'Sikeres',
+      titleEm: 'tranzakciók',
+      intro: 'Ezek az ingatlanok a FODEL közvetítésével találtak új tulajdonosra.',
+      empty: 'Ez az oldal hamarosan feltöltésre kerül a lezárt tranzakciókkal.',
+      emptyHint: 'Addig is nézze meg az aktuális kínálatot.',
+    }
+  : {
+      metaTitle: 'Verkocht — Afgeronde transacties',
+      metaDescription: 'Woningen die via FODEL zijn verkocht aan kopers uit West-Europa.',
+      eyebrow: 'Verkocht',
+      title: 'Afgeronde',
+      titleEm: 'transacties',
+      intro: 'Deze woningen hebben via FODEL een nieuwe eigenaar gevonden.',
+      empty: 'Deze pagina wordt binnenkort gevuld met afgeronde transacties.',
+      emptyHint: 'Bekijk in de tussentijd het actuele aanbod.',
+    };
+---
+
+<Base
+  locale={locale}
+  title={t.metaTitle}
+  description={t.metaDescription}
+  alternates={alternatesFor('sold')}
+  noindex={sold.length === 0}
+>
+  <PageHeader eyebrow={t.eyebrow} title={t.title} titleEm={t.titleEm} body={t.intro} compact />
+
+  <div class="sold">
+    {
+      sold.length > 0 ? (
+        <div class="grid">
+          {sold.map((p) => <PropertyCard property={p} locale={locale} />)}
+        </div>
+      ) : (
+        <div class="empty">
+          <GoldRule center space="28px" />
+          <p class="empty-title">{t.empty}</p>
+          <p class="empty-hint">{t.emptyHint}</p>
+          <Button variant="dark" href={path(locale, 'properties')}>{ui.cta.allProperties}</Button>
+        </div>
+      )
+    }
+  </div>
+</Base>
+
+<style>
+  .sold {
+    padding: 8px var(--pad-x) var(--section-y);
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 44px 36px;
+  }
+  .empty {
+    text-align: center;
+    padding: 60px 0 80px;
+  }
+  .empty-title {
+    font-family: var(--serif);
+    font-size: 24px;
+    color: var(--ink);
+    margin-bottom: 10px;
+  }
+  .empty-hint {
+    font-size: var(--fs-body);
+    color: var(--taupe);
+    margin-bottom: 28px;
+  }
+  @media (max-width: 900px) {
+    .sold {
+      padding: 8px var(--pad-x-mob) var(--section-y-mob);
+    }
+    .grid {
+      grid-template-columns: 1fr;
+      gap: 28px;
+    }
+  }
+</style>

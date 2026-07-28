@@ -1,0 +1,303 @@
+---
+/**
+ * Long-form content page — services, agricultural, guides and the legal pages.
+ *
+ * Sections are structured data rather than raw HTML so both locales share one
+ * template and every heading level stays correct for screen readers.
+ */
+import Base from '~/layouts/Base.astro';
+import PageHeader from '~/components/PageHeader.astro';
+import Eyebrow from '~/components/Eyebrow.astro';
+import GoldRule from '~/components/GoldRule.astro';
+import Button from '~/components/Button.astro';
+import { path as routePath, type Locale, type RouteKey } from '~/i18n/ui';
+import type { ContentPageData } from '~/lib/content-sections';
+import { alternatesFor } from '~/lib/page';
+
+interface Props {
+  locale: Locale;
+  routeKey: RouteKey;
+  data: ContentPageData;
+  noindex?: boolean;
+}
+
+const { locale, routeKey, data, noindex = false } = Astro.props;
+const path = (key: RouteKey) => routePath(locale, key);
+---
+
+<Base
+  locale={locale}
+  title={data.metaTitle}
+  description={data.metaDescription}
+  alternates={alternatesFor(routeKey)}
+  noindex={noindex}
+>
+  <PageHeader
+    eyebrow={data.eyebrow}
+    title={data.title}
+    titleEm={data.titleEm}
+    body={data.intro}
+    compact
+  />
+
+  <div class="content">
+    {
+      data.updated && (
+        <p class="updated">
+          {locale === 'hu' ? 'Utolsó frissítés' : 'Laatst bijgewerkt'}: {data.updated}
+        </p>
+      )
+    }
+
+    {
+      data.sections.map((section) => {
+        switch (section.type) {
+          case 'prose':
+            return (
+              <section class="sec">
+                {section.title && <h2>{section.title}</h2>}
+                {section.paragraphs.map((p) => <p>{p}</p>)}
+              </section>
+            );
+
+          case 'list':
+            return (
+              <section class="sec">
+                {section.title && <h2>{section.title}</h2>}
+                {section.intro && <p>{section.intro}</p>}
+                {section.ordered ? (
+                  <ol class="bullets">{section.items.map((i) => <li>{i}</li>)}</ol>
+                ) : (
+                  <ul class="bullets">{section.items.map((i) => <li>{i}</li>)}</ul>
+                )}
+              </section>
+            );
+
+          case 'steps':
+            return (
+              <section class="sec">
+                {section.title && <h2>{section.title}</h2>}
+                <ol class="steps">
+                  {section.items.map((s) => (
+                    <li>
+                      <span class="n">{s.n}</span>
+                      <h3>{s.t}</h3>
+                      <p>{s.b}</p>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            );
+
+          case 'table':
+            return (
+              <section class="sec">
+                {section.title && <h2>{section.title}</h2>}
+                {section.intro && <p>{section.intro}</p>}
+                <div class="table-wrap">
+                  <table>
+                    <tbody>
+                      {section.rows.map(([label, value]) => (
+                        <tr>
+                          <th scope="row">{label}</th>
+                          <td>{value}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            );
+
+          case 'callout':
+            return (
+              <aside class="callout">
+                <Eyebrow space="10px">{section.title}</Eyebrow>
+                <p>{section.body}</p>
+              </aside>
+            );
+
+          case 'cta':
+            return (
+              <section class="cta">
+                <GoldRule space="24px" />
+                <h2>{section.title}</h2>
+                {section.body && <p>{section.body}</p>}
+                <div class="cta-actions">
+                  <Button variant="dark" href={path(section.primary.to)}>{section.primary.label}</Button>
+                  {section.secondary && (
+                    <Button variant="outline" href={path(section.secondary.to)}>
+                      {section.secondary.label}
+                    </Button>
+                  )}
+                </div>
+              </section>
+            );
+        }
+      })
+    }
+  </div>
+</Base>
+
+<style>
+  .content {
+    max-width: 78ch;
+    padding: 8px var(--pad-x) var(--section-y);
+  }
+
+  .updated {
+    font-size: var(--fs-micro);
+    letter-spacing: 0.06em;
+    color: var(--taupe);
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 40px;
+  }
+
+  .sec {
+    margin-bottom: 48px;
+  }
+  h2 {
+    font-family: var(--serif);
+    font-weight: var(--fw-display);
+    font-size: clamp(24px, 2.4vw, 34px);
+    line-height: 1.25;
+    color: var(--ink);
+    margin-bottom: 20px;
+  }
+  h3 {
+    font-family: var(--serif);
+    font-weight: var(--fw-display);
+    font-size: var(--fs-lead);
+    color: var(--ink);
+    margin-bottom: 8px;
+  }
+  p {
+    font-size: var(--fs-body);
+    line-height: 1.9;
+    color: var(--taupe);
+    margin-bottom: 16px;
+  }
+
+  .bullets {
+    list-style: none;
+    margin: 4px 0 16px;
+  }
+  .bullets li {
+    position: relative;
+    padding-left: 24px;
+    font-size: var(--fs-body);
+    line-height: 1.85;
+    color: var(--taupe);
+    margin-bottom: 10px;
+  }
+  .bullets li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 14px;
+    width: 14px;
+    height: 1px;
+    background: var(--accent);
+  }
+  ol.bullets {
+    counter-reset: item;
+  }
+  ol.bullets li::before {
+    counter-increment: item;
+    content: counter(item) '.';
+    top: 0;
+    width: auto;
+    height: auto;
+    background: none;
+    color: var(--accent);
+    font-family: var(--serif);
+  }
+
+  .steps {
+    list-style: none;
+    display: grid;
+    gap: 24px;
+  }
+  .steps li {
+    border-top: 2px solid var(--accent);
+    padding-top: 18px;
+  }
+  .n {
+    display: block;
+    font-family: var(--serif);
+    font-weight: var(--fw-light);
+    font-size: 30px;
+    line-height: 1;
+    color: var(--accent);
+    opacity: 0.62; /* was .45 — 2.64:1, below the 3:1 large-text floor */
+    margin-bottom: 12px;
+  }
+  .steps p {
+    margin-bottom: 0;
+    font-size: var(--fs-small);
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  th,
+  td {
+    text-align: left;
+    padding: 15px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: var(--fs-body);
+    line-height: 1.7;
+    font-weight: var(--fw-light);
+    vertical-align: baseline;
+  }
+  th {
+    color: var(--ink);
+    padding-right: 32px;
+    width: 40%;
+  }
+  td {
+    color: var(--taupe);
+  }
+
+  .callout {
+    background: var(--linen);
+    border-left: 2px solid var(--accent);
+    padding: 26px 30px;
+    margin-bottom: 48px;
+  }
+  .callout p {
+    margin-bottom: 0;
+    font-size: var(--fs-small);
+    line-height: 1.85;
+  }
+
+  .cta {
+    border-top: 1px solid var(--border);
+    padding-top: 40px;
+    margin-top: 8px;
+  }
+  .cta-actions {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 24px;
+  }
+
+  @media (max-width: 768px) {
+    .content {
+      padding: 8px var(--pad-x-mob) var(--section-y-mob);
+    }
+    th {
+      width: 45%;
+      padding-right: 16px;
+    }
+    .cta-actions {
+      flex-direction: column;
+    }
+  }
+</style>

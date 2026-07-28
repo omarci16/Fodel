@@ -1,0 +1,221 @@
+/**
+ * Structured data and hreflang.
+ *
+ * Everything emitted here must also be visible on the page — that is Google's
+ * condition for using it, and it is what makes the markup safe to feed to
+ * answer engines. Nothing is asserted that the page does not show.
+ */
+
+import { COMPANY, COMMISSION } from '~/config/company';
+import { BRAND, CATEGORIES, LOCALE_META, type Locale, type CategoryKey } from '~/i18n/ui';
+import type { Property } from './properties';
+import { text } from './properties';
+
+const SITE = 'https://fodel.nl';
+
+export const abs = (path: string): string => new URL(path, SITE).toString();
+
+/* ── Organisation ─────────────────────────────────────────────────────── */
+
+export function organisationSchema(locale: Locale) {
+  const brand = BRAND[locale];
+
+  return {
+    '@type': 'RealEstateAgent',
+    '@id': `${SITE}/#organization`,
+    name: brand.name,
+    legalName: COMPANY.names.legal,
+    description: brand.tagline,
+    url: abs(`/${locale}/`),
+    foundingDate: String(COMPANY.founded),
+    email: COMPANY.email.primary,
+    telephone: COMPANY.phones.map((p) => p.display),
+    address: {
+      '@type': 'PostalAddress',
+      streetAddress: COMPANY.address.street,
+      postalCode: COMPANY.address.postalCode,
+      addressLocality: COMPANY.address.city,
+      addressCountry: COMPANY.address.countryCode,
+    },
+    // Only emitted once verified — an unconfirmed identifier is worse than none.
+    ...(COMPANY.registration.kvk ? { identifier: COMPANY.registration.kvk } : {}),
+    ...(COMPANY.registration.vatVerified ? { vatID: COMPANY.registration.vat } : {}),
+    areaServed: [
+      { '@type': 'Country', name: 'Hungary' },
+      { '@type': 'Country', name: 'Netherlands' },
+      { '@type': 'Country', name: 'Belgium' },
+    ],
+    knowsLanguage: ['hu', 'nl', 'de', 'en', 'fr'],
+    sameAs: [COMPANY.social.youtube, COMPANY.social.facebookNl, COMPANY.social.facebookHu],
+    openingHoursSpecification: {
+      '@type': 'OpeningHoursSpecification',
+      dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+      opens: COMPANY.hours.weekdays.from,
+      closes: COMPANY.hours.weekdays.to,
+    },
+  };
+}
+
+export function websiteSchema(locale: Locale, searchPath: string) {
+  return {
+    '@type': 'WebSite',
+    '@id': `${SITE}/#website`,
+    name: BRAND[locale].name,
+    url: abs(`/${locale}/`),
+    inLanguage: LOCALE_META[locale].htmlLang,
+    publisher: { '@id': `${SITE}/#organization` },
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: {
+        '@type': 'EntryPoint',
+        urlTemplate: `${abs(searchPath)}?q={search_term_string}`,
+      },
+      'query-input': 'required name=search_term_string',
+    },
+  };
+}
+
+/* ── Property listing ─────────────────────────────────────────────────── */
+
+export function propertySchema(p: Property, locale: Locale, pageUrl: string, imageUrl: string) {
+  const d = p.data;
+  const residenceType = CATEGORIES[d.category as CategoryKey].schema;
+
+  const availability =
+    d.status === 'sold'
+      ? 'https://schema.org/SoldOut'
+      : d.status === 'reserved'
+        ? 'https://schema.org/LimitedAvailability'
+        : 'https://schema.org/InStock';
+
+  return {
+    '@type': 'RealEstateListing',
+    '@id': `${abs(pageUrl)}#listing`,
+    url: abs(pageUrl),
+    name: text(d.title, locale),
+    description: text(d.description, locale),
+    datePosted: d.listing.publishedAt.toISOString(),
+    image: abs(imageUrl),
+    inLanguage: LOCALE_META[locale].htmlLang,
+    provider: { '@id': `${SITE}/#organization` },
+    identifier: d.ref,
+
+    about: {
+      '@type': residenceType,
+      name: text(d.title, locale),
+      ...(d.areas.floorM2
+        ? {
+            floorSize: {
+              '@type': 'QuantitativeValue',
+              value: d.areas.floorM2,
+              unitCode: 'MTK',
+            },
+          }
+        : {}),
+      ...(d.rooms
+        ? {
+            numberOfRooms: d.rooms.bedrooms,
+            numberOfBathroomsTotal: d.rooms.bathrooms,
+          }
+        : {}),
+      ...(d.building.yearBuilt ? { yearBuilt: d.building.yearBuilt } : {}),
+      address: {
+        '@type': 'PostalAddress',
+        addressLocality: d.location.settlement,
+        addressRegion: d.location.county,
+        addressCountry: 'HU',
+      },
+      geo: {
+        '@type': 'GeoCoordinates',
+        latitude: d.location.lat,
+        longitude: d.location.lng,
+      },
+    },
+
+    offers: {
+      '@type': 'Offer',
+      // Numeric, no separators or symbol — Google is strict about this.
+      price: d.price.eur,
+      priceCurrency: 'EUR',
+      availability,
+      businessFunction: 'https://purl.org/goodrelations/v1#Sell',
+      url: abs(pageUrl),
+      seller: { '@id': `${SITE}/#organization` },
+    },
+  };
+}
+
+/* ── Supporting types ─────────────────────────────────────────────────── */
+
+export function breadcrumbSchema(items: { name: string; url: string }[]) {
+  return {
+    '@type': 'BreadcrumbList',
+    itemListElement: items.map((item, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: item.name,
+      item: abs(item.url),
+    })),
+  };
+}
+
+export function faqSchema(entries: { question: string; answer: string }[]) {
+  return {
+    '@type': 'FAQPage',
+    mainEntity: entries.map((e) => ({
+      '@type': 'Question',
+      name: e.question,
+      acceptedAnswer: { '@type': 'Answer', text: e.answer },
+    })),
+  };
+}
+
+export function articleSchema(opts: {
+  title: string;
+  description: string;
+  url: string;
+  image?: string;
+  published: Date;
+  updated?: Date;
+  locale: Locale;
+  author: string;
+}) {
+  return {
+    '@type': 'Article',
+    headline: opts.title,
+    description: opts.description,
+    url: abs(opts.url),
+    ...(opts.image ? { image: abs(opts.image) } : {}),
+    datePublished: opts.published.toISOString(),
+    dateModified: (opts.updated ?? opts.published).toISOString(),
+    inLanguage: LOCALE_META[opts.locale].htmlLang,
+    author: { '@type': 'Organization', name: opts.author },
+    publisher: { '@id': `${SITE}/#organization` },
+  };
+}
+
+/** The commission terms, stated as data so answer engines can quote them. */
+export function serviceSchema(locale: Locale, name: string, description: string) {
+  return {
+    '@type': 'Service',
+    name,
+    description,
+    provider: { '@id': `${SITE}/#organization` },
+    areaServed: { '@type': 'Country', name: 'Hungary' },
+    offers: {
+      '@type': 'Offer',
+      priceSpecification: {
+        '@type': 'PriceSpecification',
+        description: `${COMMISSION.percent}% + ${COMMISSION.vatPercent}% VAT, min. €${COMMISSION.minimumEur}`,
+        priceCurrency: 'EUR',
+        minPrice: COMMISSION.minimumEur,
+      },
+    },
+    inLanguage: LOCALE_META[locale].htmlLang,
+  };
+}
+
+/** Wrap graph nodes into one @graph document. */
+export function graph(nodes: unknown[]) {
+  return { '@context': 'https://schema.org', '@graph': nodes.filter(Boolean) };
+}

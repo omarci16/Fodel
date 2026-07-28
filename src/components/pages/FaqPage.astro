@@ -1,0 +1,247 @@
+---
+/**
+ * FAQ — FODEL's own 22 questions, absent from the prototype.
+ *
+ * This is the highest-value SEO and answer-engine content they own: plainly
+ * stated facts about prices, commission and process, which is exactly what
+ * assistants quote. Emits FAQPage structured data over the same text that is
+ * visible on the page.
+ */
+import Base from '~/layouts/Base.astro';
+import PageHeader from '~/components/PageHeader.astro';
+import Eyebrow from '~/components/Eyebrow.astro';
+import Button from '~/components/Button.astro';
+import { UI, path, type Locale } from '~/i18n/ui';
+import { FAQ, faqAnswerText, type FaqAudience } from '~/data/faq';
+import { alternatesFor } from '~/lib/page';
+import { faqSchema } from '~/lib/seo';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const ui = UI[locale];
+const hu = locale === 'hu';
+const entries = FAQ[locale];
+
+const t = hu
+  ? {
+      metaTitle: 'Gyakori kérdések — Hirdetés, jutalék, külföldi vevők',
+      metaDescription:
+        'Miért jó egy külföldi vevő? Mennyibe kerül a hirdetés? Mikor kell jutalékot fizetni? A FODEL 22 leggyakoribb kérdése és válasza.',
+      eyebrow: 'Gyakori kérdések',
+      title: 'Kérdések és',
+      titleEm: 'válaszok',
+      body: 'Az alábbiakban azokat a kérdéseket gyűjtöttük össze, amelyeket a leggyakrabban kapunk. Ha nem találja, amit keres, hívjon minket — vagy kérjen ingyenes visszahívást.',
+      groups: [
+        { id: 'seller' as FaqAudience, label: 'Eladóknak' },
+        { id: 'both' as FaqAudience, label: 'Általános' },
+      ],
+      stillHead: 'Nem találta meg a választ?',
+      stillBody: 'Hívjon minket munkanapokon 09:00 és 18:00 között, vagy kérjen ingyenes visszahívást.',
+    }
+  : {
+      metaTitle: 'Veelgestelde vragen — Kopen in Hongarije',
+      metaDescription:
+        'Kan ik als EU-burger kopen in Hongarije? Wat kost uw bemiddeling? Moet ik erheen om te tekenen? De vragen die kopers ons het vaakst stellen.',
+      eyebrow: 'Veelgestelde vragen',
+      title: 'Vragen en',
+      titleEm: 'antwoorden',
+      body: 'Hieronder de vragen die wij het vaakst krijgen. Staat uw vraag er niet bij? Bel ons gerust, of vraag om teruggebeld te worden.',
+      groups: [
+        { id: 'buyer' as FaqAudience, label: 'Voor kopers' },
+        { id: 'both' as FaqAudience, label: 'Algemeen' },
+      ],
+      stillHead: 'Geen antwoord gevonden?',
+      stillBody: 'Bel ons op werkdagen tussen 09:00 en 18:00, of vraag om teruggebeld te worden.',
+    };
+
+const grouped = t.groups
+  .map((g) => ({ ...g, items: entries.filter((e) => e.audience === g.id) }))
+  .filter((g) => g.items.length > 0);
+---
+
+<Base
+  locale={locale}
+  title={t.metaTitle}
+  description={t.metaDescription}
+  alternates={alternatesFor('faq')}
+  schema={[faqSchema(entries.map((e) => ({ question: e.question, answer: faqAnswerText(e) })))]}
+>
+  <PageHeader eyebrow={t.eyebrow} title={t.title} titleEm={t.titleEm} body={t.body} compact />
+
+  <div class="faq-page">
+    <nav class="toc no-print" aria-label={hu ? 'Kérdések' : 'Vragen'}>
+      {
+        grouped.map((group) => (
+          <div class="toc-group">
+            <Eyebrow space="12px">{group.label}</Eyebrow>
+            <ol>
+              {group.items.map((e) => (
+                <li><a href={`#${e.id}`}>{e.question}</a></li>
+              ))}
+            </ol>
+          </div>
+        ))
+      }
+    </nav>
+
+    <div class="faq-body">
+      {
+        grouped.map((group) => (
+          <section class="group">
+            <h2 class="group-head">{group.label}</h2>
+            {group.items.map((entry) => (
+              <article class="entry" id={entry.id}>
+                <h3>{entry.question}</h3>
+                <div class="answer">
+                  {entry.answer.map((para) =>
+                    para.startsWith('- ') ? <p class="bullet">{para.slice(2)}</p> : <p>{para}</p>
+                  )}
+                </div>
+              </article>
+            ))}
+          </section>
+        ))
+      }
+
+      <aside class="still">
+        <Eyebrow space="10px">{t.stillHead}</Eyebrow>
+        <p>{t.stillBody}</p>
+        <div class="still-actions">
+          <Button variant="dark" href={path(locale, 'contact')}>{ui.cta.callback}</Button>
+          <Button variant="outline" href={path(locale, hu ? 'submitAd' : 'searchRequest')}>
+            {hu ? ui.cta.submitAd : ui.cta.searchRequest}
+          </Button>
+        </div>
+      </aside>
+    </div>
+  </div>
+</Base>
+
+<style>
+  .faq-page {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 72px;
+    padding: 24px var(--pad-x) var(--section-y);
+    align-items: start;
+  }
+
+  .toc {
+    position: sticky;
+    top: calc(var(--nav-h) + 20px);
+    max-height: calc(100vh - var(--nav-h) - 60px);
+    overflow-y: auto;
+    border-left: 1px solid var(--border);
+    padding-left: 24px;
+  }
+  .toc-group + .toc-group {
+    margin-top: 28px;
+  }
+  .toc ol {
+    list-style: none;
+  }
+  .toc li {
+    margin-bottom: 9px;
+  }
+  .toc a {
+    font-size: var(--fs-small);
+    line-height: 1.55;
+    color: var(--taupe);
+    display: block;
+  }
+  .toc a:hover {
+    color: var(--ink);
+  }
+
+  .group + .group {
+    margin-top: 64px;
+  }
+  .group-head {
+    font-family: var(--serif);
+    font-weight: var(--fw-regular);
+    font-size: clamp(24px, 2.6vw, 36px);
+    color: var(--ink);
+    padding-bottom: 16px;
+    border-bottom: 2px solid var(--accent);
+    margin-bottom: 8px;
+  }
+
+  .entry {
+    padding: 32px 0;
+    border-bottom: 1px solid var(--border);
+    scroll-margin-top: calc(var(--nav-h) + 20px);
+  }
+  .entry h3 {
+    font-family: var(--serif);
+    font-weight: var(--fw-display);
+    font-size: clamp(19px, 1.8vw, 23px);
+    line-height: 1.4;
+    color: var(--ink);
+    margin-bottom: 16px;
+  }
+  .answer p {
+    font-size: var(--fs-body);
+    line-height: 1.9;
+    color: var(--taupe);
+    margin-bottom: 14px;
+    max-width: 72ch;
+  }
+  .answer p:last-child {
+    margin-bottom: 0;
+  }
+  .bullet {
+    padding-left: 20px;
+    position: relative;
+    margin-bottom: 8px;
+  }
+  .bullet::before {
+    content: '·';
+    position: absolute;
+    left: 5px;
+    color: var(--accent);
+  }
+
+  .still {
+    margin-top: 64px;
+    background: var(--linen);
+    border-left: 2px solid var(--accent);
+    padding: 36px 40px;
+  }
+  .still p {
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    color: var(--taupe);
+    margin-bottom: 24px;
+    max-width: 56ch;
+  }
+  .still-actions {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  @media (max-width: 1000px) {
+    .faq-page {
+      grid-template-columns: 1fr;
+      gap: 32px;
+      padding: 16px var(--pad-x-mob) var(--section-y-mob);
+    }
+    .toc {
+      position: static;
+      max-height: none;
+      overflow: visible;
+      border-left: none;
+      border-top: 1px solid var(--border);
+      padding: 24px 0 0;
+    }
+    .still {
+      padding: 28px 24px;
+    }
+    .still-actions {
+      flex-direction: column;
+    }
+  }
+</style>

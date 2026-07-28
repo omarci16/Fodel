@@ -1,0 +1,469 @@
+---
+/**
+ * Ad submission — the page that makes FODEL money, missing from the prototype.
+ *
+ * The flow matches how the business already works (fodel.hu/szolgaltatas):
+ * form → díjbekérő by email → bank transfer → photo upload rights →
+ * translation → published in five languages. No card payment, because FODEL
+ * do not take card payments.
+ */
+import Base from '~/layouts/Base.astro';
+import PageHeader from '~/components/PageHeader.astro';
+import Eyebrow from '~/components/Eyebrow.astro';
+import Button from '~/components/Button.astro';
+import FormShell from '~/components/forms/FormShell.astro';
+import Field from '~/components/forms/Field.astro';
+import { UI, CATEGORIES, path, type Locale, type CategoryKey } from '~/i18n/ui';
+import { COMPANY } from '~/config/company';
+import { COUNTIES } from '~/data/features';
+import { alternatesFor } from '~/lib/page';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const ui = UI[locale];
+const hu = locale === 'hu';
+
+const t = hu
+  ? {
+      metaTitle: 'Hirdetés feladása — Hirdesse ingatlanát Nyugat-Európában',
+      metaDescription:
+        'Adja fel ingatlanhirdetését 69 €-tól. 5 nyelven, 8 országban, kizárólagossági szerződés nélkül. Töltse ki az űrlapot — a díjbekérőt e-mailben küldjük.',
+      eyebrow: 'Hirdetésfeladás',
+      title: 'Hirdesse ingatlanát',
+      titleEm: 'Nyugat-Európában',
+      body: 'Töltse ki az alábbi űrlapot. Munkatársunk átnézi az adatokat, majd e-mailben elküldi a díjbekérőt. A díj beérkezése után feltöltheti a képeket, mi pedig lefordítjuk és közzétesszük a hirdetést.',
+      processHead: 'A folyamat',
+      steps: [
+        { n: '01', t: 'Űrlap kitöltése', b: 'Megadja az ingatlan adatait és a kért csomagot.' },
+        { n: '02', t: 'Díjbekérő', b: 'E-mailben megküldjük a díjbekérőt a választott csomagról.' },
+        { n: '03', t: 'Banki átutalás', b: 'Magyar vagy holland bankszámlára egyaránt utalhat.' },
+        { n: '04', t: 'Képek feltöltése', b: 'Az átutalás után megkapja a képfeltöltési jogosultságot.' },
+        { n: '05', t: 'Fordítás', b: 'A szöveget anyanyelvi szinten lefordítjuk a kért nyelvekre.' },
+        { n: '06', t: 'Megjelenés', b: 'A hirdetés néhány munkanapon belül élesedik, 5 nyelven.' },
+      ],
+      formHead: 'Hirdetésfeladási űrlap',
+      formNote:
+        'A csillaggal jelölt mezők kitöltése kötelező. Ha bármiben elakad, hívjon minket — szívesen segítünk az űrlap kitöltésében is.',
+      packages: [
+        { value: 'cheap-6m', label: 'Olcsó hirdetés — 6 hónap, max. 20 kép — 69 €' },
+        { value: 'normal-12m-129', label: 'Normál hirdetés — 12 hónap, korlátlan kép — 129 €' },
+        { value: 'normal-12m-179', label: 'Normál hirdetés — 150 M Ft felett — 179 €' },
+      ],
+      translations: 'Kért fordítások',
+      translationsHint:
+        'Nyelvenként 25 €. Javasolt sorrend: holland, német, angol, francia. A magyar nyelvű megjelenés ingyenes.',
+      highlight: 'Kiemelés',
+      highlightOptions: [
+        { value: 'none', label: 'Nem kérek kiemelést' },
+        { value: 'category', label: 'Kategórián belüli kiemelés — 15 €/hó (min. 3 hó)' },
+        { value: 'homepage', label: 'Főoldali kiemelés — 25 €/hó (min. 3 hó)' },
+        { value: 'both', label: 'Mindkettő' },
+      ],
+      ownerVisible: 'Megjelenjen az elérhetőségem a hirdetésben?',
+      ownerVisibleHint:
+        'Ha igen, a külföldi érdeklődő közvetlenül Önt is megkeresheti. Ilyen esetben — ha nincs szükség a segítségünkre — semmilyen jutalékot nem számítunk fel.',
+      yes: 'Igen, jelenjen meg a nevem és a telefonszámom',
+      no: 'Nem, csak a FODEL elérhetősége jelenjen meg',
+      bankHead: 'Bankszámlaszámaink',
+      bankNote: 'A díjbekérő megérkezése után ezekre a számlákra utalhat.',
+      submit: 'Hirdetés elküldése',
+      successTitle: 'Köszönjük!',
+      successBody:
+        'Megkaptuk a hirdetésfeladását. Munkatársunk átnézi az adatokat, és munkanapokon 09:00 és 18:00 között e-mailben elküldi a díjbekérőt.',
+    }
+  : {
+      metaTitle: 'Advertentie plaatsen — Uw woning in West-Europa',
+      metaDescription:
+        'Plaats uw advertentie vanaf € 69. In 5 talen, in 8 landen, zonder exclusiviteit. Vul het formulier in — het betaalverzoek ontvangt u per e-mail.',
+      eyebrow: 'Adverteren',
+      title: 'Plaats uw woning',
+      titleEm: 'in West-Europa',
+      body: 'Vul onderstaand formulier in. Wij controleren de gegevens en sturen u per e-mail een betaalverzoek. Na ontvangst van de betaling kunt u foto’s uploaden en verzorgen wij de vertaling en publicatie.',
+      processHead: 'Het proces',
+      steps: [
+        { n: '01', t: 'Formulier invullen', b: 'U geeft de gegevens van de woning en het gewenste pakket door.' },
+        { n: '02', t: 'Betaalverzoek', b: 'U ontvangt per e-mail een betaalverzoek voor het gekozen pakket.' },
+        { n: '03', t: 'Bankoverschrijving', b: 'U kunt overmaken naar onze Nederlandse of Hongaarse rekening.' },
+        { n: '04', t: 'Foto’s uploaden', b: 'Na de betaling ontvangt u de rechten om foto’s te uploaden.' },
+        { n: '05', t: 'Vertaling', b: 'Wij laten de tekst door moedertaalsprekers vertalen.' },
+        { n: '06', t: 'Publicatie', b: 'Binnen enkele werkdagen staat de advertentie online, in 5 talen.' },
+      ],
+      formHead: 'Aanmeldformulier',
+      formNote:
+        'Velden met een sterretje zijn verplicht. Loopt u ergens op vast? Bel ons gerust — wij vullen het formulier desgewenst samen met u in.',
+      packages: [
+        { value: 'cheap-6m', label: 'Voordelige advertentie — 6 maanden, max. 20 foto’s — € 69' },
+        { value: 'normal-12m-129', label: 'Normale advertentie — 12 maanden, onbeperkt — € 129' },
+        { value: 'normal-12m-179', label: 'Normale advertentie — boven 150 mln HUF — € 179' },
+      ],
+      translations: 'Gewenste vertalingen',
+      translationsHint:
+        '€ 25 per taal. Aanbevolen volgorde: Nederlands, Duits, Engels, Frans. Publicatie in het Hongaars is gratis.',
+      highlight: 'Uitlichten',
+      highlightOptions: [
+        { value: 'none', label: 'Geen uitlichting' },
+        { value: 'category', label: 'Binnen de categorie — € 15/maand (min. 3 mnd)' },
+        { value: 'homepage', label: 'Op de homepage — € 25/maand (min. 3 mnd)' },
+        { value: 'both', label: 'Beide' },
+      ],
+      ownerVisible: 'Mogen wij uw contactgegevens bij de advertentie tonen?',
+      ownerVisibleHint:
+        'Zo ja, dan kan een buitenlandse geïnteresseerde u rechtstreeks benaderen. Regelt u de koop dan zelf, dan brengen wij geen courtage in rekening.',
+      yes: 'Ja, toon mijn naam en telefoonnummer',
+      no: 'Nee, toon alleen de gegevens van FODEL',
+      bankHead: 'Onze bankrekeningen',
+      bankNote: 'Na ontvangst van het betaalverzoek kunt u naar deze rekeningen overmaken.',
+      submit: 'Advertentie aanmelden',
+      successTitle: 'Dank u wel!',
+      successBody:
+        'Wij hebben uw aanmelding ontvangen. Wij controleren de gegevens en sturen u op werkdagen tussen 09:00 en 18:00 per e-mail een betaalverzoek.',
+    };
+
+const categoryOptions = (Object.keys(CATEGORIES) as CategoryKey[]).map((key) => ({
+  value: key,
+  label: CATEGORIES[key][locale].label,
+}));
+---
+
+<Base
+  locale={locale}
+  title={t.metaTitle}
+  description={t.metaDescription}
+  alternates={alternatesFor('submitAd')}
+>
+  <PageHeader
+    eyebrow={t.eyebrow}
+    title={t.title}
+    titleEm={t.titleEm}
+    body={t.body}
+    compact
+    secondary={{ label: ui.cta.priceList, href: path(locale, 'priceList') }}
+  />
+
+  {/* ── Process ── */}
+  <section class="process">
+    <Eyebrow space="20px">{t.processHead}</Eyebrow>
+    <ol>
+      {
+        t.steps.map((s: any) => (
+          <li>
+            <span class="n">{s.n}</span>
+            <h2>{s.t}</h2>
+            <p>{s.b}</p>
+          </li>
+        ))
+      }
+    </ol>
+  </section>
+
+  {/* ── Form ── */}
+  <section class="form-section">
+    <div class="form-head">
+      <Eyebrow space="20px">{t.formHead}</Eyebrow>
+      <p class="form-note">{t.formNote}</p>
+    </div>
+
+    <div class="form-body">
+      <FormShell
+        locale={locale}
+        endpoint="/api/listing-order"
+        formId="listing-order"
+        submitLabel={t.submit}
+        successTitle={t.successTitle}
+        successBody={t.successBody}
+      >
+        <Field locale={locale} name="name" label={ui.form.name} required autocomplete="name" span="half" />
+        <Field locale={locale} name="email" label={ui.form.email} type="email" required autocomplete="email" span="half" />
+        <Field locale={locale} name="phone" label={ui.form.phone} type="tel" required autocomplete="tel" span="half" />
+        <Field
+          locale={locale}
+          name="package"
+          label={hu ? 'Választott csomag' : 'Gekozen pakket'}
+          type="select"
+          required
+          options={t.packages}
+          span="half"
+        />
+
+        <Field
+          locale={locale}
+          name="propertyType"
+          label={hu ? 'Ingatlan típusa' : 'Type woning'}
+          type="select"
+          required
+          options={categoryOptions}
+          span="half"
+        />
+        <Field
+          locale={locale}
+          name="county"
+          label={hu ? 'Megye' : 'Comitaat'}
+          type="select"
+          required
+          options={COUNTIES.map((c) => ({ value: c, label: c }))}
+          span="half"
+        />
+        <Field
+          locale={locale}
+          name="settlement"
+          label={hu ? 'Település' : 'Plaats'}
+          required
+          span="half"
+        />
+        <Field
+          locale={locale}
+          name="priceHuf"
+          label={hu ? 'Irányár (Ft)' : 'Vraagprijs (HUF)'}
+          type="number"
+          required
+          min={0}
+          span="half"
+        />
+        <Field
+          locale={locale}
+          name="floorM2"
+          label={hu ? 'Alapterület (m²)' : 'Woonoppervlak (m²)'}
+          type="number"
+          min={0}
+          span="half"
+        />
+        <Field
+          locale={locale}
+          name="plotM2"
+          label={hu ? 'Telekterület (m²)' : 'Perceeloppervlak (m²)'}
+          type="number"
+          min={0}
+          span="half"
+        />
+
+        <Field
+          locale={locale}
+          name="translations"
+          label={t.translations}
+          hint={t.translationsHint}
+          placeholder={hu ? 'pl. holland, német' : 'bijv. Duits, Engels'}
+          span="full"
+        />
+        <Field
+          locale={locale}
+          name="highlight"
+          label={t.highlight}
+          type="select"
+          options={t.highlightOptions}
+          span="full"
+        />
+        <Field
+          locale={locale}
+          name="ownerVisible"
+          label={t.ownerVisible}
+          hint={t.ownerVisibleHint}
+          type="select"
+          required
+          options={[
+            { value: 'yes', label: t.yes },
+            { value: 'no', label: t.no },
+          ]}
+          span="full"
+        />
+        <Field
+          locale={locale}
+          name="speaks"
+          label={hu ? 'Milyen nyelven tud kommunikálni?' : 'Welke talen spreekt u?'}
+          hint={
+            hu
+              ? 'Ezt feltüntetjük a hirdetésben, hogy a külföldi érdeklődő előre tudja.'
+              : 'Wij vermelden dit bij de advertentie, zodat geïnteresseerden dit vooraf weten.'
+          }
+          placeholder={hu ? 'pl. magyar, német' : 'bijv. Hongaars, Duits'}
+          span="full"
+        />
+        <Field
+          locale={locale}
+          name="description"
+          label={hu ? 'Az ingatlan leírása' : 'Omschrijving van de woning'}
+          type="textarea"
+          rows={7}
+          hint={
+            hu
+              ? 'Írja le a bővítési lehetőségeket és a közeli infrastruktúrát: víz, város, bevásárlás, orvos, autópálya, repülőtér távolsága.'
+              : 'Beschrijf de uitbreidingsmogelijkheden en de omgeving: water, stad, winkels, huisarts, snelweg en luchthaven.'
+          }
+          span="full"
+        />
+
+        <Field locale={locale} name="billingName" label={hu ? 'Számlázási név' : 'Factuurnaam'} span="half" />
+        <Field locale={locale} name="billingAddress" label={hu ? 'Számlázási cím' : 'Factuuradres'} span="half" />
+      </FormShell>
+
+      <aside class="bank">
+        <Eyebrow space="20px">{t.bankHead}</Eyebrow>
+        <p class="bank-note">{t.bankNote}</p>
+        <dl>
+          <div>
+            <dt>Nederland</dt>
+            <dd>{COMPANY.banks.nl.iban}</dd>
+            <dd class="bic">{COMPANY.banks.nl.bic}</dd>
+          </div>
+          <div>
+            <dt>Magyarország</dt>
+            <dd>{COMPANY.banks.hu.account}</dd>
+          </div>
+        </dl>
+
+        <div class="help">
+          <p>{hu ? 'Segítségre van szüksége?' : 'Hulp nodig?'}</p>
+          {COMPANY.phones.slice(0, 2).map((p) => <a href={p.href}>{p.display}</a>)}
+          <Button variant="text" href={path(locale, 'faq')}>
+            {hu ? 'Gyakori kérdések' : 'Veelgestelde vragen'}
+          </Button>
+        </div>
+      </aside>
+    </div>
+  </section>
+</Base>
+
+<style>
+
+  .process {
+    padding: 24px var(--pad-x) 64px;
+    border-bottom: 1px solid var(--border);
+  }
+  .process ol {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 32px 40px;
+    list-style: none;
+    counter-reset: step;
+  }
+  .process li {
+    border-top: 2px solid var(--accent);
+    padding-top: 20px;
+  }
+  .n {
+    display: block;
+    font-family: var(--serif);
+    font-weight: var(--fw-light);
+    font-size: 34px;
+    line-height: 1;
+    color: var(--accent);
+    opacity: 0.62; /* was .45 — 2.64:1, below the 3:1 large-text floor */
+    margin-bottom: 14px;
+  }
+  .process h2 {
+    font-family: var(--serif);
+    font-weight: var(--fw-display);
+    font-size: 19px;
+    color: var(--ink);
+    margin-bottom: 8px;
+  }
+  .process p {
+    font-size: var(--fs-small);
+    line-height: 1.8;
+    color: var(--taupe);
+  }
+
+  .form-section {
+    padding: 64px var(--pad-x) var(--section-y);
+  }
+  .form-head {
+    max-width: 62ch;
+    margin-bottom: 44px;
+  }
+  .form-note {
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    color: var(--taupe);
+  }
+  .form-body {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 64px;
+    align-items: start;
+  }
+
+  .bank {
+    position: sticky;
+    top: calc(var(--nav-h) + 20px);
+    background: var(--linen);
+    border-left: 2px solid var(--accent);
+    padding: 32px;
+  }
+  .bank-note {
+    font-size: var(--fs-small);
+    line-height: 1.75;
+    color: var(--taupe);
+    margin-bottom: 24px;
+  }
+  .bank dl > div {
+    padding-bottom: 16px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .bank dt {
+    font-size: var(--fs-eyebrow);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--taupe);
+    margin-bottom: 6px;
+  }
+  .bank dd {
+    font-family: var(--serif);
+    font-size: var(--fs-body-lg);
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .bic {
+    font-size: var(--fs-small);
+    color: var(--taupe);
+    margin-top: 2px;
+  }
+  .help {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .help p {
+    font-size: var(--fs-eyebrow);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--taupe);
+    margin-bottom: 6px;
+  }
+  .help a {
+    font-family: var(--serif);
+    font-size: var(--fs-lead);
+    color: var(--ink);
+  }
+  .help a:hover {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+
+  @media (max-width: 1000px) {
+    .form-body {
+      grid-template-columns: 1fr;
+      gap: 40px;
+    }
+    .bank {
+      position: static;
+    }
+    .process ol {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  @media (max-width: 700px) {
+    .process {
+      padding: 16px var(--pad-x-mob) 44px;
+    }
+    .process ol {
+      grid-template-columns: 1fr;
+      gap: 24px;
+    }
+    .form-section {
+      padding: 44px var(--pad-x-mob) var(--section-y-mob);
+    }
+  }
+</style>

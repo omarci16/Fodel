@@ -1,0 +1,228 @@
+---
+/**
+ * One labelled control. Every field is a real <label for>, every error has
+ * aria-describedby, and required fields are marked in text as well as with
+ * the attribute — the prototype's forms had labels but no association,
+ * no validation and no error surface at all.
+ */
+import { UI, type Locale } from '~/i18n/ui';
+
+interface Props {
+  locale: Locale;
+  name: string;
+  label: string;
+  type?: 'text' | 'email' | 'tel' | 'number' | 'url' | 'textarea' | 'select';
+  required?: boolean;
+  placeholder?: string;
+  autocomplete?: string;
+  rows?: number;
+  options?: { value: string; label: string }[];
+  value?: string;
+  hint?: string;
+  /** Dark form surfaces (the property enquiry panel) invert the field styling. */
+  onDark?: boolean;
+  min?: number;
+  max?: number;
+  span?: 'full' | 'half';
+}
+
+const {
+  locale,
+  name,
+  label,
+  type = 'text',
+  required = false,
+  placeholder,
+  autocomplete,
+  rows = 4,
+  options = [],
+  value,
+  hint,
+  onDark = false,
+  min,
+  max,
+  span = 'full',
+} = Astro.props;
+
+const ui = UI[locale];
+const id = `f-${name}`;
+const errorId = `${id}-error`;
+const hintId = hint ? `${id}-hint` : undefined;
+const describedBy = [hintId, errorId].filter(Boolean).join(' ');
+---
+
+<div class:list={['field', `span-${span}`, { 'on-dark': onDark }]}>
+  <label for={id}>
+    {label}
+    <span class="req">{required ? `(${ui.form.required})` : `(${ui.form.optional})`}</span>
+  </label>
+
+  {hint && <p class="hint" id={hintId}>{hint}</p>}
+
+  {
+    type === 'textarea' ? (
+      <textarea
+        id={id}
+        name={name}
+        rows={rows}
+        required={required}
+        placeholder={placeholder}
+        aria-describedby={describedBy}
+        autocomplete={autocomplete}
+      >{value}</textarea>
+    ) : type === 'select' ? (
+      <select
+        id={id}
+        name={name}
+        required={required}
+        aria-describedby={describedBy}
+        autocomplete={autocomplete}
+      >
+        {options.map((o) => (
+          <option value={o.value} selected={o.value === value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    ) : (
+      <input
+        id={id}
+        name={name}
+        type={type}
+        required={required}
+        placeholder={placeholder}
+        value={value}
+        min={min}
+        max={max}
+        aria-describedby={describedBy}
+        autocomplete={autocomplete}
+      />
+    )
+  }
+
+  <p class="error" id={errorId} hidden></p>
+</div>
+
+<style>
+  .field {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 22px;
+  }
+  .span-half {
+    grid-column: span 1;
+  }
+  .span-full {
+    grid-column: 1 / -1;
+  }
+
+  label {
+    font-family: var(--sans);
+    /* ADJUSTED: 9.5px in the prototype. */
+    font-size: var(--fs-eyebrow);
+    letter-spacing: var(--ls-label);
+    text-transform: uppercase;
+    color: var(--taupe);
+    margin-bottom: 9px;
+  }
+  .req {
+    text-transform: none;
+    letter-spacing: 0.02em;
+    /* No opacity: --taupe sits at 4.83:1 on --cream, so any fade fails AA. */
+    margin-left: 4px;
+  }
+  .hint {
+    font-size: var(--fs-micro);
+    line-height: 1.6;
+    color: var(--taupe);
+    margin-bottom: 8px;
+  }
+
+  input,
+  textarea,
+  select {
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    padding: 13px 0;
+    font-weight: var(--fw-light);
+    font-size: var(--fs-body);
+    color: var(--ink);
+    outline: none;
+    transition: border-color 0.3s;
+  }
+  textarea {
+    resize: vertical;
+    min-height: 96px;
+  }
+  select {
+    appearance: none;
+    cursor: pointer;
+    background-image: linear-gradient(45deg, transparent 50%, var(--taupe) 50%),
+      linear-gradient(135deg, var(--taupe) 50%, transparent 50%);
+    background-position:
+      calc(100% - 12px) calc(50% + 2px),
+      calc(100% - 7px) calc(50% + 2px);
+    background-size: 5px 5px;
+    background-repeat: no-repeat;
+    padding-right: 28px;
+  }
+
+  input:focus,
+  textarea:focus,
+  select:focus {
+    border-bottom-color: var(--accent);
+  }
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  input[aria-invalid='true'],
+  textarea[aria-invalid='true'],
+  select[aria-invalid='true'] {
+    border-bottom-color: #b3261e;
+    border-bottom-width: 2px;
+  }
+
+  .error {
+    font-size: var(--fs-micro);
+    line-height: 1.5;
+    color: #b3261e;
+    margin-top: 7px;
+  }
+  .error[hidden] {
+    display: none;
+  }
+
+  /* Dark panel (property enquiry) */
+  .on-dark label {
+    color: var(--on-dark-muted);
+  }
+  .on-dark .hint {
+    color: var(--on-dark-muted);
+  }
+  .on-dark input,
+  .on-dark textarea,
+  .on-dark select {
+    background: var(--on-dark-field);
+    border: 1px solid var(--on-dark-field-border);
+    color: var(--cream);
+    padding: 13px 16px;
+  }
+  .on-dark input::placeholder,
+  .on-dark textarea::placeholder {
+    color: var(--on-dark-faint);
+  }
+  .on-dark input:focus,
+  .on-dark textarea:focus,
+  .on-dark select:focus {
+    border-color: var(--cream);
+  }
+  .on-dark .error {
+    color: #f0b4ae;
+  }
+</style>

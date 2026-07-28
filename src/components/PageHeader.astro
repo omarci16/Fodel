@@ -1,0 +1,162 @@
+---
+/**
+ * Shared page header — the split hero used on Sellers, Buyers, About and the
+ * revenue pages in the prototype, generalised.
+ */
+import { Image } from 'astro:assets';
+import Eyebrow from './Eyebrow.astro';
+import GoldRule from './GoldRule.astro';
+import Button from './Button.astro';
+import type { ImageMetadata } from 'astro';
+
+interface Props {
+  eyebrow: string;
+  title: string;
+  titleEm?: string;
+  body?: string;
+  image?: ImageMetadata;
+  imageAlt?: string;
+  primary?: { label: string; href: string };
+  secondary?: { label: string; href: string };
+  /** Narrow, centred variant for content pages with no hero image. */
+  compact?: boolean;
+}
+
+const {
+  eyebrow,
+  title,
+  titleEm,
+  body,
+  image,
+  imageAlt = '',
+  primary,
+  secondary,
+  compact = false,
+} = Astro.props;
+---
+
+<header class:list={['page-header', { compact, 'has-image': !!image }]}>
+  <div class="copy">
+    <Eyebrow space="16px">{eyebrow}</Eyebrow>
+    <h1>
+      {title}{titleEm && <><br /><em>{titleEm}</em></>}
+    </h1>
+    <GoldRule space="28px" />
+    {body && <p class="ph-body">{body}</p>}
+
+    {
+      (primary || secondary) && (
+        <div class="ph-actions">
+          {primary && <Button variant="dark" href={primary.href}>{primary.label}</Button>}
+          {secondary && <Button variant="outline" href={secondary.href}>{secondary.label}</Button>}
+        </div>
+      )
+    }
+  </div>
+
+  {
+    image && (
+      <div class="media">
+        <Image
+          src={image}
+          alt={imageAlt}
+          widths={[600, 900, 1200]}
+          sizes="(max-width: 900px) 100vw, 50vw"
+          loading="eager"
+          fetchpriority="high"
+        />
+      </div>
+    )
+  }
+</header>
+
+<style>
+  .page-header {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    min-height: 80vh;
+  }
+  .page-header:not(.has-image) {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+  .compact {
+    min-height: 0;
+  }
+
+  .copy {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 100px 72px 80px var(--pad-x);
+  }
+  .compact .copy {
+    padding: 72px var(--pad-x) 44px;
+    max-width: 78ch;
+  }
+
+  h1 {
+    font-family: var(--serif);
+    font-weight: var(--fw-display);
+    font-size: clamp(38px, 4.8vw, 76px);
+    line-height: 1.04;
+    color: var(--ink);
+    margin-bottom: 28px;
+  }
+  .compact h1 {
+    font-size: clamp(34px, 4vw, 60px);
+  }
+  h1 em {
+    font-style: italic;
+  }
+  .ph-body {
+    font-size: var(--fs-body-lg);
+    line-height: var(--lh-lead);
+    color: var(--taupe);
+    max-width: 52ch;
+    margin-bottom: 44px;
+  }
+  .ph-actions {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .media {
+    position: relative;
+    overflow: hidden;
+    background: var(--mist);
+  }
+  .media :global(img) {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  @media (max-width: 900px) {
+    .page-header {
+      grid-template-columns: 1fr;
+      min-height: 0;
+    }
+    .media {
+      order: -1;
+      aspect-ratio: 16 / 10;
+    }
+    .copy,
+    .compact .copy {
+      padding: 36px var(--pad-x-mob) 32px;
+    }
+    h1 {
+      margin-bottom: 18px;
+    }
+    .ph-rule,
+    .ph-body {
+      margin-bottom: 28px;
+    }
+    .ph-actions {
+      flex-direction: column;
+    }
+  }
+</style>

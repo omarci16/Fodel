@@ -1,0 +1,39 @@
+---
+interface Props {
+  center?: boolean;
+  class?: string;
+  as?: 'div' | 'span' | 'p';
+  /**
+   * Bottom margin, e.g. "16px".
+   *
+   * Spacing is a prop rather than a class from the parent because Astro scopes
+   * styles per component: a parent's `.foo { margin-bottom: 16px }` compiles to
+   * `.foo[data-astro-cid-PARENT]`, which never matches this element — it
+   * carries Eyebrow's own scope id. Those rules silently did nothing.
+   */
+  space?: string;
+}
+
+const { center = false, class: className, as: Tag = 'div', space } = Astro.props;
+---
+
+<Tag class:list={['eyebrow', { center }, className]} style={space ? `--eyebrow-space:${space}` : undefined}>
+  <slot />
+</Tag>
+
+<style>
+  .eyebrow {
+    margin-bottom: var(--eyebrow-space, 0);
+    font-family: var(--sans);
+    font-weight: var(--fw-regular);
+    /* ADJUSTED: 10px in the prototype. */
+    font-size: var(--fs-eyebrow);
+    letter-spacing: 0.28em;
+    line-height: 1.4;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .center {
+    text-align: center;
+  }
+</style>

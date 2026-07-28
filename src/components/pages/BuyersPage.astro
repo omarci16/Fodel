@@ -1,0 +1,409 @@
+---
+/**
+ * Buyers. Ported from the prototype, with two additions: the "direct from the
+ * owner" mechanic stated concretely (it is FODEL's differentiator and the
+ * prototype only gestured at it), and the free search service, which is the
+ * strongest call to action on this page.
+ */
+import Base from '~/layouts/Base.astro';
+import PageHeader from '~/components/PageHeader.astro';
+import Eyebrow from '~/components/Eyebrow.astro';
+import GoldRule from '~/components/GoldRule.astro';
+import Button from '~/components/Button.astro';
+import PropertyCard from '~/components/PropertyCard.astro';
+import ParallaxCta from '~/components/ParallaxCta.astro';
+import { UI, path, type Locale } from '~/i18n/ui';
+import { AGRI_HECTARE_LIMIT } from '~/config/company';
+import { copy } from '~/data/copy';
+import { faqFor, faqAnswerText } from '~/data/faq';
+import { alternatesFor } from '~/lib/page';
+import { faqSchema } from '~/lib/seo';
+import { homepageFeatured } from '~/lib/properties';
+import vevoknek from '~/assets/properties/vevoknek.jpg';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const ui = UI[locale];
+const c = copy(locale).buyers;
+const hu = locale === 'hu';
+
+const buyerFaq = faqFor(locale, 'buyer').slice(0, 8);
+const featured = await homepageFeatured(3);
+
+// FAQ Q19 / Q21 — what FODEL say Dutch and Belgian buyers actually look for.
+const wants = hu
+  ? [
+      'Vidéki, reális árú ingatlanok',
+      'Hegyvidéki ingatlanok kilátással',
+      'Erdőszéli, erdőközeli ingatlanok',
+      'Kiadható nyaralók, vízparti ingatlanok',
+      'Állattartásra, lótartásra alkalmas tanyák',
+      'Nagy földterületek, agráringatlanok',
+      'Ferihegyhez jó közlekedéssel rendelkező ingatlanok',
+      'A Dunántúlon fekvő ingatlanok',
+    ]
+  : [
+      'Landelijk gelegen woningen met een reële prijs',
+      'Woningen op een heuvel, met uitzicht',
+      'Panden aan de bosrand',
+      'Verhuurbare vakantiehuizen en waterkant',
+      'Boerderijen geschikt voor vee en paarden',
+      'Grote percelen en agrarisch vastgoed',
+      'Goede verbinding met de luchthaven van Boedapest',
+      'Vastgoed in Transdanubië',
+    ];
+---
+
+<Base
+  locale={locale}
+  title={c.meta.title}
+  description={c.meta.description}
+  alternates={alternatesFor('buyers')}
+  schema={[faqSchema(buyerFaq.map((e) => ({ question: e.question, answer: faqAnswerText(e) })))]}
+>
+  <PageHeader
+    eyebrow={c.hero.eyebrow}
+    title={c.hero.title}
+    titleEm={c.hero.titleEm}
+    body={c.hero.body}
+    image={vevoknek}
+    imageAlt={hu ? 'Felújított magyar parasztház belső tere' : 'Interieur van een gerenoveerde Hongaarse woning'}
+    primary={{ label: c.hero.cta, href: path(locale, 'properties') }}
+    secondary={{ label: c.hero.secondary, href: path(locale, 'searchRequest') }}
+  />
+
+  {/* ── Direct-from-owner explainer ── */}
+  <section class="direct" data-bg="dark">
+    <div class="direct-inner reveal">
+      <Eyebrow space="16px">{hu ? 'A FODEL-modell' : 'Het FODEL-model'}</Eyebrow>
+      <h2>
+        {
+          hu
+            ? 'A hirdetésben a tulajdonos neve és telefonszáma is szerepel.'
+            : 'Bij de advertentie staan ook de naam en het nummer van de eigenaar.'
+        }
+      </h2>
+      <GoldRule space="28px" />
+      <p>
+        {
+          hu
+            ? 'Ez nem szlogen, hanem a modellünk lényege. Ahol a tulajdonos hozzájárult, ott közvetlenül felveheti vele a kapcsolatot. Ha így köti meg az üzletet, sem Önnek, sem az eladónak nem kell jutalékot fizetnie — mi a hirdetésért kaptunk díjat.'
+            : 'Dat is geen slogan maar de kern van ons model. Waar de eigenaar daarmee heeft ingestemd, kunt u rechtstreeks contact opnemen. Regelt u de koop zo, dan betaalt niemand courtage — wij zijn al betaald voor de advertentie.'
+        }
+      </p>
+    </div>
+  </section>
+
+  {/* ── What we handle ── */}
+  <div class="split">
+    <section class="services reveal">
+      <Eyebrow space="16px">{c.services.eyebrow}</Eyebrow>
+      <h2>{c.services.title}</h2>
+      <GoldRule space="28px" />
+      <ul class="points">
+        {
+          c.services.points.map((p: string) => (
+            <li>
+              <span class="dash" aria-hidden="true" />
+              <span>{p}</span>
+            </li>
+          ))
+        }
+      </ul>
+      <Button variant="text" href={path(locale, 'services')}>
+        {hu ? 'Szolgáltatások és díjak' : 'Diensten en tarieven'}
+      </Button>
+    </section>
+
+    <section class="wants reveal">
+      <Eyebrow space="16px">{c.reasons.eyebrow}</Eyebrow>
+      <h2>{c.reasons.title}</h2>
+      <GoldRule space="28px" />
+      <ul class="points">
+        {
+          wants.map((w) => (
+            <li>
+              <span class="dash" aria-hidden="true" />
+              <span>{w}</span>
+            </li>
+          ))
+        }
+      </ul>
+    </section>
+  </div>
+
+  {/* ── Agricultural note ── */}
+  <section class="agri reveal">
+    <div class="agri-inner">
+      <Eyebrow space="16px">{hu ? 'Agráringatlan' : 'Agrarisch vastgoed'}</Eyebrow>
+      <h2>
+        {
+          hu
+            ? `Agrárvégzettséggel ${AGRI_HECTARE_LIMIT} hektárig vásárolhat`
+            : `Met een agrarische kwalificatie tot ${AGRI_HECTARE_LIMIT} hectare`
+        }
+      </h2>
+      <p>
+        {
+          hu
+            ? `Uniós állampolgár agrárvégzettséggel Magyarországon összesen ${AGRI_HECTARE_LIMIT} hektár földterület megvásárlására jogosult. Ennek a procedúrának a teljes körű leszervezését a FODEL vállalja.`
+            : `Een EU-burger met een agrarische kwalificatie mag in Hongarije in totaal ${AGRI_HECTARE_LIMIT} hectare grond verwerven. Die hele procedure regelen wij voor u.`
+        }
+      </p>
+      <Button variant="outline" href={path(locale, 'agricultural')}>
+        {hu ? 'Részletek' : 'Meer hierover'}
+      </Button>
+    </div>
+  </section>
+
+  {/* ── Featured ── */}
+  <section class="featured">
+    <div class="feat-head reveal">
+      <Eyebrow space="16px">{hu ? 'Válogatás' : 'Selectie'}</Eyebrow>
+      <h2>{hu ? 'Kiemelt ingatlanok' : 'Uitgelicht aanbod'}</h2>
+    </div>
+    <div class="feat-grid">
+      {featured.map((p) => <PropertyCard property={p} locale={locale} class="reveal" />)}
+    </div>
+    <div class="feat-more reveal">
+      <Button variant="outline" href={path(locale, 'properties')}>{ui.cta.allProperties}</Button>
+    </div>
+  </section>
+
+  {/* ── FAQ ── */}
+  <section class="faq">
+    <div class="faq-head reveal">
+      <Eyebrow center space="16px">{hu ? 'Gyakori kérdések' : 'Veelgestelde vragen'}</Eyebrow>
+      <h2>{hu ? 'Amit a vevők kérdezni szoktak' : 'Wat kopers ons vragen'}</h2>
+    </div>
+    <div class="faq-list">
+      {
+        buyerFaq.map((entry) => (
+          <details class="faq-item">
+            <summary>
+              <span>{entry.question}</span>
+              <span class="chev" aria-hidden="true">+</span>
+            </summary>
+            <div class="faq-answer">
+              {entry.answer.map((para) =>
+                para.startsWith('- ') ? <p class="bullet">{para.slice(2)}</p> : <p>{para}</p>
+              )}
+            </div>
+          </details>
+        ))
+      }
+    </div>
+    <div class="faq-more reveal">
+      <Button variant="text" href={path(locale, 'faq')}>
+        {hu ? 'Összes kérdés és válasz' : 'Alle vragen en antwoorden'}
+      </Button>
+    </div>
+  </section>
+
+  <ParallaxCta
+    eyebrow={hu ? 'Nem találta meg?' : 'Niet gevonden?'}
+    title={hu ? 'Kerestesse velünk' : 'Laat ons zoeken'}
+    titleEm={hu ? 'díjmentesen' : 'zonder kosten'}
+    body={
+      hu
+        ? 'Adja meg, mit keres — a nem hirdetett kínálatból is keresünk Önnek.'
+        : 'Geef door wat u zoekt — wij zoeken ook buiten het geadverteerde aanbod.'
+    }
+    primary={{ label: ui.cta.searchRequest, href: path(locale, 'searchRequest') }}
+    secondary={{ label: ui.cta.contact, href: path(locale, 'contact') }}
+  />
+</Base>
+
+<style>
+  h2 {
+    font-family: var(--serif);
+    font-weight: var(--fw-display);
+    font-size: clamp(26px, 2.8vw, 42px);
+    line-height: 1.2;
+    color: var(--ink);
+    margin-bottom: 24px;
+  }
+
+  .direct {
+    background: var(--ink);
+    padding: 88px var(--pad-x);
+  }
+  .direct-inner {
+    max-width: 72ch;
+  }
+  .direct h2 {
+    color: var(--cream);
+  }
+  .direct p {
+    font-size: var(--fs-body-lg);
+    line-height: var(--lh-lead);
+    color: var(--on-dark-body);
+  }
+
+  .split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-bottom: 1px solid var(--border);
+  }
+  .services,
+  .wants {
+    padding: 88px var(--pad-x);
+  }
+  .wants {
+    background: var(--linen);
+    border-left: 1px solid var(--border);
+  }
+  .points {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    list-style: none;
+    margin-bottom: 28px;
+  }
+  .points li {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    font-size: var(--fs-body);
+    line-height: 1.8;
+    color: var(--taupe);
+  }
+  .dash {
+    width: 20px;
+    height: 1px;
+    background: var(--accent);
+    margin-top: 13px;
+    flex-shrink: 0;
+  }
+
+  .agri {
+    padding: 72px var(--pad-x);
+    border-bottom: 1px solid var(--border);
+  }
+  .agri-inner {
+    max-width: 68ch;
+  }
+  .agri p {
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    color: var(--taupe);
+    margin-bottom: 28px;
+  }
+
+  .featured {
+    padding: var(--section-y) var(--pad-x);
+  }
+  .feat-head {
+    margin-bottom: 52px;
+  }
+  .feat-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 36px;
+  }
+  .feat-more {
+    margin-top: 40px;
+  }
+
+  .faq {
+    padding: 0 var(--pad-x) var(--section-y);
+  }
+  .faq-head {
+    text-align: center;
+    margin-bottom: 52px;
+  }
+  .faq-list {
+    max-width: 78ch;
+    margin-inline: auto;
+    border-top: 1px solid var(--border);
+  }
+  .faq-item {
+    border-bottom: 1px solid var(--border);
+  }
+  summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 24px;
+    padding: 22px 0;
+    cursor: pointer;
+    font-family: var(--serif);
+    font-weight: var(--fw-medium);
+    font-size: var(--fs-lead);
+    line-height: 1.5;
+    color: var(--ink);
+    list-style: none;
+  }
+  summary::-webkit-details-marker {
+    display: none;
+  }
+  .chev {
+    font-size: 20px;
+    line-height: 1;
+    color: var(--accent);
+    flex-shrink: 0;
+    transition: transform var(--dur-fast) ease;
+  }
+  .faq-item[open] .chev {
+    transform: rotate(45deg);
+  }
+  .faq-answer {
+    padding-bottom: 24px;
+  }
+  .faq-answer p {
+    font-size: var(--fs-body);
+    line-height: 1.9;
+    color: var(--taupe);
+    margin-bottom: 12px;
+  }
+  .bullet {
+    padding-left: 18px;
+    position: relative;
+    margin-bottom: 6px;
+  }
+  .bullet::before {
+    content: '·';
+    position: absolute;
+    left: 4px;
+    color: var(--accent);
+  }
+  .faq-more {
+    text-align: center;
+    margin-top: 40px;
+  }
+
+  @media (max-width: 900px) {
+    .direct,
+    .services,
+    .wants,
+    .agri {
+      padding: 44px var(--pad-x-mob);
+    }
+    .split {
+      grid-template-columns: 1fr;
+    }
+    .wants {
+      border-left: none;
+      border-top: 1px solid var(--border);
+    }
+    .featured {
+      padding: var(--section-y-mob) var(--pad-x-mob);
+    }
+    .feat-head {
+      margin-bottom: 28px;
+    }
+    .feat-grid {
+      grid-template-columns: 1fr;
+      gap: 28px;
+    }
+    .faq {
+      padding: 0 var(--pad-x-mob) var(--section-y-mob);
+    }
+    .faq-head {
+      margin-bottom: 28px;
+    }
+  }
+</style>

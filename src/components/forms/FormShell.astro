@@ -1,0 +1,334 @@
+---
+/**
+ * Form wrapper: consent, spam traps, submission, and status messaging.
+ *
+ * With JavaScript the form posts via fetch and swaps in the success panel.
+ * Without it, the browser does a native POST and the endpoint redirects to a
+ * real thank-you page — a prerendered page cannot read ?sent= at build time,
+ * so the confirmation has to be its own URL.
+ *
+ * The prototype's forms ran `e.preventDefault(); setSent(true)` — the user was
+ * told "Üzenetét megkaptuk" while the message was discarded. This one posts to
+ * a real endpoint and reports what actually happened.
+ *
+ * Spam handling is a honeypot plus a time-trap, both checked server-side. No
+ * third-party captcha, so nothing is loaded from another origin and no
+ * consent is required for the form to work.
+ */
+import Button from '~/components/Button.astro';
+import GoldRule from '~/components/GoldRule.astro';
+import { UI, path, type Locale } from '~/i18n/ui';
+
+interface Props {
+  locale: Locale;
+  /** POST target, e.g. /api/enquiry */
+  endpoint: string;
+  formId: string;
+  submitLabel?: string;
+  onDark?: boolean;
+  /** Hidden context passed to the endpoint (property ref, source page…). */
+  meta?: Record<string, string>;
+  successTitle?: string;
+  successBody?: string;
+}
+
+const {
+  locale,
+  endpoint,
+  formId,
+  submitLabel,
+  onDark = false,
+  meta = {},
+  successTitle,
+  successBody,
+} = Astro.props;
+
+const ui = UI[locale];
+---
+
+<div class:list={['form-shell', { 'on-dark': onDark }]}>
+  <div class="status" id={`${formId}-success`} role="status" hidden>
+    <GoldRule center space="28px" />
+    <h3>{successTitle ?? ui.form.successTitle}</h3>
+    <p>{successBody ?? ui.form.successBody}</p>
+  </div>
+
+  <form
+    id={formId}
+    class="form"
+    method="POST"
+    action={endpoint}
+    novalidate
+    data-locale={locale}
+  >
+    <input type="hidden" name="locale" value={locale} />
+    <input type="hidden" name="formId" value={formId} />
+    <input type="hidden" name="returnTo" value={Astro.url.pathname} />
+    {Object.entries(meta).map(([k, v]) => <input type="hidden" name={k} value={v} />)}
+
+    {/* Honeypot — hidden from people, irresistible to bots. */}
+    <div class="hp" aria-hidden="true">
+      <label for={`${formId}-company`}>Company</label>
+      <input id={`${formId}-company`} type="text" name="company" tabindex="-1" autocomplete="off" />
+    </div>
+    {/* Time-trap: submissions faster than a human can type are rejected. */}
+    <input type="hidden" name="renderedAt" value={Date.now()} />
+
+    <div class="fields">
+      <slot />
+    </div>
+
+    <div class="consent">
+      <input type="checkbox" id={`${formId}-consent`} name="consent" required value="yes" />
+      <label for={`${formId}-consent`}>
+        {ui.form.consent}
+        <a href={path(locale, 'privacy')} target="_blank" rel="noopener">{ui.form.consentLink}</a>
+      </label>
+      <p class="error" id={`${formId}-consent-error`} hidden></p>
+    </div>
+
+    <p class="form-error" id={`${formId}-error`} role="alert" hidden></p>
+
+    <Button variant="dark" light={onDark} type="submit" block class="submit">
+      {submitLabel ?? ui.form.submit}
+    </Button>
+
+    <noscript>
+      <p class="noscript">
+        {
+          locale === 'hu'
+            ? 'Ha az űrlap nem működne, hívjon minket a +36 70 225 5255 számon vagy írjon az info@fodel.nl címre.'
+            : 'Werkt het formulier niet? Bel ons op +31 6 4400 5550 of mail naar info@fodel.nl.'
+        }
+      </p>
+    </noscript>
+  </form>
+</div>
+
+<script>
+  const strings = {
+    hu: {
+      required: 'Kérjük töltse ki ezt a mezőt.',
+      email: 'Kérjük adjon meg érvényes e-mail címet.',
+      consent: 'A folytatáshoz kérjük fogadja el az adatkezelési tájékoztatót.',
+      sending: 'Küldés…',
+      error: 'Nem sikerült elküldeni. Kérjük próbálja újra, vagy hívjon minket.',
+    },
+    nl: {
+      required: 'Vul dit veld in.',
+      email: 'Vul een geldig e-mailadres in.',
+      consent: 'Ga akkoord met de privacyverklaring om verder te gaan.',
+      sending: 'Versturen…',
+      error: 'Versturen mislukt. Probeer het opnieuw, of bel ons.',
+    },
+  };
+
+  document.querySelectorAll<HTMLFormElement>('form.form').forEach((form) => {
+    const locale = (form.dataset.locale ?? 'hu') as 'hu' | 'nl';
+    const t = strings[locale];
+    const formId = form.id;
+    const submit = form.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+    const formError = document.getElementById(`${formId}-error`)!;
+    const success = document.getElementById(`${formId}-success`)!;
+    const originalLabel = submit.textContent ?? '';
+
+    const showFieldError = (input: HTMLElement, message: string) => {
+      const wrap = input.closest('.field') ?? input.closest('.consent');
+      const error = wrap?.querySelector<HTMLElement>('.error');
+      input.setAttribute('aria-invalid', 'true');
+      if (error) {
+        error.textContent = message;
+        error.hidden = false;
+      }
+    };
+
+    const clearFieldError = (input: HTMLElement) => {
+      const wrap = input.closest('.field') ?? input.closest('.consent');
+      const error = wrap?.querySelector<HTMLElement>('.error');
+      input.removeAttribute('aria-invalid');
+      if (error) error.hidden = true;
+    };
+
+    const validate = (): HTMLElement | null => {
+      let firstInvalid: HTMLElement | null = null;
+      const controls = form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(
+        'input:not([type=hidden]):not([tabindex="-1"]), textarea, select'
+      );
+
+      for (const control of controls) {
+        clearFieldError(control);
+
+        if (control.type === 'checkbox') {
+          if (control.required && !(control as HTMLInputElement).checked) {
+            showFieldError(control, t.consent);
+            firstInvalid ??= control;
+          }
+          continue;
+        }
+
+        const value = control.value.trim();
+        if (control.required && !value) {
+          showFieldError(control, t.required);
+          firstInvalid ??= control;
+        } else if (control.type === 'email' && value && !/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(value)) {
+          showFieldError(control, t.email);
+          firstInvalid ??= control;
+        }
+      }
+      return firstInvalid;
+    };
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      formError.hidden = true;
+
+      const invalid = validate();
+      if (invalid) {
+        invalid.focus();
+        return;
+      }
+
+      submit.disabled = true;
+      submit.textContent = t.sending;
+
+      try {
+        const response = await fetch(form.action, {
+          method: 'POST',
+          headers: { Accept: 'application/json' },
+          body: new FormData(form),
+        });
+
+        if (!response.ok) throw new Error(String(response.status));
+
+        form.hidden = true;
+        success.hidden = false;
+        success.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        (success.querySelector('h3') as HTMLElement | null)?.focus?.();
+      } catch {
+        formError.textContent = t.error;
+        formError.hidden = false;
+        submit.disabled = false;
+        submit.textContent = originalLabel;
+      }
+    });
+  });
+</script>
+
+<style>
+  .form-shell {
+    width: 100%;
+  }
+  .fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 24px;
+  }
+
+  .hp {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+  }
+
+  .consent {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 10px 12px;
+    align-items: start;
+    margin: 6px 0 26px;
+  }
+  .consent input {
+    width: 18px;
+    height: 18px;
+    margin-top: 2px;
+    accent-color: var(--ink);
+  }
+  .consent label {
+    font-size: var(--fs-small);
+    line-height: 1.65;
+    color: var(--taupe);
+  }
+  .consent a {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    margin-left: 4px;
+  }
+  .consent .error {
+    grid-column: 2;
+    font-size: var(--fs-micro);
+    color: #b3261e;
+  }
+  .consent .error[hidden] {
+    display: none;
+  }
+
+  .form-error {
+    font-size: var(--fs-small);
+    line-height: 1.6;
+    color: #b3261e;
+    padding: 12px 14px;
+    border-left: 2px solid #b3261e;
+    background: rgba(179, 38, 30, 0.06);
+    margin-bottom: 18px;
+  }
+  .form-error[hidden] {
+    display: none;
+  }
+
+  .status {
+    text-align: center;
+    padding: 24px 0;
+  }
+  .status[hidden] {
+    display: none;
+  }
+  .status h3 {
+    font-family: var(--serif);
+    font-weight: var(--fw-display);
+    font-size: clamp(28px, 4vw, 40px);
+    color: var(--ink);
+    margin-bottom: 14px;
+  }
+  .status p {
+    font-size: var(--fs-body);
+    line-height: 1.85;
+    color: var(--taupe);
+    max-width: 46ch;
+    margin-inline: auto;
+  }
+
+  .noscript {
+    font-size: var(--fs-small);
+    line-height: 1.7;
+    color: var(--taupe);
+    margin-top: 16px;
+  }
+
+  /* Dark panel */
+  .on-dark .consent label,
+  .on-dark .noscript {
+    color: var(--on-dark-muted);
+  }
+  .on-dark .consent input {
+    accent-color: var(--cream);
+  }
+  .on-dark .status h3 {
+    color: var(--cream);
+  }
+  .on-dark .status p {
+    color: var(--on-dark-body);
+  }
+  .on-dark .form-error {
+    color: #f0b4ae;
+    border-left-color: #f0b4ae;
+    background: rgba(240, 180, 174, 0.08);
+  }
+
+  @media (max-width: 640px) {
+    .fields {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
