@@ -1,0 +1,135 @@
+---
+/** Admin-only. Guarded by src/middleware.ts (ADMIN_ONLY_PREFIXES includes /portal/review). */
+export const prerender = false;
+
+import Portal from '~/layouts/Portal.astro';
+import { getProperty, CATEGORY_LABEL, STATUS_LABEL } from '~/lib/portal/properties';
+import { resolveImage } from '~/lib/property-images';
+
+function mediaSrc(storagePath: string): string {
+  if (storagePath.startsWith('http')) return storagePath;
+  return resolveImage(storagePath).src;
+}
+
+const { supabase } = Astro.locals;
+const { id } = Astro.params;
+
+const property = await getProperty(supabase, id!);
+if (!property) return new Response('Ingatlan nem található.', { status: 404 });
+
+const hu = property.translations.find((t) => t.locale === 'hu');
+const hero = property.media.find((m) => m.is_hero) ?? property.media[0];
+
+const { data: notes } = await supabase
+  .from('review_notes')
+  .select('note, created_at')
+  .eq('property_id', id)
+  .order('created_at', { ascending: false });
+---
+
+<Portal title={`Elbírálás — #${property.ref}`}>
+  <header class="head">
+    <p class="eyebrow">Elbírálás · #{property.ref} · <span class="status">{STATUS_LABEL[property.status]}</span></p>
+    <h1>{hu?.title ?? 'Névtelen hirdetés'}</h1>
+    <a href={`/portal/properties/${property.id}`} class="edit-link">Szerkesztő megnyitása →</a>
+  </header>
+
+  {property.status !== 'submitted' && (
+    <p class="notice warn">Ez a hirdetés jelenleg nem vár elbírálásra ({STATUS_LABEL[property.status]}).</p>
+  )}
+
+  <div class="preview">
+    {hero && <img src={mediaSrc(hero.storage_path)} alt="" class="hero" />}
+    <dl class="facts">
+      <div><dt>Típus</dt><dd>{CATEGORY_LABEL[property.category] ?? property.category}</dd></div>
+      <div><dt>Település</dt><dd>{property.settlement}, {property.county}</dd></div>
+      <div><dt>Ár</dt><dd>€{property.price_eur.toLocaleString('de-DE')} / {property.price_huf.toLocaleString('hu-HU')} Ft</dd></div>
+      <div><dt>Alapterület</dt><dd>{property.floor_m2 ?? '—'} m² / {property.plot_m2} m² telek</dd></div>
+      <div><dt>Fotók</dt><dd>{property.media.length} db</dd></div>
+      <div><dt>Nyelvek</dt><dd>{property.translations.map((t) => t.locale.toUpperCase()).join(', ')}</dd></div>
+    </dl>
+    <p class="description">{hu?.description}</p>
+  </div>
+
+  {notes && notes.length > 0 && (
+    <section class="notes">
+      <h2>Korábbi megjegyzések</h2>
+      {notes.map((n) => (
+        <p class="note">{n.note}</p>
+      ))}
+    </section>
+  )}
+
+  {property.status === 'submitted' && (
+    <section class="actions">
+      <button type="button" class="btn" id="approve-btn">Jóváhagyás és publikálás</button>
+
+      <div class="changes-form">
+        <label for="note">Javítási megjegyzés (ha visszaküldi)</label>
+        <textarea id="note" rows="4" placeholder="Mit kell javítani?"></textarea>
+        <button type="button" class="btn ghost" id="reject-btn">Javítás kérése</button>
+      </div>
+
+      <p class="action-status" id="action-status" role="status"></p>
+    </section>
+  )}
+</Portal>
+
+<script define:vars={{ propertyId: property.id }}>
+  async function doAction(action, note) {
+    const status = document.getElementById('action-status');
+    const res = await fetch(`/api/portal/properties/${propertyId}/status`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action, note }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json.ok) {
+      status.textContent = 'Nem sikerült végrehajtani.';
+      return;
+    }
+    location.href = '/portal/properties?status=submitted';
+  }
+
+  document.getElementById('approve-btn')?.addEventListener('click', () => {
+    if (confirm('Jóváhagyja és publikálja ezt a hirdetést?')) doAction('approve');
+  });
+  document.getElementById('reject-btn')?.addEventListener('click', () => {
+    const note = document.getElementById('note').value.trim();
+    if (!note) { alert('Írjon megjegyzést a javítás kéréséhez.'); return; }
+    doAction('request_changes', note);
+  });
+</script>
+
+<style>
+  .head { margin-bottom: 24px; }
+  .eyebrow { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--taupe); margin-bottom: 8px; }
+  .status { color: var(--ink); font-weight: 500; }
+  h1 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 28px; color: var(--ink); }
+  .edit-link { font-size: var(--fs-small); text-decoration: underline; }
+
+  .notice.warn { padding: 12px 16px; font-size: var(--fs-small); background: rgba(200, 150, 0, 0.08); border-left: 2px solid #96700b; color: #6b4f08; margin-bottom: 20px; }
+
+  .preview { padding: 24px 0; border-top: 1px solid var(--border); }
+  .hero { width: 100%; max-width: 480px; aspect-ratio: 4/3; object-fit: cover; margin-bottom: 20px; }
+  .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
+  .facts dt { font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: 0.06em; color: var(--taupe); }
+  .facts dd { font-size: var(--fs-body); color: var(--ink); }
+  .description { font-size: var(--fs-body); line-height: 1.8; color: var(--taupe); max-width: 68ch; }
+
+  .notes { padding: 24px 0; border-top: 1px solid var(--border); }
+  .notes h2 { font-size: 16px; margin-bottom: 12px; }
+  .note { font-size: var(--fs-small); color: var(--taupe); padding: 10px 14px; background: var(--linen); margin-bottom: 8px; }
+
+  .actions { padding: 28px 0; border-top: 1px solid var(--border); }
+  .btn { padding: 13px 32px; background: var(--ink); color: var(--cream); font-size: var(--fs-micro); letter-spacing: var(--ls-button); text-transform: uppercase; }
+  .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--ink); margin-top: 12px; }
+  .changes-form { max-width: 480px; margin-top: 24px; }
+  .changes-form label { display: block; font-size: var(--fs-eyebrow); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--taupe); margin-bottom: 8px; }
+  .changes-form textarea { width: 100%; border: 1px solid var(--border); padding: 12px; font-size: var(--fs-body); }
+  .action-status { font-size: var(--fs-small); color: var(--taupe); margin-top: 14px; }
+
+  @media (max-width: 720px) {
+    .facts { grid-template-columns: 1fr 1fr; }
+  }
+</style>

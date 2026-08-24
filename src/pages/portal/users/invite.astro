@@ -1,0 +1,53 @@
+---
+export const prerender = false;
+
+import Portal from '~/layouts/Portal.astro';
+
+const sent = Astro.url.searchParams.get('sent');
+const err = Astro.url.searchParams.get('error');
+---
+
+<Portal title="Meghívás">
+  <header class="head">
+    <p class="eyebrow">Felhasználók</p>
+    <h1>Új felhasználó meghívása</h1>
+  </header>
+
+  {sent && <p class="notice ok">Meghívó elküldve: {decodeURIComponent(sent)}</p>}
+  {err && <p class="notice error">{decodeURIComponent(err)}</p>}
+
+  <form method="POST" action="/api/portal/users/invite" class="panel">
+    <div class="field">
+      <label for="email">E-mail cím</label>
+      <input id="email" name="email" type="email" required />
+    </div>
+    <div class="field">
+      <label for="role">Szerep</label>
+      <select id="role" name="role">
+        <option value="owner">Hirdető</option>
+        <option value="admin">Admin</option>
+      </select>
+    </div>
+    <button type="submit" class="btn">Meghívó küldése</button>
+  </form>
+
+  <a href="/portal/users" class="back">← Vissza a felhasználókhoz</a>
+</Portal>
+
+<style>
+  .head { margin-bottom: 24px; }
+  .eyebrow { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--taupe); margin-bottom: 8px; }
+  h1 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 26px; color: var(--ink); }
+
+  .notice { padding: 12px 16px; font-size: var(--fs-small); margin-bottom: 20px; }
+  .notice.ok { background: rgba(16, 42, 67, 0.06); border-left: 2px solid var(--ink); }
+  .notice.error { background: rgba(179, 38, 30, 0.06); border-left: 2px solid #b3261e; color: #b3261e; }
+
+  .panel { max-width: 400px; }
+  .field { display: flex; flex-direction: column; margin-bottom: 18px; }
+  label { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--taupe); margin-bottom: 8px; }
+  input, select { border: 1px solid var(--border); background: #fff; padding: 11px 12px; font-size: var(--fs-body); color: var(--ink); }
+
+  .btn { padding: 12px 24px; background: var(--ink); color: var(--cream); font-size: var(--fs-micro); letter-spacing: var(--ls-button); text-transform: uppercase; }
+  .back { display: inline-block; margin-top: 24px; font-size: var(--fs-small); text-decoration: underline; color: var(--taupe); }
+</style>

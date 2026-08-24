@@ -1,4 +1,9 @@
 ---
+// Reads property data from Supabase (via SoldPage.astro), so this renders on
+// request rather than once at build time. Cached at the CDN for 5 minutes.
+export const prerender = false;
+Astro.response.headers.set('Cache-Control', 's-maxage=300, stale-while-revalidate=86400');
+
 import SoldPage from "~/components/pages/SoldPage.astro";
 ---
 

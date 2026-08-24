@@ -1,12 +1,16 @@
 ---
 /**
- * Property search.
+ * Property search — Stage 6 rewrite.
  *
- * Every card is rendered into the HTML at build time; filtering and sorting
- * happen by toggling `hidden` and reordering the pre-rendered nodes. So the
- * full inventory is crawlable and readable without JavaScript, and filtering
- * costs no network request. Filters read from the URL, so a search is a real
- * shareable link — the prototype kept all of this in React state at `/`.
+ * Used to load all active listings into the HTML at build time and filter by
+ * toggling `hidden` client-side; that stopped being viable once the
+ * inventory can be hundreds of rows instead of six. Filtering, sorting and
+ * pagination are now a real Postgres query (searchProperties, which calls
+ * the search_properties() function — see supabase/migrations/0004_search.sql)
+ * run fresh on every request. The URL is still the single source of truth
+ * for what's being viewed — changing a filter is a real navigation with new
+ * query params, so a search result is still a plain, shareable, indexable
+ * link, exactly as before.
  */
 import Base from '~/layouts/Base.astro';
 import Eyebrow from '~/components/Eyebrow.astro';
@@ -15,36 +19,81 @@ import Button from '~/components/Button.astro';
 import PropertyCard from '~/components/PropertyCard.astro';
 import { UI, CATEGORIES, path, type Locale, type CategoryKey } from '~/i18n/ui';
 import { alternatesFor, crumbs } from '~/lib/page';
-import { activeProperties, regionsOf, categoriesOf, PRICE_BANDS, priceBandLabel } from '~/lib/properties';
+import {
+  activeProperties,
+  searchProperties,
+  regionsOf,
+  categoriesOf,
+  PRICE_BANDS,
+  priceBandLabel,
+} from '~/lib/properties';
 import { breadcrumbSchema } from '~/lib/seo';
 
 interface Props {
   locale: Locale;
-  /** Pre-filtered subset for a region or category landing page. */
-  subset?: Awaited<ReturnType<typeof activeProperties>>;
   heading?: string;
   intro?: string;
   metaTitle?: string;
   metaDescription?: string;
-  canonicalKey?: 'properties';
 }
 
-const { locale, subset, heading, intro, metaTitle, metaDescription } = Astro.props;
+const { locale, heading, intro, metaTitle, metaDescription } = Astro.props;
 const ui = UI[locale];
+const params = Astro.url.searchParams;
 
-const all = await activeProperties();
-const properties = subset ?? all;
+// Facet options always reflect the full active inventory, not just the
+// current result set, so a search that returns zero results still lets the
+// visitor pivot to a different filter instead of hitting a dead end.
+const facetSource = await activeProperties();
+const regions = regionsOf(facetSource);
+const categories = categoriesOf(facetSource);
 
-const regions = regionsOf(all);
-const categories = categoriesOf(all);
+const q = params.get('q') ?? '';
+const type = params.get('type') ?? '';
+const region = params.get('region') ?? '';
+const priceBandId = params.get('price') ?? '';
+const beds = params.get('beds') ?? '';
+const sort = (params.get('sort') as 'featured' | 'price-asc' | 'price-desc' | 'area-desc') || 'featured';
+const page = Math.max(1, Number(params.get('page') ?? '1') || 1);
+
+const priceBand = PRICE_BANDS.find((b) => b.id === priceBandId);
+
+const bboxParam = params.get('bbox');
+const bbox = bboxParam && bboxParam.split(',').length === 4
+  ? (bboxParam.split(',').map(Number) as [number, number, number, number])
+  : undefined;
+
+const { properties, total, perPage } = await searchProperties({
+  locale,
+  q,
+  category: type || undefined,
+  region: region || undefined,
+  priceMin: priceBand?.min,
+  priceMax: priceBand?.max,
+  bedroomsMin: beds ? Number(beds) : undefined,
+  bbox,
+  sort,
+  page,
+});
+const totalPages = Math.max(1, Math.ceil(total / perPage));
 
 const title = heading ?? (locale === 'hu' ? 'Ingatlanok' : 'Ons aanbod');
 const defaultDescription =
   locale === 'hu'
-    ? `${properties.length} magyar ingatlan eladó — házak, tanyák, kúriák, nyaralók és birtokok. Szűrjön típus, régió és ár szerint.`
-    : `${properties.length} woningen in Hongarije — huizen, boerderijen, landhuizen en vakantiehuizen. Filter op type, regio en prijs.`;
+    ? `${total} magyar ingatlan eladó — házak, tanyák, kúriák, nyaralók és birtokok. Szűrjön típus, régió és ár szerint.`
+    : `${total} woningen in Hongarije — huizen, boerderijen, landhuizen en vakantiehuizen. Filter op type, regio en prijs.`;
 
 const trail = crumbs(locale, [{ name: title, url: path(locale, 'properties') }]);
+
+/** Rebuilds the current query string with one field overridden — used by pagination links. */
+function withParam(key: string, value: string): string {
+  const next = new URLSearchParams(params);
+  if (value) next.set(key, value);
+  else next.delete(key);
+  if (key !== 'page') next.delete('page');
+  const query = next.toString();
+  return query ? `${path(locale, 'properties')}?${query}` : path(locale, 'properties');
+}
 ---
 
 <Base
@@ -74,12 +123,22 @@ const trail = crumbs(locale, [{ name: title, url: path(locale, 'properties') }])
   </header>
 
   <form class="filters" id="filters" method="GET" action={path(locale, 'properties')}>
+    <div class="search-row">
+      <input
+        type="search"
+        name="q"
+        value={q}
+        placeholder={locale === 'hu' ? 'Keresés — pl. Balaton, présház, panoráma…' : 'Zoeken — bijv. Balaton, wijnkelder, uitzicht…'}
+        aria-label={locale === 'hu' ? 'Szabad szavas keresés' : 'Vrij zoeken'}
+      />
+    </div>
+
     <div class="filter-row">
       <div class="fcell">
         <label for="f-type">{ui.filters.type}</label>
         <select id="f-type" name="type">
           <option value="">{ui.filters.all}</option>
-          {categories.map((k) => <option value={k}>{CATEGORIES[k][locale].label}</option>)}
+          {categories.map((k) => <option value={k} selected={k === type}>{CATEGORIES[k][locale].label}</option>)}
         </select>
       </div>
 
@@ -87,7 +146,7 @@ const trail = crumbs(locale, [{ name: title, url: path(locale, 'properties') }])
         <label for="f-region">{ui.filters.region}</label>
         <select id="f-region" name="region">
           <option value="">{ui.filters.all}</option>
-          {regions.map((r) => <option value={r}>{r}</option>)}
+          {regions.map((r) => <option value={r} selected={r === region}>{r}</option>)}
         </select>
       </div>
 
@@ -95,7 +154,7 @@ const trail = crumbs(locale, [{ name: title, url: path(locale, 'properties') }])
         <label for="f-price">{ui.filters.price}</label>
         <select id="f-price" name="price">
           <option value="">{ui.filters.all}</option>
-          {PRICE_BANDS.map((b) => <option value={b.id}>{priceBandLabel(b)}</option>)}
+          {PRICE_BANDS.map((b) => <option value={b.id} selected={b.id === priceBandId}>{priceBandLabel(b)}</option>)}
         </select>
       </div>
 
@@ -103,137 +162,66 @@ const trail = crumbs(locale, [{ name: title, url: path(locale, 'properties') }])
         <label for="f-beds">{ui.filters.beds}</label>
         <select id="f-beds" name="beds">
           <option value="">{ui.filters.any}</option>
-          {[2, 3, 4, 5].map((n) => <option value={String(n)}>{n}+</option>)}
+          {[2, 3, 4, 5].map((n) => <option value={String(n)} selected={String(n) === beds}>{n}+</option>)}
         </select>
       </div>
 
       <div class="fcell">
         <label for="f-sort">{ui.filters.sort}</label>
         <select id="f-sort" name="sort">
-          <option value="featured">{ui.filters.sortFeatured}</option>
-          <option value="price-asc">{ui.filters.sortPriceAsc}</option>
-          <option value="price-desc">{ui.filters.sortPriceDesc}</option>
-          <option value="area-desc">{ui.filters.sortAreaDesc}</option>
+          <option value="featured" selected={sort === 'featured'}>{ui.filters.sortFeatured}</option>
+          <option value="price-asc" selected={sort === 'price-asc'}>{ui.filters.sortPriceAsc}</option>
+          <option value="price-desc" selected={sort === 'price-desc'}>{ui.filters.sortPriceDesc}</option>
+          <option value="area-desc" selected={sort === 'area-desc'}>{ui.filters.sortAreaDesc}</option>
         </select>
       </div>
     </div>
 
     <div class="filter-foot">
-      <p class="count" id="result-count" role="status">{ui.filters.results(properties.length)}</p>
+      <p class="count" role="status">{ui.filters.results(total)}</p>
       <div class="filter-actions">
-        <button type="button" id="filter-reset" class="reset">{ui.filters.reset}</button>
-        <noscript><button type="submit" class="reset">{ui.filters.search}</button></noscript>
+        <a href={path(locale, 'properties')} class="reset">{ui.filters.reset}</a>
+        <button type="submit" class="reset submit-btn">{ui.filters.search}</button>
       </div>
     </div>
   </form>
 
-  <div class="grid" id="property-grid">
-    {properties.map((p, i) => <PropertyCard property={p} locale={locale} eager={i < 3} />)}
-  </div>
+  {
+    properties.length > 0 ? (
+      <div class="grid">
+        {properties.map((p, i) => <PropertyCard property={p} locale={locale} eager={i < 3} />)}
+      </div>
+    ) : (
+      <div class="empty">
+        <GoldRule center space="28px" />
+        <p class="empty-title">{ui.filters.noResults}</p>
+        <p class="empty-hint">{ui.filters.noResultsHint}</p>
+        <Button variant="dark" href={path(locale, 'searchRequest')}>{ui.cta.searchRequest}</Button>
+      </div>
+    )
+  }
 
-  <div class="empty" id="no-results" hidden>
-    <GoldRule center space="28px" />
-    <p class="empty-title">{ui.filters.noResults}</p>
-    <p class="empty-hint">{ui.filters.noResultsHint}</p>
-    <Button variant="dark" href={path(locale, 'searchRequest')}>{ui.cta.searchRequest}</Button>
-  </div>
+  {
+    totalPages > 1 && (
+      <nav class="pagination" aria-label={locale === 'hu' ? 'Lapozás' : 'Paginering'}>
+        {page > 1 && <a href={withParam('page', String(page - 1))}>&larr; {locale === 'hu' ? 'Előző' : 'Vorige'}</a>}
+        <span class="page-of">
+          {locale === 'hu' ? `${page}. oldal / ${totalPages}` : `Pagina ${page} van ${totalPages}`}
+        </span>
+        {page < totalPages && <a href={withParam('page', String(page + 1))}>{locale === 'hu' ? 'Következő' : 'Volgende'} &rarr;</a>}
+      </nav>
+    )
+  }
 </Base>
 
 <script>
-  const form = document.getElementById('filters') as HTMLFormElement | null;
-  const grid = document.getElementById('property-grid');
-  const empty = document.getElementById('no-results');
-  const count = document.getElementById('result-count');
-
-  if (form && grid && empty && count) {
-    const cards = Array.from(grid.querySelectorAll<HTMLElement>('[data-property]'));
-    const template = count.textContent ?? '';
-
-    const BANDS: Record<string, [number, number]> = {
-      'to-75': [0, 75000],
-      '75-150': [75000, 150000],
-      '150-250': [150000, 250000],
-      'from-250': [250000, Infinity],
-    };
-
-    const readParams = () => {
-      const params = new URLSearchParams(location.search);
-      for (const field of ['type', 'region', 'price', 'beds', 'sort']) {
-        const value = params.get(field);
-        const control = form.elements.namedItem(field) as HTMLSelectElement | null;
-        if (value && control) control.value = value;
-      }
-    };
-
-    const apply = (pushState: boolean) => {
-      const data = new FormData(form);
-      const type = String(data.get('type') ?? '');
-      const region = String(data.get('region') ?? '');
-      const price = String(data.get('price') ?? '');
-      const beds = Number(data.get('beds') ?? 0);
-      const sort = String(data.get('sort') ?? 'featured');
-
-      let visible = 0;
-      for (const card of cards) {
-        const d = card.dataset;
-        const cardPrice = Number(d.price);
-        const band = price ? BANDS[price] : null;
-
-        const match =
-          (!type || d.category === type) &&
-          (!region || d.region === region) &&
-          (!beds || Number(d.beds) >= beds) &&
-          (!band || (cardPrice >= band[0] && cardPrice < band[1]));
-
-        card.hidden = !match;
-        if (match) visible++;
-      }
-
-      const shown = cards.filter((c) => !c.hidden);
-      shown.sort((a, b) => {
-        switch (sort) {
-          case 'price-asc':
-            return Number(a.dataset.price) - Number(b.dataset.price);
-          case 'price-desc':
-            return Number(b.dataset.price) - Number(a.dataset.price);
-          case 'area-desc':
-            return Number(b.dataset.floor) - Number(a.dataset.floor);
-          default:
-            return (
-              Number(b.dataset.featured) - Number(a.dataset.featured) ||
-              Number(b.dataset.published) - Number(a.dataset.published)
-            );
-        }
-      });
-      shown.forEach((card) => grid.appendChild(card));
-
-      // The label is "1 ingatlan" / "3 ingatlan" — swap the leading number.
-      count.textContent = template.replace(/^\d+/, String(visible));
-      empty.hidden = visible > 0;
-      grid.hidden = visible === 0;
-
-      if (pushState) {
-        const params = new URLSearchParams();
-        for (const [key, value] of data.entries()) {
-          if (value && !(key === 'sort' && value === 'featured')) params.set(key, String(value));
-        }
-        const query = params.toString();
-        history.replaceState(null, '', query ? `?${query}` : location.pathname);
-      }
-    };
-
-    readParams();
-    apply(false);
-
-    form.addEventListener('change', () => apply(true));
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      apply(true);
-    });
-
-    document.getElementById('filter-reset')?.addEventListener('click', () => {
-      form.reset();
-      apply(true);
+  // Filters now drive a real server-side search, so a change is a real
+  // navigation — this just removes the extra click on "Keresés" for anyone
+  // with JS, while the <noscript>-safe submit button covers everyone else.
+  const form = document.getElementById('filters');
+  if (form instanceof HTMLFormElement) {
+    form.querySelectorAll('select').forEach((select) => {
+      select.addEventListener('change', () => form.submit());
     });
   }
 </script>
@@ -280,6 +268,22 @@ const trail = crumbs(locale, [{ name: title, url: path(locale, 'properties') }])
 
   .filters {
     padding: 0 var(--pad-x) 36px;
+  }
+  .search-row {
+    margin-bottom: 14px;
+  }
+  .search-row input {
+    width: 100%;
+    border: 1px solid var(--border);
+    background: transparent;
+    padding: 14px 16px;
+    font-size: var(--fs-body);
+    font-weight: var(--fw-light);
+    color: var(--ink);
+  }
+  .search-row input:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: 2px;
   }
   .filter-row {
     display: grid;
@@ -335,6 +339,7 @@ const trail = crumbs(locale, [{ name: title, url: path(locale, 'properties') }])
   }
   .filter-actions {
     display: flex;
+    align-items: center;
     gap: 16px;
   }
   .reset {
@@ -344,6 +349,9 @@ const trail = crumbs(locale, [{ name: title, url: path(locale, 'properties') }])
     color: var(--taupe);
     text-decoration: underline;
     text-underline-offset: 4px;
+    background: none;
+    border: none;
+    cursor: pointer;
   }
   .reset:hover {
     color: var(--ink);
@@ -353,18 +361,12 @@ const trail = crumbs(locale, [{ name: title, url: path(locale, 'properties') }])
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 44px 36px;
-    padding: 12px var(--pad-x) var(--section-y);
-  }
-  .grid [hidden] {
-    display: none;
+    padding: 12px var(--pad-x) 60px;
   }
 
   .empty {
     text-align: center;
     padding: 80px var(--pad-x) var(--section-y);
-  }
-  .empty[hidden] {
-    display: none;
   }
   .empty-title {
     font-family: var(--serif);
@@ -376,6 +378,23 @@ const trail = crumbs(locale, [{ name: title, url: path(locale, 'properties') }])
     font-size: var(--fs-body);
     color: var(--taupe);
     margin-bottom: 28px;
+  }
+
+  .pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 32px;
+    padding: 0 var(--pad-x) var(--section-y);
+    font-size: var(--fs-small);
+  }
+  .pagination a {
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .page-of {
+    color: var(--taupe);
   }
 
   @media (max-width: 1000px) {

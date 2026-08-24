@@ -1,0 +1,87 @@
+---
+export const prerender = false;
+
+import Portal from '~/layouts/Portal.astro';
+import { listProperties, STATUS_LABEL, CATEGORY_LABEL } from '~/lib/portal/properties';
+
+const { supabase, profile } = Astro.locals;
+const statusFilter = Astro.url.searchParams.get('status') ?? '';
+
+const properties = await listProperties(supabase, statusFilter ? { status: statusFilter } : {});
+
+const title = (p: (typeof properties)[number]) =>
+  p.translations.find((t) => t.locale === 'hu')?.title || 'Névtelen hirdetés';
+---
+
+<Portal title="Ingatlanok">
+  <header class="head">
+    <p class="eyebrow">Ingatlanok</p>
+    <h1>{properties.length} hirdetés</h1>
+    <a class="btn" href="/portal/properties/new">+ Új ingatlan</a>
+  </header>
+
+  <div class="filters">
+    <a href="/portal/properties" aria-current={!statusFilter ? 'page' : undefined}>Mind</a>
+    {Object.entries(STATUS_LABEL).map(([value, label]) => (
+      <a href={`/portal/properties?status=${value}`} aria-current={statusFilter === value ? 'page' : undefined}>
+        {label}
+      </a>
+    ))}
+  </div>
+
+  {properties.length === 0 ? (
+    <p class="empty">Nincs ehhez a szűréshez tartozó ingatlan.</p>
+  ) : (
+    <table class="list">
+      <thead>
+        <tr>
+          <th>Azonosító</th>
+          <th>Cím</th>
+          <th>Típus</th>
+          <th>Település</th>
+          <th>Ár</th>
+          <th>Állapot</th>
+        </tr>
+      </thead>
+      <tbody>
+        {properties.map((p) => (
+          <tr>
+            <td><a href={`/portal/properties/${p.id}`}>#{p.ref}</a></td>
+            <td><a href={`/portal/properties/${p.id}`}>{title(p)}</a></td>
+            <td>{CATEGORY_LABEL[p.category] ?? p.category}</td>
+            <td>{p.settlement}</td>
+            <td>€{p.price_eur.toLocaleString('de-DE')}</td>
+            <td><span class:list={['pill', `pill-${p.status}`]}>{STATUS_LABEL[p.status] ?? p.status}</span></td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )}
+</Portal>
+
+<style>
+  .head { display: flex; align-items: baseline; gap: 24px; margin-bottom: 20px; flex-wrap: wrap; }
+  .eyebrow { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--taupe); }
+  h1 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 28px; color: var(--ink); flex: 1; }
+  .btn { padding: 11px 22px; background: var(--ink); color: var(--cream); font-size: var(--fs-micro); letter-spacing: var(--ls-button); text-transform: uppercase; }
+
+  .filters { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 24px; }
+  .filters a { padding: 7px 14px; font-size: var(--fs-micro); letter-spacing: 0.04em; color: var(--taupe); border: 1px solid var(--border); }
+  .filters a[aria-current='page'] { background: var(--ink); color: var(--cream); border-color: var(--ink); }
+
+  .empty { color: var(--taupe); padding: 40px 0; }
+
+  .list { width: 100%; border-collapse: collapse; font-size: var(--fs-small); }
+  .list th { text-align: left; font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; color: var(--taupe); padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .list td { padding: 12px; border-bottom: 1px solid var(--border); color: var(--ink); }
+  .list a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+
+  .pill { font-size: var(--fs-micro); padding: 3px 10px; border: 1px solid var(--border); white-space: nowrap; }
+  .pill-published { background: rgba(16, 42, 67, 0.08); border-color: var(--ink); }
+  .pill-submitted { background: rgba(200, 150, 0, 0.1); border-color: #96700b; color: #6b4f08; }
+  .pill-changes_requested { background: rgba(179, 38, 30, 0.08); border-color: #b3261e; color: #b3261e; }
+
+  @media (max-width: 720px) {
+    .list { display: block; overflow-x: auto; }
+  }
+</style>

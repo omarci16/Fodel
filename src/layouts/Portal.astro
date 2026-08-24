@@ -1,0 +1,185 @@
+---
+/**
+ * Portal shell — login, dashboard, property editor, review, users, settings.
+ *
+ * Reuses the public site's design tokens and typefaces (see src/styles/) so
+ * it visually belongs to FODEL, but the layout itself is simpler and denser
+ * than the marketing site: a slim top bar instead of the full Nav/Footer, no
+ * hero sections, no reveal-on-scroll. This is a tool people use daily, not a
+ * page they arrive at from search — density beats editorial spacing here.
+ *
+ * Always noindex: nothing under /portal/ is for search engines.
+ */
+import Logo from '~/components/Logo.astro';
+import '~/styles/global.css';
+
+interface Props {
+  title: string;
+  /** Hide the top bar's nav — used by the login and invite-accept screens. */
+  bare?: boolean;
+}
+
+const { title, bare = false } = Astro.props;
+const profile = Astro.locals.profile;
+
+const NAV = [
+  { href: '/portal/dashboard', label: 'Áttekintés' },
+  { href: '/portal/properties', label: 'Ingatlanok' },
+  ...(profile?.role === 'admin' ? [{ href: '/portal/users', label: 'Felhasználók' }] : []),
+  { href: '/portal/settings', label: 'Beállítások' },
+];
+
+const current = Astro.url.pathname;
+---
+
+<!doctype html>
+<html lang="hu">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title} — FODEL portál</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    {
+      !bare && (
+        <header class="topbar">
+          <Logo locale="hu" href="/portal/dashboard" />
+          <nav aria-label="Portál navigáció">
+            <ul>
+              {NAV.map((item) => (
+                <li>
+                  <a href={item.href} aria-current={current.startsWith(item.href) ? 'page' : undefined}>
+                    {item.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+          <div class="who">
+            {profile && (
+              <>
+                <span class="name">{profile.full_name ?? profile.email}</span>
+                <span class="role">{profile.role === 'admin' ? 'Admin' : 'Hirdető'}</span>
+                <form method="POST" action="/portal/logout">
+                  <button type="submit" class="logout">Kilépés</button>
+                </form>
+              </>
+            )}
+          </div>
+        </header>
+      )
+    }
+
+    <main class:list={{ bare }}>
+      <slot />
+    </main>
+  </body>
+</html>
+
+<style>
+  html,
+  body {
+    background: var(--cream);
+    min-height: 100%;
+  }
+  body {
+    font-family: var(--sans);
+    color: var(--ink);
+  }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 40px;
+    padding: 18px 32px;
+    border-bottom: 1px solid var(--border);
+    background: var(--cream);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .topbar nav {
+    flex: 1;
+  }
+  .topbar ul {
+    display: flex;
+    gap: 28px;
+    list-style: none;
+  }
+  .topbar a {
+    font-size: var(--fs-small);
+    letter-spacing: 0.04em;
+    color: var(--taupe);
+    padding: 6px 0;
+    border-bottom: 2px solid transparent;
+  }
+  .topbar a:hover,
+  .topbar a[aria-current='page'] {
+    color: var(--ink);
+    border-bottom-color: var(--ink);
+  }
+
+  .who {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-size: var(--fs-small);
+  }
+  .who .name {
+    color: var(--ink);
+  }
+  .who .role {
+    font-size: var(--fs-micro);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--taupe);
+    border: 1px solid var(--border);
+    padding: 2px 8px;
+  }
+  .logout {
+    font-size: var(--fs-micro);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--taupe);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .logout:hover {
+    color: var(--ink);
+  }
+
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 32px 80px;
+  }
+  main.bare {
+    max-width: 420px;
+    padding: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  @media (max-width: 720px) {
+    .topbar {
+      flex-wrap: wrap;
+      gap: 16px;
+      padding: 16px 20px;
+    }
+    .topbar nav {
+      order: 3;
+      width: 100%;
+    }
+    .topbar ul {
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+    main {
+      padding: 28px 20px 60px;
+    }
+  }
+</style>

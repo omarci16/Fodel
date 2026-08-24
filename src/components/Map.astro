@@ -1,0 +1,212 @@
+---
+/**
+ * Shared MapLibre GL map — self-hosted vector tiles from a single Hungary
+ * PMTiles file (see scripts/build-pmtiles.mjs), no third party ever sees a
+ * visitor's map interaction.
+ *
+ * Two modes:
+ *  - "pin": one property, detail page. Respects `precision` — an exact
+ *    location gets a real pin; an approximate one gets a soft circle, so the
+ *    map never shows more precision than the seller agreed to publish.
+ *  - "browse": every active listing, clustered, with a "search this area"
+ *    action that re-runs the Stage 6 search scoped to the visible bounds.
+ *
+ * MapLibre is a real ~200 kB library — a deliberate, plan-specified
+ * exception to this site's near-zero-JS budget, loaded only on the pages
+ * that actually show a map, never site-wide. See the note in
+ * scripts/verify-ssg.mjs's JS budget check.
+ */
+import type { Locale } from '~/i18n/ui';
+import 'maplibre-gl/dist/maplibre-gl.css';
+
+interface Props {
+  mode: 'pin' | 'browse';
+  lat?: number;
+  lng?: number;
+  precision?: 'exact' | 'approximate';
+  zoom?: number;
+  locale?: Locale;
+  id?: string;
+}
+
+const { mode, lat, lng, precision = 'approximate', zoom = mode === 'pin' ? 13 : 7, locale = 'hu', id = 'fodel-map' } =
+  Astro.props;
+
+const pmtilesUrl = import.meta.env.PMTILES_URL ?? '';
+---
+
+<div
+  id={id}
+  class="fodel-map"
+  data-mode={mode}
+  data-lat={lat}
+  data-lng={lng}
+  data-precision={precision}
+  data-zoom={zoom}
+  data-locale={locale}
+  data-pmtiles={pmtilesUrl}
+>
+  {!pmtilesUrl && (
+    <p class="map-unavailable">
+      {locale === 'hu'
+        ? 'A térkép jelenleg nem elérhető.'
+        : 'De kaart is momenteel niet beschikbaar.'}
+    </p>
+  )}
+</div>
+
+<script>
+  // maplibre-gl v6 has no default export — everything is named.
+  import { Map as MapLibreMap, Marker, NavigationControl, addProtocol, type GeoJSONSource } from 'maplibre-gl';
+  import { Protocol } from 'pmtiles';
+  import { mapStyle } from '~/lib/map-style';
+
+  const protocol = new Protocol();
+  addProtocol('pmtiles', protocol.tile);
+
+  document.querySelectorAll<HTMLElement>('.fodel-map[data-pmtiles]').forEach((el) => {
+    const pmtilesUrl = el.dataset.pmtiles;
+    if (!pmtilesUrl) return; // no tileset configured yet — the "unavailable" message already shows
+
+    const mode = el.dataset.mode;
+    const zoom = Number(el.dataset.zoom ?? 7);
+    const lat = el.dataset.lat ? Number(el.dataset.lat) : 47.1625;
+    const lng = el.dataset.lng ? Number(el.dataset.lng) : 19.5033;
+
+    const map = new MapLibreMap({
+      container: el,
+      style: mapStyle(pmtilesUrl) as any,
+      center: [lng, lat],
+      zoom,
+      attributionControl: { compact: true },
+    });
+    map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
+
+    if (mode === 'pin') {
+      if (el.dataset.precision === 'exact') {
+        new Marker({ color: '#102A43' }).setLngLat([lng, lat]).addTo(map);
+      } else {
+        // Approximate: a soft ~600m circle rather than a house-level pin —
+        // never shows more precision than the seller agreed to publish.
+        map.on('load', () => {
+          map.addSource('approx', {
+            type: 'geojson',
+            data: { type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [lng, lat] } },
+          });
+          map.addLayer({
+            id: 'approx-circle',
+            type: 'circle',
+            source: 'approx',
+            paint: {
+              'circle-radius': 22,
+              'circle-color': '#102A43',
+              'circle-opacity': 0.18,
+              'circle-stroke-width': 1.5,
+              'circle-stroke-color': '#102A43',
+            },
+          });
+        });
+      }
+      return;
+    }
+
+    // Browse mode: clustered listing markers + "search this area".
+    const locale = el.dataset.locale === 'nl' ? 'nl' : 'hu';
+    const listUrl = locale === 'hu' ? '/hu/ingatlanok/' : '/nl/woningen/';
+
+    map.on('load', async () => {
+      const res = await fetch(`/api/map/properties.geojson?locale=${locale}`);
+      const data = await res.json();
+
+      map.addSource('listings', {
+        type: 'geojson',
+        data,
+        cluster: true,
+        clusterMaxZoom: 13,
+        clusterRadius: 44,
+      });
+
+      map.addLayer({
+        id: 'clusters',
+        type: 'circle',
+        source: 'listings',
+        filter: ['has', 'point_count'],
+        paint: {
+          'circle-color': '#102A43',
+          'circle-radius': ['step', ['get', 'point_count'], 16, 10, 20, 30, 26],
+        },
+      });
+      map.addLayer({
+        id: 'cluster-count',
+        type: 'symbol',
+        source: 'listings',
+        filter: ['has', 'point_count'],
+        layout: { 'text-field': ['get', 'point_count_abbreviated'], 'text-size': 12 },
+        paint: { 'text-color': '#F4F4F2' },
+      });
+      map.addLayer({
+        id: 'unclustered',
+        type: 'circle',
+        source: 'listings',
+        filter: ['!', ['has', 'point_count']],
+        paint: {
+          'circle-radius': 7,
+          'circle-color': '#F4F4F2',
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#102A43',
+        },
+      });
+
+      map.on('click', 'clusters', (e) => {
+        const features = map.queryRenderedFeatures(e.point, { layers: ['clusters'] });
+        const clusterId = features[0]?.properties?.cluster_id;
+        const source = map.getSource('listings') as GeoJSONSource;
+        source.getClusterExpansionZoom(clusterId).then((z) => {
+          map.easeTo({ center: (features[0].geometry as any).coordinates, zoom: z });
+        });
+      });
+
+      map.on('click', 'unclustered', (e) => {
+        const feature = e.features?.[0];
+        const url = feature?.properties?.url;
+        if (url) window.location.href = url;
+      });
+
+      map.on('mouseenter', 'unclustered', () => (map.getCanvas().style.cursor = 'pointer'));
+      map.on('mouseleave', 'unclustered', () => (map.getCanvas().style.cursor = ''));
+    });
+
+    const searchBtn = document.getElementById('search-this-area');
+    searchBtn?.addEventListener('click', () => {
+      const b = map.getBounds();
+      const params = new URLSearchParams({
+        bbox: [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map((n) => n.toFixed(4)).join(','),
+      });
+      window.location.href = `${listUrl}?${params}`;
+    });
+  });
+</script>
+
+<style>
+  .fodel-map {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: 320px;
+    background: var(--mist);
+  }
+  .map-unavailable {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--fs-small);
+    color: var(--taupe);
+    text-align: center;
+    padding: 20px;
+  }
+  :global(.maplibregl-ctrl-attrib) {
+    font-size: 10px;
+  }
+</style>

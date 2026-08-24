@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "FODEL Ingatlan / FODEL Vastgoed \u2014 Hungarian property advertised across Western Europe",
+  "description": "FODEL Ingatlan / FODEL Vastgoed — Hungarian property advertised across Western Europe",
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
@@ -14,15 +14,28 @@
     "verify:contrast": "node scripts/verify-contrast.mjs",
     "verify": "npm run build && npm run verify:ssg && npm run verify:contrast",
     "verify:dev": "npm run build && node scripts/verify-ssg.mjs --allow-missing-kvk && npm run verify:contrast",
-    "og": "node scripts/build-og.mjs"
+    "og": "node scripts/build-og.mjs",
+    "build:pmtiles": "node scripts/build-pmtiles.mjs",
+    "seed:500": "node scripts/seed-500.mjs",
+    "verify:rls": "node scripts/verify-rls.mjs",
+    "verify:workflow": "node scripts/verify-workflow.mjs"
   },
   "dependencies": {
     "@astrojs/netlify": "^6.5.13",
     "@astrojs/sitemap": "^3.6.0",
     "@fontsource-variable/jost": "^5.3.0",
     "@fontsource/dm-sans": "^5.3.0",
+    "@supabase/ssr": "^0.12.5",
+    "@supabase/supabase-js": "^2.45.4",
     "astro": "^5.16.2",
+    "maplibre-gl": "^6.5.0",
+    "pmtiles": "^4.5.0",
     "resend": "^6.1.2",
-    "sharp": "^0.34.4"
+    "sharp": "^0.34.4",
+    "stripe": "^22.5.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "typescript": "^5.9.3"
   }
 }

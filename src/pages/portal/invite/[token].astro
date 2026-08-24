@@ -1,0 +1,85 @@
+---
+/**
+ * Public by necessity — the token itself, not a session, is the credential
+ * here (see src/middleware.ts's PUBLIC_PORTAL_PATHS). Validated by hashing
+ * the token from the URL and comparing to the stored hash, same principle as
+ * a password: the raw value never round-trips through the database.
+ */
+export const prerender = false;
+
+import crypto from 'node:crypto';
+import Portal from '~/layouts/Portal.astro';
+import Logo from '~/components/Logo.astro';
+import { createSupabaseAdminClient } from '~/lib/supabase-server';
+
+const { token } = Astro.params;
+const err = Astro.url.searchParams.get('error');
+
+if (Astro.locals.user) {
+  return Astro.redirect('/portal/dashboard');
+}
+
+const tokenHash = crypto.createHash('sha256').update(token!).digest('hex');
+const admin = createSupabaseAdminClient();
+const { data: invite } = await admin
+  .from('invites')
+  .select('email, role, expires_at, accepted_at')
+  .eq('token_hash', tokenHash)
+  .maybeSingle();
+
+const invalid = !invite;
+const expired = invite && new Date(invite.expires_at) < new Date();
+const used = invite && invite.accepted_at;
+---
+
+<Portal title="Meghívó elfogadása" bare>
+  <div class="panel">
+    <div class="brand"><Logo locale="hu" href="/hu/" /></div>
+
+    {invalid || expired || used ? (
+      <>
+        <h1>A meghívó nem érvényes</h1>
+        <p class="body">
+          {invalid && 'Ez a meghívó link nem található.'}
+          {expired && 'Ez a meghívó lejárt. Kérjen újat a FODEL-től.'}
+          {used && 'Ezt a meghívót már felhasználták.'}
+        </p>
+      </>
+    ) : (
+      <>
+        <h1>Üdvözöljük a FODEL portálon</h1>
+        <p class="body">Fiók létrehozása ehhez: <strong>{invite!.email}</strong></p>
+
+        {err && <p class="error">{decodeURIComponent(err)}</p>}
+
+        <form method="POST" action="/api/portal/invite/accept">
+          <input type="hidden" name="token" value={token} />
+          <div class="field">
+            <label for="full_name">Teljes név</label>
+            <input id="full_name" name="full_name" required autofocus />
+          </div>
+          <div class="field">
+            <label for="password">Jelszó</label>
+            <input id="password" name="password" type="password" required minlength="8" autocomplete="new-password" />
+          </div>
+          <button type="submit" class="submit">Fiók létrehozása</button>
+        </form>
+      </>
+    )}
+  </div>
+</Portal>
+
+<style>
+  .panel { width: 100%; padding: 48px 40px; border: 1px solid var(--border); background: var(--cream); }
+  .brand { margin-bottom: 32px; }
+  h1 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 24px; color: var(--ink); margin-bottom: 16px; }
+  .body { font-size: var(--fs-body); line-height: 1.8; color: var(--taupe); margin-bottom: 24px; }
+  .error { font-size: var(--fs-small); color: #b3261e; padding: 10px 14px; border-left: 2px solid #b3261e; background: rgba(179, 38, 30, 0.06); margin-bottom: 20px; }
+
+  .field { display: flex; flex-direction: column; margin-bottom: 18px; }
+  label { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--taupe); margin-bottom: 8px; }
+  input { border: 1px solid var(--border); background: #fff; padding: 11px 12px; font-size: var(--fs-body); color: var(--ink); }
+  input:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+
+  .submit { width: 100%; margin-top: 8px; padding: 13px; background: var(--ink); color: var(--cream); font-size: var(--fs-micro); letter-spacing: var(--ls-button); text-transform: uppercase; }
+</style>

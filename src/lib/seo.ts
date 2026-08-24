@@ -215,6 +215,25 @@ export function serviceSchema(locale: Locale, name: string, description: string)
   };
 }
 
+/** FODEL sells video placement at €36 — everything asserted here must also render on the page (see VideoEmbed.astro). */
+export function videoObjectSchema(opts: {
+  name: string;
+  description: string;
+  url: string;
+  videoId: string;
+  uploadDate: Date;
+}) {
+  return {
+    '@type': 'VideoObject',
+    name: opts.name,
+    description: opts.description,
+    thumbnailUrl: `https://i.ytimg.com/vi/${opts.videoId}/hqdefault.jpg`,
+    uploadDate: opts.uploadDate.toISOString(),
+    embedUrl: `https://www.youtube-nocookie.com/embed/${opts.videoId}`,
+    contentUrl: opts.url,
+  };
+}
+
 /** Wrap graph nodes into one @graph document. */
 export function graph(nodes: unknown[]) {
   return { '@context': 'https://schema.org', '@graph': nodes.filter(Boolean) };

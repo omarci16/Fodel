@@ -1,0 +1,75 @@
+---
+/** Admin-only. Guarded by src/middleware.ts. */
+export const prerender = false;
+
+import Portal from '~/layouts/Portal.astro';
+
+const { supabase } = Astro.locals;
+const { data: profiles } = await supabase
+  .from('profiles')
+  .select('id, role, full_name, email, phone, created_at')
+  .order('created_at', { ascending: false });
+
+const { data: pendingInvites } = await supabase
+  .from('invites')
+  .select('email, role, expires_at')
+  .is('accepted_at', null)
+  .order('expires_at', { ascending: true });
+---
+
+<Portal title="Felhasználók">
+  <header class="head">
+    <p class="eyebrow">Felhasználók</p>
+    <h1>{profiles?.length ?? 0} regisztrált fiók</h1>
+    <a class="btn" href="/portal/users/invite">+ Meghívás</a>
+  </header>
+
+  <table class="list">
+    <thead>
+      <tr><th>Név</th><th>E-mail</th><th>Szerep</th><th>Telefon</th></tr>
+    </thead>
+    <tbody>
+      {(profiles ?? []).map((p) => (
+        <tr>
+          <td>{p.full_name ?? '—'}</td>
+          <td>{p.email}</td>
+          <td><span class:list={['pill', p.role === 'admin' && 'pill-admin']}>{p.role === 'admin' ? 'Admin' : 'Hirdető'}</span></td>
+          <td>{p.phone ?? '—'}</td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+
+  {pendingInvites && pendingInvites.length > 0 && (
+    <>
+      <h2 class="sub">Függőben lévő meghívók</h2>
+      <table class="list">
+        <thead><tr><th>E-mail</th><th>Szerep</th><th>Lejár</th></tr></thead>
+        <tbody>
+          {pendingInvites.map((i) => (
+            <tr>
+              <td>{i.email}</td>
+              <td>{i.role === 'admin' ? 'Admin' : 'Hirdető'}</td>
+              <td>{new Date(i.expires_at).toLocaleDateString('hu-HU')}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
+  )}
+</Portal>
+
+<style>
+  .head { display: flex; align-items: baseline; gap: 24px; margin-bottom: 24px; flex-wrap: wrap; }
+  .eyebrow { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--taupe); }
+  h1 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 26px; color: var(--ink); flex: 1; }
+  .sub { font-family: var(--serif); font-size: 18px; color: var(--ink); margin: 32px 0 14px; }
+  .btn { padding: 11px 22px; background: var(--ink); color: var(--cream); font-size: var(--fs-micro); letter-spacing: var(--ls-button); text-transform: uppercase; }
+
+  .list { width: 100%; border-collapse: collapse; font-size: var(--fs-small); }
+  .list th { text-align: left; font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; color: var(--taupe); padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .list td { padding: 12px; border-bottom: 1px solid var(--border); color: var(--ink); }
+
+  .pill { font-size: var(--fs-micro); padding: 3px 10px; border: 1px solid var(--border); }
+  .pill-admin { background: rgba(16, 42, 67, 0.08); border-color: var(--ink); }
+</style>

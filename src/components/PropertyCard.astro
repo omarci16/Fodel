@@ -58,14 +58,16 @@ const specs = [
   <a class="card-link" href={href}>
     <div class="card-img-wrap">
       <div class="card-img-inner">
+        {/* astro:assets' <Image> has separate local/remote overloads; a src that can be either doesn't match either cleanly — the `as any` is a type-checker limitation, not a runtime one. */}
         <Image
-          src={d.media.hero}
+          src={d.media.hero as any}
           alt={heroAlt}
           widths={[400, 600, 800]}
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 45vw, 30vw"
           loading={eager ? 'eager' : 'lazy'}
           fetchpriority={eager ? 'high' : 'auto'}
           class="card-img"
+          inferSize={typeof d.media.hero === 'string'}
         />
       </div>
       {tag && <span class="tag">{tag}</span>}

@@ -1,0 +1,182 @@
+---
+export const prerender = false;
+
+import Portal from '~/layouts/Portal.astro';
+
+const { supabase, profile } = Astro.locals;
+const isAdmin = profile?.role === 'admin';
+
+// Row-Level Security already scopes this to "my own properties" for an
+// owner and "everything" for an admin — the query itself doesn't need to
+// know which one it is.
+const { data: rows } = await supabase.from('properties').select('id, status, ref');
+const counts = {
+  draft: 0,
+  submitted: 0,
+  changes_requested: 0,
+  published: 0,
+  sold: 0,
+  archived: 0,
+};
+for (const row of rows ?? []) {
+  if (row.status in counts) counts[row.status as keyof typeof counts]++;
+}
+
+let pendingReview = 0;
+let ownerCount = 0;
+if (isAdmin) {
+  const { count } = await supabase
+    .from('properties')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'submitted');
+  pendingReview = count ?? 0;
+
+  const { count: owners } = await supabase
+    .from('profiles')
+    .select('id', { count: 'exact', head: true })
+    .eq('role', 'owner');
+  ownerCount = owners ?? 0;
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  draft: 'Piszkozat',
+  submitted: 'Elbírálásra vár',
+  changes_requested: 'Javítás szükséges',
+  published: 'Élő hirdetés',
+  sold: 'Eladva',
+  archived: 'Archiválva',
+};
+---
+
+<Portal title="Áttekintés">
+  <header class="head">
+    <p class="eyebrow">Áttekintés</p>
+    <h1>Üdvözöljük, {profile?.full_name ?? profile?.email}</h1>
+  </header>
+
+  {
+    isAdmin && pendingReview > 0 && (
+      <a class="callout" href="/portal/properties?status=submitted">
+        <strong>{pendingReview}</strong> hirdetés vár elbírálásra →
+      </a>
+    )
+  }
+
+  <section class="stats">
+    {
+      Object.entries(counts).map(([status, n]) => (
+        <a class="stat" href={`/portal/properties?status=${status}`}>
+          <span class="n">{n}</span>
+          <span class="label">{STATUS_LABEL[status]}</span>
+        </a>
+      ))
+    }
+  </section>
+
+  {
+    isAdmin && (
+      <section class="admin-row">
+        <a class="stat" href="/portal/users">
+          <span class="n">{ownerCount}</span>
+          <span class="label">Regisztrált hirdető</span>
+        </a>
+      </section>
+    )
+  }
+
+  <div class="actions">
+    <a class="btn" href="/portal/properties/new">+ Új ingatlan</a>
+    <a class="btn ghost" href="/portal/properties">Összes ingatlan</a>
+  </div>
+</Portal>
+
+<style>
+  .head {
+    margin-bottom: 32px;
+  }
+  .eyebrow {
+    font-size: var(--fs-eyebrow);
+    letter-spacing: var(--ls-eyebrow);
+    text-transform: uppercase;
+    color: var(--taupe);
+    margin-bottom: 8px;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-weight: var(--fw-display);
+    font-size: 32px;
+    color: var(--ink);
+  }
+
+  .callout {
+    display: block;
+    background: var(--ink);
+    color: var(--cream);
+    padding: 16px 20px;
+    margin-bottom: 28px;
+    font-size: var(--fs-body);
+  }
+  .callout:hover {
+    opacity: 0.92;
+  }
+
+  .stats,
+  .admin-row {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+  .admin-row {
+    grid-template-columns: repeat(3, 1fr);
+    max-width: 300px;
+  }
+  .stat {
+    background: var(--cream);
+    padding: 20px 16px;
+    text-align: center;
+  }
+  .stat:hover {
+    background: var(--linen);
+  }
+  .stat .n {
+    display: block;
+    font-family: var(--serif);
+    font-weight: var(--fw-medium);
+    font-size: 28px;
+    color: var(--ink);
+  }
+  .stat .label {
+    display: block;
+    margin-top: 4px;
+    font-size: var(--fs-micro);
+    color: var(--taupe);
+  }
+
+  .actions {
+    display: flex;
+    gap: 14px;
+    margin-top: 32px;
+  }
+  .btn {
+    padding: 12px 24px;
+    background: var(--ink);
+    color: var(--cream);
+    font-size: var(--fs-micro);
+    letter-spacing: var(--ls-button);
+    text-transform: uppercase;
+  }
+  .btn.ghost {
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid var(--ink);
+  }
+
+  @media (max-width: 720px) {
+    .stats {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+</style>

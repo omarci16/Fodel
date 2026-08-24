@@ -1,0 +1,101 @@
+---
+/**
+ * Map browse. A full-viewport clustered map of every active listing, with a
+ * "search this area" action that hands the current bounds off to the Stage 6
+ * search (see PropertiesPage.astro, which reads ?bbox= — Stage 6's own
+ * search_properties() function doesn't filter by bbox itself yet, so today
+ * this narrows results to properties whose settlement/region text matches
+ * what's visible, which is an approximation; a real PostGIS bounding-box
+ * filter is the natural next step once the inventory is large enough to need
+ * it precisely).
+ */
+import Base from '~/layouts/Base.astro';
+import Eyebrow from '~/components/Eyebrow.astro';
+import Map from '~/components/Map.astro';
+import { UI, path, type Locale } from '~/i18n/ui';
+import { alternatesFor, crumbs } from '~/lib/page';
+import { breadcrumbSchema } from '~/lib/seo';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const ui = UI[locale];
+
+const title = locale === 'hu' ? 'Ingatlanok térképen' : 'Woningen op de kaart';
+const description =
+  locale === 'hu'
+    ? 'Böngéssze a FODEL magyarországi ingatlanait térképen, régió szerint csoportosítva.'
+    : 'Blader door het Hongaarse vastgoed van FODEL op de kaart, gegroepeerd per regio.';
+
+const trail = crumbs(locale, [
+  { name: ui.nav.properties, url: path(locale, 'properties') },
+  { name: title, url: path(locale, 'map') },
+]);
+---
+
+<Base
+  locale={locale}
+  title={title}
+  description={description}
+  alternates={alternatesFor('map')}
+  schema={[breadcrumbSchema(trail)]}
+  flush
+>
+  <div class="map-page">
+    <div class="map-head">
+      <Eyebrow space="8px">{ui.nav.properties}</Eyebrow>
+      <h1>{title}</h1>
+      <button type="button" id="search-this-area" class="area-btn">
+        {locale === 'hu' ? 'Keresés ezen a területen' : 'Zoek in dit gebied'}
+      </button>
+    </div>
+    <div class="map-wrap">
+      <Map mode="browse" locale={locale} id="browse-map" />
+    </div>
+  </div>
+</Base>
+
+<style>
+  .map-page {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - var(--nav-h));
+  }
+  .map-head {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 20px var(--pad-x);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-weight: var(--fw-display);
+    font-size: 22px;
+    color: var(--ink);
+    flex: 1;
+  }
+  .area-btn {
+    padding: 10px 20px;
+    background: var(--ink);
+    color: var(--cream);
+    font-size: var(--fs-micro);
+    letter-spacing: var(--ls-button);
+    text-transform: uppercase;
+  }
+  .map-wrap {
+    flex: 1;
+    min-height: 0;
+  }
+  @media (max-width: 768px) {
+    .map-page {
+      height: calc(100vh - var(--nav-h-mob));
+    }
+    .map-head {
+      padding: 16px var(--pad-x-mob);
+    }
+  }
+</style>

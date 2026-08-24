@@ -1,0 +1,8 @@
+---
+export const prerender = false;
+Astro.response.headers.set('Cache-Control', 's-maxage=300, stale-while-revalidate=86400');
+
+import MapBrowsePage from '~/components/pages/MapBrowsePage.astro';
+---
+
+<MapBrowsePage locale="hu" />

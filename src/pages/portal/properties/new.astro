@@ -1,0 +1,14 @@
+---
+// A thin redirect: creates a blank draft and sends the seller straight into
+// its editor, so "+ Új ingatlan" behaves like "start a new document" rather
+// than requiring a separate empty form step first.
+export const prerender = false;
+
+import { createDraft } from '~/lib/portal/properties';
+
+const { supabase, user } = Astro.locals;
+if (!user) return Astro.redirect('/portal/login');
+
+const id = await createDraft(supabase, user.id);
+return Astro.redirect(`/portal/properties/${id}`);
+---

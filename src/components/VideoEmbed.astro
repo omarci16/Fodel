@@ -1,0 +1,95 @@
+---
+/**
+ * Click-to-load YouTube facade (Stage 8). Shows YouTube's own poster image —
+ * a plain static asset, no cookies or script involved — and only loads the
+ * real player (from youtube-nocookie.com, YouTube's privacy-enhanced
+ * embed domain) once a visitor actually clicks. Nothing from YouTube runs
+ * before that click, so this needs no cookie-consent gate of its own and
+ * costs the page nothing until someone wants to watch.
+ */
+interface Props {
+  url: string;
+  title: string;
+  locale: 'hu' | 'nl';
+}
+
+import { extractYouTubeId } from '~/lib/video';
+
+const { url, title, locale } = Astro.props;
+const videoId = extractYouTubeId(url);
+const poster = videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : null;
+const playLabel = locale === 'hu' ? 'Videó lejátszása' : 'Video afspelen';
+---
+
+{videoId && poster ? (
+  <div class="video-embed" data-video-id={videoId}>
+    <button type="button" class="poster" aria-label={`${playLabel}: ${title}`}>
+      <img src={poster} alt="" width="480" height="360" loading="lazy" />
+      <span class="play-icon" aria-hidden="true">▶</span>
+    </button>
+  </div>
+) : (
+  <a href={url} target="_blank" rel="noopener">{url}</a>
+)}
+
+<script>
+  document.querySelectorAll<HTMLElement>('.video-embed').forEach((wrap) => {
+    wrap.querySelector('.poster')?.addEventListener('click', () => {
+      const id = wrap.dataset.videoId;
+      const iframe = document.createElement('iframe');
+      iframe.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1`;
+      iframe.title = 'YouTube video player';
+      iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+      iframe.allowFullscreen = true;
+      wrap.replaceChildren(iframe);
+    }, { once: true });
+  });
+</script>
+
+<style>
+  .video-embed {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    background: var(--ink);
+    overflow: hidden;
+  }
+  .video-embed iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+  }
+  .poster {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: block;
+    cursor: pointer;
+  }
+  .poster img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    opacity: 0.85;
+  }
+  .play-icon {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 64px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(16, 42, 67, 0.85);
+    color: var(--cream);
+    border-radius: 50%;
+    font-size: 20px;
+    padding-left: 4px;
+  }
+  .poster:hover .play-icon {
+    background: var(--ink);
+  }
+</style>

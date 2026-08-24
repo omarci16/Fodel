@@ -12,6 +12,8 @@ import Eyebrow from '~/components/Eyebrow.astro';
 import GoldRule from '~/components/GoldRule.astro';
 import Button from '~/components/Button.astro';
 import PropertyCard from '~/components/PropertyCard.astro';
+import Map from '~/components/Map.astro';
+import VideoEmbed from '~/components/VideoEmbed.astro';
 import FormShell from '~/components/forms/FormShell.astro';
 import Field from '~/components/forms/Field.astro';
 import { UI, categoryLabel, path, type Locale, type CategoryKey } from '~/i18n/ui';
@@ -19,8 +21,9 @@ import { COMPANY } from '~/config/company';
 import { featureLabel } from '~/data/features';
 import { activeProperties, similarTo, text, url as propUrl, type Property } from '~/lib/properties';
 import { propertyAlternates, crumbs } from '~/lib/page';
-import { propertySchema, breadcrumbSchema } from '~/lib/seo';
+import { propertySchema, breadcrumbSchema, videoObjectSchema } from '~/lib/seo';
 import { eur, huf, area, floorArea, epcLabel, formatDate } from '~/lib/format';
+import { extractYouTubeId } from '~/lib/video';
 
 interface Props {
   locale: Locale;
@@ -61,6 +64,7 @@ const shareImage = await getImage({
   // accepts 'jpg' and 500s otherwise.
   format: 'jpg',
   quality: 80,
+  inferSize: typeof gallery[0].src === 'string',
 });
 
 const pageUrl = propUrl(property, locale);
@@ -91,6 +95,8 @@ const metaDescription = `${title} — ${d.location.settlement}, ${d.location.cou
 )}${d.areas.floorM2 ? `, ${floorArea(d.areas.floorM2)}` : ''}, ${area(d.areas.plotM2, locale)}. ${
   locale === 'hu' ? 'Azonosító' : 'Referentie'
 } ${d.ref}.`;
+
+const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
 ---
 
 <Base
@@ -103,6 +109,14 @@ const metaDescription = `${title} — ${d.location.settlement}, ${d.location.cou
   schema={[
     propertySchema(property, locale, pageUrl, shareImage.src),
     breadcrumbSchema(trail),
+    videoId &&
+      videoObjectSchema({
+        name: title,
+        description,
+        url: d.media.videoUrl!,
+        videoId,
+        uploadDate: d.listing.publishedAt,
+      }),
   ]}
 >
   <nav class="crumbs no-print" aria-label={ui.a11y.breadcrumb}>
@@ -122,13 +136,15 @@ const metaDescription = `${title} — ${d.location.settlement}, ${d.location.cou
     {
       gallery.map((image, i) => (
         <div class="property-detail-hero-media gallery-slide" data-slide={i} hidden={i !== 0}>
+          {/* astro:assets' <Image> has separate local/remote overloads; a src that can be either doesn't match either cleanly — the `as any` is a type-checker limitation, not a runtime one. */}
           <Image
-            src={image.src}
+            src={image.src as any}
             alt={image.alt}
             widths={HERO_WIDTHS}
             sizes={HERO_SIZES}
             loading={i === 0 ? 'eager' : 'lazy'}
             fetchpriority={i === 0 ? 'high' : 'auto'}
+            inferSize={typeof image.src === 'string'}
           />
         </div>
       ))
@@ -171,9 +187,13 @@ const metaDescription = `${title} — ${d.location.settlement}, ${d.location.cou
       <p class="location">
         {d.location.settlement}, {d.location.county}
         <a class="map-link no-print" href={mapUrl} target="_blank" rel="noopener">
-          {locale === 'hu' ? 'Térképen' : 'Op de kaart'}
+          {locale === 'hu' ? 'OpenStreetMap-en' : 'Op OpenStreetMap'}
         </a>
       </p>
+
+      <div class="detail-map no-print">
+        <Map mode="pin" lat={d.location.lat} lng={d.location.lng} precision={d.location.precision} locale={locale} id={`map-${d.ref}`} />
+      </div>
 
       <div class="price-row">
         <span class="price">{eur(d.price.eur)}</span>
@@ -222,7 +242,7 @@ const metaDescription = `${title} — ${d.location.settlement}, ${d.location.cou
         d.media.videoUrl && (
           <section class="video no-print">
             <Eyebrow space="14px">{ui.property.video}</Eyebrow>
-            <a href={d.media.videoUrl} target="_blank" rel="noopener">{d.media.videoUrl}</a>
+            <VideoEmbed url={d.media.videoUrl} title={title} locale={locale} />
           </section>
         )
       }
@@ -448,7 +468,12 @@ const metaDescription = `${title} — ${d.location.settlement}, ${d.location.cou
   .location {
     font-size: var(--fs-body);
     color: var(--taupe);
+    margin-bottom: 16px;
+  }
+  .detail-map {
+    height: 280px;
     margin-bottom: 36px;
+    border: 1px solid var(--border);
   }
   .map-link {
     margin-left: 12px;

@@ -1,4 +1,9 @@
 ---
+// Not pure content: shows 3 live featured listings, so — like the homepage —
+// this reads from Supabase and renders on request rather than at build time.
+export const prerender = false;
+Astro.response.headers.set('Cache-Control', 's-maxage=300, stale-while-revalidate=86400');
+
 import BuyersPage from "~/components/pages/BuyersPage.astro";
 ---
 

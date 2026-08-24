@@ -1,8 +1,16 @@
-# FODEL Website 1.0
+# FODEL 1.0
 
-Astro static site for **FODEL VASTGOED / FODEL INGATLAN** — Hungarian property
-advertised to Western European buyers. Hungarian and Dutch at launch, with
-German, English and French scaffolded.
+Astro platform for **FODEL VASTGOED / FODEL INGATLAN** — Hungarian property
+advertised to Western European buyers, with an admin system and an
+invite-only seller portal behind it. Hungarian and Dutch are the two fully
+built markets; German, English and French have a structural bridge page each
+(see [Locales](#locales-hunl-full-deenfr-structural) below).
+
+**No longer a static site.** Property data (listings, translations, photos)
+lives in Postgres (Supabase), not in Markdown files — a logged-in seller
+writes to it and an admin approves what gets published. The marketing pages
+(About, Sellers, FAQ, legal, blog, …) are still plain static HTML, exactly as
+before.
 
 Companion documents: [`FODEL_AUDIT.md`](FODEL_AUDIT.md) (why this rebuild exists)
 and [`fodel_brand_identity 2.md`](fodel_brand_identity%202.md) (brand ground truth).
@@ -15,21 +23,114 @@ as the design reference.
 
 ```bash
 npm install
-cp .env.example .env      # add RESEND_API_KEY to make the forms deliver
+cp .env.example .env      # fill in Supabase, Resend, and (optional) Stripe/PMTiles values
 npm run dev               # http://localhost:4321
 ```
 
+Without a configured Supabase project, static content pages (About, Sellers,
+FAQ, legal, blog) still work. Anything that reads property data — home, the
+listings page, a property page, the sold archive, the map, the entire
+`/portal/` seller/admin area — will show a clear "not configured" error
+instead of the real page until `SUPABASE_URL`/`SUPABASE_ANON_KEY` are set and
+`supabase/migrations/*.sql` have been run. See **Database setup** below.
+
 | Script | What it does |
 |---|---|
-| `npm run dev` | Dev server, including the four form endpoints |
-| `npm run build` | Static build to `dist/` |
-| `npm run preview` | Serves the built `dist/` at localhost:4321. Zero dependencies. |
+| `npm run dev` | Dev server, including all form and API endpoints |
+| `npm run build` | Build to `dist/` (mixed static HTML + server functions) |
+| `npm run preview` | Serves the *static* pages in `dist/` at localhost:4321. Pages that read Supabase (home, listings, portal, …) aren't in `dist/` as files — use `npm run dev` for those. |
 | `npm run verify` | Build + full preflight. **Fails until the KvK number is set.** |
 | `npm run verify:dev` | Same, but waives the KvK gate |
+| `npm run verify:rls` | Proves one seller can't read/edit/delete another's listings or reach admin routes — needs a configured Supabase project |
+| `npm run verify:workflow` | Scripted pass through draft → submitted → changes requested → approved → published |
+| `npm run seed:500` | Generates 500 synthetic listings for search/pagination load-testing |
+| `npm run build:pmtiles` | Builds the self-hosted map basemap (real data-engineering step, not part of `npm run build`) |
 | `npm run og` | Regenerates `public/og/fodel-default.jpg` |
 
 `build` runs `scripts/prune-assets.mjs` afterwards, which drops the source
 images Astro emits alongside the optimised variants (11 MB, unreferenced).
+
+---
+
+## Database setup
+
+1. Create a free project at [supabase.com](https://supabase.com) (region
+   Frankfurt/`eu-central-1` recommended — closest to Hungary/Netherlands).
+2. SQL Editor → paste and run, in order: `supabase/migrations/0001_init.sql`,
+   `0002_seed_properties.sql`, `0003_portal_infrastructure.sql`,
+   `0004_search.sql`.
+3. Project Settings → API → copy the Project URL, `anon` key and
+   `service_role` key into `.env` as `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
+   `SUPABASE_SERVICE_ROLE_KEY`.
+4. `npm run dev` — the public site now reads the six seeded demo listings
+   from the database.
+
+To get into the portal, an admin account has to exist first — there's no
+"first admin" self-signup by design (an unauthenticated route that creates
+an admin account would be a real security hole). Create the first admin by
+hand once, in the Supabase SQL Editor, after signing up a user any way you
+like (e.g. Authentication → Users → Add user in the dashboard):
+```sql
+insert into profiles (id, role, email, full_name)
+values ('<the user''s auth.users id>', 'admin', 'you@example.com', 'Your Name');
+```
+Every admin after that can invite more people from `/portal/users/invite`.
+
+---
+
+## Architecture — public site vs. portal
+
+The public marketing site works exactly as the original build (see
+**Decisions worth knowing** below) — static HTML, near-zero client JS,
+sharp-optimised images. Layered on top:
+
+- **Data**: `src/lib/properties.ts` queries Supabase with the low-privilege
+  anon key — every query is still filtered by Row-Level Security
+  (`supabase/migrations/0001_init.sql`), which is the actual security
+  boundary, not this file.
+- **Rendering**: `astro.config.mjs` sets `output: 'server'`. Pure content
+  pages declare `export const prerender = true` and are built once, same as
+  before. Pages that read Supabase (home, listings, a property, sold
+  archive, the map, `/portal/`) render per request with a short CDN cache
+  (`s-maxage=300`), so approving a listing shows up live within minutes.
+- **Search**: `src/lib/properties.ts`'s `searchProperties()` calls a
+  Postgres function (`search_properties`, in `0004_search.sql`) that does
+  free-text search (PostgreSQL's built-in Hungarian/Dutch dictionaries — no
+  extension needed), filtering, sorting and pagination in one round trip.
+- **Maps**: `src/components/Map.astro` — MapLibre GL + a self-hosted PMTiles
+  basemap (`PMTILES_URL`), never a third-party map provider. Shows a plain
+  "unavailable" message until that env var points at a real tileset (see
+  `npm run build:pmtiles`).
+- **Portal** (`/portal/`, always `noindex`): Supabase Auth + a
+  session-scoped Supabase client (`src/lib/supabase-server.ts`) so every
+  portal query runs *as* the signed-in user and RLS decides what they can
+  touch. `src/middleware.ts` is a convenience gate on top (redirects a
+  signed-out visitor, blocks non-admins from admin routes) — a bug there
+  would be embarrassing, not dangerous, because the database enforces the
+  same rules independently.
+- **Media**: a seller's uploaded photo is re-encoded through `sharp` before
+  it ever reaches Supabase Storage (`src/lib/media.ts`) — strips EXIF/GPS,
+  neutralises anything embedded outside the actual image data, caps
+  resolution.
+- **Email**: `src/lib/email/send.ts` — six lifecycle emails (invite,
+  welcome, submission received, approved, changes requested, new enquiry),
+  same log-instead-of-fail pattern as the public forms when `RESEND_API_KEY`
+  is unset.
+- **Payments**: `src/lib/stripe.ts` — real plumbing, inert behind
+  `STRIPE_ENABLED=false`. FODEL's live process is bank transfer; nothing
+  changes for a visitor unless that flag is deliberately turned on.
+
+### Locales: hu/nl full, de/en/fr structural
+
+`/de/`, `/en/`, `/fr/` are a single self-contained bridge page each —
+FODEL's own verified name, tagline and category vocabulary, not
+machine-translated marketing copy — pointing into the fully-built Dutch
+site. Full `HomePage`/`PropertiesPage`/`PropertyDetailPage` routing in these
+three languages is real follow-up work: those components (and `Nav`/`Footer`)
+are typed and built for exactly `hu`/`nl` today, with a `UI[locale]` string
+table and a number of small inline `locale === 'hu' ? … : …` ternaries
+throughout — extending that safely to three more languages needs live
+testing in each, not a blind edit.
 
 ### Why you can't just open the HTML file any more
 
@@ -68,40 +169,53 @@ serves the real production output.
 
 ---
 
-## Architecture
+## Repository layout
 
-Static HTML for every route; the four form endpoints are the only server code.
-**No UI framework** — the interactive pieces are small vanilla scripts over
-pre-rendered markup, so listings stay in the HTML for crawlers and the client JS
-budget is effectively zero.
+**No UI framework** — every interactive piece, on both the public site and
+the portal, is a small vanilla script over server-rendered markup. MapLibre
+GL is the one deliberate exception (a real ~250 kB-gzipped library), loaded
+only on pages that show a map.
 
 ```
 src/
-  config/company.ts     Single source of truth for every company fact.
-                        Nothing is invented; unverified values are null.
-  i18n/ui.ts            Nav, categories, route slugs, UI strings. FODEL's own
-                        vocabulary per market, taken verbatim from their sites.
-  content.config.ts     Property + article schemas
-  content/properties/   Six listings, one Markdown file each
-  data/                 copy.ts · faq.ts · features.ts · pages-content.ts
-                        pages-legal.ts
-  lib/                  properties · seo · format · page · form-handler
-  layouts/Base.astro    head, canonical, hreflang, JSON-LD, consent, skip link
-  components/           Design system, ported 1:1 from the prototype
-  components/pages/     One component per page type, shared across locales
-  pages/{hu,nl}/…       Thin route files
-  pages/api/            enquiry · callback · listing-order · search-request
-scripts/                verify-ssg · verify-contrast · build-og
+  config/company.ts        Single source of truth for every company fact.
+                            Nothing is invented; unverified values are null.
+  i18n/ui.ts                Nav, categories, route slugs, UI strings for hu/nl
+                            (full) and de/en/fr (brand strings only — see
+                            "Locales" above).
+  content.config.ts         Article schema. Properties moved to Supabase —
+                            there is no properties content collection any more.
+  data/                     copy.ts · faq.ts · features.ts · pages-content.ts
+                            pages-legal.ts
+  lib/                      properties.ts (public, RLS-scoped reads + search)
+                            · supabase.ts (anon client) · supabase-server.ts
+                            (portal's session + admin clients) · media.ts
+                            (upload processing) · email/ (lifecycle emails)
+                            · stripe.ts · map-style.ts · seo.ts · format.ts
+                            · page.ts · form-handler.ts
+  middleware.ts              Portal auth/role gate — a convenience layer;
+                            RLS is the real boundary
+  layouts/Base.astro         Public-site head, canonical, hreflang, JSON-LD
+  layouts/Portal.astro       Portal shell — reuses the same design tokens,
+                            simpler and denser, always noindex
+  components/                Design system, ported 1:1 from the prototype
+  components/pages/          One component per page type, shared across locales
+  components/portal/…, pages/portal/…    Portal screens (see Architecture above)
+  pages/{hu,nl}/…            Thin route files
+  pages/{de,en,fr}/          One bridge page each
+  pages/api/                 Public forms + /api/portal/* + /api/stripe/*
+                            + /api/map/properties.geojson
+scripts/                     verify-ssg · verify-contrast · verify-rls
+                            · verify-workflow · build-pmtiles · seed-500
+                            · build-og
+supabase/migrations/         Schema, RLS policies, search function — run
+                            these in order against a real project (see
+                            "Database setup" above)
 ```
 
-**Adding a locale** (de/en/fr): add it to `LOCALES` in `src/config/site.mjs`,
-fill in `ROUTES` and `UI` in `src/i18n/ui.ts` (brand strings are already there),
-add the locale to `COPY`, and create the thin route files under `src/pages/<loc>/`.
-hreflang and the sitemap pick it up automatically.
-
-**Adding a property**: drop a Markdown file in `src/content/properties/`. The
-schema is enforced at build time, so a missing EPC class or coordinates fails
-the build rather than shipping quietly.
+**Adding a property**: through the portal (`/portal/properties/new`) once an
+account exists — not a file any more. The six launch demo listings were
+seeded once via `supabase/migrations/0002_seed_properties.sql`.
 
 ---
 
@@ -169,35 +283,49 @@ re-declared italic inline on every use — and stays removed.
 
 ## Verification
 
-`npm run verify` checks, in order: content present in static HTML without JS ·
-no dev-mode framework anywhere · unique title/description/canonical per page ·
+`npm run verify` checks, in order: content present in rendered HTML without JS
+(static pages read from `dist/`; Supabase-backed pages are fetched from a real
+dev server — see the comment at the top of `scripts/verify-ssg.mjs`) · no
+dev-mode framework anywhere · unique title/description/canonical per page ·
 hreflang reciprocity · JSON-LD validity, numeric prices, coordinates · alt text
 and explicit dimensions on every image · modern image formats · crawlable links
-· required assets · client JS budget · legal preflight.
+· required assets · client JS budget (two budgets since Stage 7: near-zero for
+everything except a map, a generous gzipped ceiling for pages that show one) ·
+legal preflight. `npm run verify:rls` and `npm run verify:workflow` need a
+configured Supabase project and aren't part of the default `verify` chain for
+that reason — run them once the database is set up.
 
 `npm run verify:contrast` asserts the design tokens clear WCAG AA and guards
 against the prototype's failing alpha values returning.
 
-Last measured (Lighthouse mobile, throttled, local server — a real host with
-Brotli and a CDN will be faster):
+The Lighthouse numbers and axe-core pass below were measured before the
+Stage 1 rebuild (Markdown-backed, fully static, zero client JS) and have not
+been re-measured since — the architecture changed too much for the old
+numbers to still describe the site honestly (SSR on data-driven pages, a real
+map bundle on pages that show one). Re-measuring against a deployed instance
+with real Supabase data is a "before go-live" task, not something to
+guess at:
 
 | | Perf | A11y | Best practices | SEO | LCP | CLS | TBT |
 |---|---|---|---|---|---|---|---|
-| `/hu/` | 93 | 100 | 100 | 100 | 3.1s | 0.012 | 0ms |
-| `/hu/haz-elado-6412/` | 96 | 100 | 100 | 100 | 2.6s | 0.001 | 0ms |
-| `/nl/woningen/` | 97 | 99 | 100 | 100 | 2.6s | 0.001 | 0ms |
+| `/hu/` (pre-Stage-1) | 93 | 100 | 100 | 100 | 3.1s | 0.012 | 0ms |
+| `/hu/haz-elado-6412/` (pre-Stage-1) | 96 | 100 | 100 | 100 | 2.6s | 0.001 | 0ms |
+| `/nl/woningen/` (pre-Stage-1) | 97 | 99 | 100 | 100 | 2.6s | 0.001 | 0ms |
 
-`dist/` is 8.6 MB total for 62 pages, with **zero** client JavaScript files.
-
-axe-core: **0 violations** across 13 routes including 390px mobile.
+axe-core (pre-Stage-1): **0 violations** across 13 routes including 390px mobile.
 
 ---
 
 ## Deploying
 
-Netlify is configured (`@astrojs/netlify`). Set `RESEND_API_KEY`, `FODEL_INBOX`
-and `FODEL_FROM` in the site environment. To move host, swap the adapter in
-`astro.config.mjs` — nothing else is host-specific.
+Netlify is configured (`@astrojs/netlify`). Set every variable from
+`.env.example` in the site's environment — at minimum `SUPABASE_URL`,
+`SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`,
+`FODEL_INBOX` and `FODEL_FROM`; `PMTILES_URL` once the basemap is built and
+uploaded; the `STRIPE_*` vars only if card payment is deliberately turned on.
+To move host, swap the adapter in `astro.config.mjs` — nothing else is
+host-specific, though `output: 'server'` (needed for the database-backed
+pages) means the new host must support SSR, not just static hosting.
 
 **After launch:** submit `https://fodel.nl/sitemap-index.xml` to Search Console,
 and set up the 301 map from the old fodel.nl URLs when the real inventory

@@ -1,33 +1,40 @@
 ---
 /**
- * Property detail routes.
+ * Property detail route.
  *
  * Slug mirrors FODEL's existing pattern (fodel.nl/woonhuis-te-koop-1550), so
  * when their real inventory migrates the 301 map is mechanical.
+ *
+ * Rendered on request now, not built once from a fixed list of Markdown
+ * files: the property might have just been approved in the portal. A short
+ * CDN cache keeps this as fast as the old static page.
  */
-import type { GetStaticPaths } from 'astro';
-import { render } from 'astro:content';
+export const prerender = false;
+
 import PropertyDetailPage from '~/components/pages/PropertyDetailPage.astro';
-import { activeProperties } from '~/lib/properties';
+import { activeProperties, text } from '~/lib/properties';
 import { CATEGORIES, ROUTES } from '~/i18n/ui';
 
-export const getStaticPaths: GetStaticPaths = async () => {
-  const properties = await activeProperties();
-  return properties.map((property) => ({
-    params: {
-      slug: ROUTES['nl'].detail(
-        CATEGORIES[property.data.category as keyof typeof CATEGORIES]['nl'].slug,
-        property.data.ref
-      ),
-    },
-    props: { property },
-  }));
-};
+const { slug } = Astro.params;
+const properties = await activeProperties();
+const property = properties.find(
+  (p) =>
+    slug ===
+    ROUTES['nl'].detail(CATEGORIES[p.data.category as keyof typeof CATEGORIES]['nl'].slug, p.data.ref)
+);
 
-const { property } = Astro.props;
-const { Content } = await render(property);
+if (!property) {
+  Astro.response.status = 404;
+  return Astro.rewrite('/404');
+}
+
+Astro.response.headers.set('Cache-Control', 's-maxage=300, stale-while-revalidate=86400');
+
+// The long-form prose below the summary, falling back to Hungarian when a
+// locale has none — see the note in supabase/migrations/0002_seed_properties.sql.
+const paragraphs = text(property.data.body, 'nl').split('\n\n').filter(Boolean);
 ---
 
 <PropertyDetailPage locale="nl" property={property}>
-  <Content />
+  {paragraphs.map((para) => <p>{para}</p>)}
 </PropertyDetailPage>

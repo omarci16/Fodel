@@ -79,13 +79,15 @@ const schema = [websiteSchema(locale, path(locale, 'properties'))];
     {
       hero && (
         <div class="hero-media">
+          {/* astro:assets' <Image> has separate local/remote overloads; a src that can be either doesn't match either cleanly — the `as any` is a type-checker limitation, not a runtime one. */}
           <Image
-            src={hero.data.media.hero}
+            src={hero.data.media.hero as any}
             alt={text(hero.data.media.heroAlt, locale)}
             widths={HERO_WIDTHS}
             sizes={HERO_SIZES}
             loading="eager"
             fetchpriority="high"
+            inferSize={typeof hero.data.media.hero === 'string'}
             class="hero-img"
           />
           <div class="hero-scrim" aria-hidden="true"></div>

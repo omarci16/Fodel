@@ -8,17 +8,24 @@ import { SITE_URL, LOCALES, DEFAULT_LOCALE } from './src/config/site.mjs';
 /**
  * FODEL 1.0
  *
- * Static by default — every page is real HTML in the response, which is the
- * whole point of the rebuild. Only the four form endpoints under /api opt out
- * via `export const prerender = false`; the Netlify adapter serves those.
+ * Hybrid rendering, not fully static any more: property data now lives in
+ * Supabase, not in files the build can read once and freeze. Content pages
+ * (about, sellers, legal, blog, …) still declare `export const prerender =
+ * true` and are exactly as static as before. Pages that read from Supabase —
+ * home, property list, property detail, sold archive — render on request
+ * with a short CDN cache (`s-maxage=300`), so an admin approving a listing
+ * shows up live within minutes without a full rebuild. The four form
+ * endpoints under /api were already `prerender = false`; nothing changes for
+ * them.
  *
  * No UI framework is installed on purpose. The interactive pieces (filters,
- * gallery, mobile nav, consent) are small vanilla scripts over pre-rendered
- * markup, so listings stay in the HTML for crawlers and JS stays near zero.
+ * gallery, mobile nav, consent) are small vanilla scripts over server-
+ * rendered markup, so listings stay in the HTML for crawlers and JS stays
+ * near zero.
  */
 export default defineConfig({
   site: SITE_URL,
-  output: 'static',
+  output: 'server',
   // imageCDN: false — the adapter otherwise hands every <Image> to Netlify's
   // image CDN at runtime, which ships the unoptimised originals in dist/ and
   // ties the build to one host. We optimise with sharp instead.
@@ -27,12 +34,20 @@ export default defineConfig({
   i18n: {
     defaultLocale: DEFAULT_LOCALE,
     locales: [...LOCALES],
-    routing: {
-      // /hu/ and /nl/ are both explicit. No bare-root content: the root
-      // redirects, so we never serve the same page on two URLs.
-      prefixDefaultLocale: true,
-      redirectToDefaultLocale: false,
-    },
+    // Manual, not the automatic `{ prefixDefaultLocale, redirectToDefaultLocale }`
+    // strategy this started with. That automatic mode does more than its name
+    // suggests: for every *page* route (not API routes) it silently 404s any
+    // path whose segments don't include a configured locale — found while
+    // wiring up the portal (Stage 2) and /de,/en,/fr (Stage 8), both entirely
+    // outside /hu/ or /nl/, which the automatic strategy was quietly killing
+    // even though a real page existed at each. Nothing in this codebase uses
+    // Astro's built-in i18n helpers (Astro.currentLocale, getRelativeLocaleUrl
+    // — checked, zero references): routing, URLs and hreflang are all
+    // hand-rolled in src/i18n/ui.ts and src/lib/page.ts, and the root's own
+    // redirect is hand-rolled in src/pages/index.astro. So `manual` disables
+    // exactly the one behaviour that was doing anything here, and it was
+    // actively wrong.
+    routing: 'manual',
   },
 
   integrations: [
@@ -52,6 +67,11 @@ export default defineConfig({
     service: { entrypoint: 'astro/assets/services/sharp' },
     responsiveStyles: true,
     layout: 'constrained',
+    // Property photos a seller uploads through the portal (Stage 3) live in
+    // Supabase Storage, not the repo, so <Image> needs to be allowed to
+    // fetch and transform them on request — the same sharp service handles
+    // both local demo photos and these at request time under SSR.
+    remotePatterns: [{ protocol: 'https', hostname: '*.supabase.co' }],
   },
 
   build: {

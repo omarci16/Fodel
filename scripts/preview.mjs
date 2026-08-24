@@ -12,6 +12,12 @@
  *
  * Zero dependencies — node:http only. `astro preview` refuses to run while the
  * Netlify adapter is configured, so this stands in for it.
+ *
+ * Since Stage 1, this only serves the pages that are still static: about,
+ * sellers, legal, blog, and so on. Home, the property list, property detail
+ * pages and the sold archive now read from Supabase and render on request —
+ * they are Netlify functions in the real build, not files in dist/, so this
+ * server can't show them. Use `npm run dev` to see those.
  */
 import http from 'node:http';
 import fs from 'node:fs/promises';
@@ -86,6 +92,17 @@ const server = http.createServer(async (req, res) => {
   const file = await resolve(urlPath);
 
   if (!file) {
+    // These routes are real in the actual build (Netlify functions reading
+    // from Supabase) but don't exist as files here, so a plain 404 would be
+    // misleading — tell the developer why and what to do instead.
+    if (/^\/(hu|nl)\/(ingatlanok|woningen|eladva|verkocht)?\/?$|-(elado|te-koop)-\d+\/?$/.test(urlPath)) {
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      res.end(
+        `<p>This page reads from Supabase and only renders on request — it isn't a file in dist/.</p>` +
+          `<p>Run <code>npm run dev</code> instead to see it.</p>`
+      );
+      return;
+    }
     const notFound = path.join(dist, '404.html');
     const body = await fs.readFile(notFound).catch(() => Buffer.from('404'));
     res.writeHead(404, { 'content-type': 'text/html; charset=utf-8' });

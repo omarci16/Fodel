@@ -28,6 +28,13 @@ export interface FormDefinition {
   /** Subject line prefix in the notification email. */
   subject: string;
   fields: FieldRule[];
+  /**
+   * Fires after FODEL's notification email is sent, before the response goes
+   * out. Used by the enquiry form to also persist to Supabase and notify the
+   * property's owner — a side effect specific to one form, so it lives here
+   * as an opt-in hook rather than complicating this shared handler.
+   */
+  onSuccess?: (values: Record<string, string>, extras: Record<string, string>) => Promise<void>;
 }
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/;
@@ -236,6 +243,16 @@ export async function handleForm(
         subject: ack.subject,
         html: ack.body(result.values.name ?? ''),
       });
+    }
+
+    if (def.onSuccess) {
+      // Best-effort — a failure here shouldn't turn a successfully-delivered
+      // enquiry into an error response for the visitor who submitted it.
+      try {
+        await def.onSuccess(result.values, extras);
+      } catch (error) {
+        console.error(`[form:${def.id}] onSuccess hook failed`, error);
+      }
     }
 
     return respond(200, { ok: true, delivered: true });

@@ -1,0 +1,230 @@
+---
+/**
+ * DE/EN/FR "structural support only" (Stage 8) — per the build plan, these
+ * three markets get FODEL's own captured taglines and navigation, not
+ * machine-translated marketing prose. Rather than routing these locales
+ * through the full component tree (HomePage, PropertiesPage,
+ * PropertyDetailPage, Nav, Footer), which has Hungarian/Dutch text
+ * hardcoded inline in a number of small ternaries and would need careful,
+ * page-by-page verification in three more languages to do safely, this is a
+ * single self-contained page: FODEL's own verified name, tagline and
+ * category vocabulary (already captured in BRAND/CATEGORIES for these
+ * locales), the verified contact facts (locale-neutral), and a clear path
+ * into the two fully-built markets. It is genuinely useful to a DE/EN/FR
+ * visitor today, and it is honest about what exists — full HomePage /
+ * PropertiesPage / PropertyDetailPage routing in these languages is real
+ * follow-up work, not something to fake with a thin wrapper.
+ *
+ * No hreflang alternates: this page has no true equivalent in hu/nl (they
+ * are the full site, this is a bridge to it), so it stays self-canonical.
+ *
+ * Deliberately does NOT use Base.astro/Nav.astro/Footer.astro: all three are
+ * typed and built for exactly hu/nl (UI[locale] lookups, <html lang>, nav
+ * labels), and forcing a de/en/fr page through them would either crash or —
+ * worse — silently render Hungarian nav chrome around German/English/French
+ * content with the wrong <html lang>. This is a small, self-contained
+ * document instead, the same pattern src/pages/index.astro already uses for
+ * the same reason (a page that sits outside the hu/nl-only shell).
+ */
+import { BRAND, CATEGORIES, LOCALE_META, type PlannedLocale } from '~/i18n/ui';
+import { COMPANY } from '~/config/company';
+import { abs } from '~/lib/seo';
+import '~/styles/global.css';
+
+interface Props {
+  locale: Extract<PlannedLocale, 'de' | 'en' | 'fr'>;
+}
+
+const { locale } = Astro.props;
+const brand = BRAND[locale];
+const meta = LOCALE_META[locale];
+const canonical = abs(Astro.url.pathname);
+
+const organisationSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'RealEstateAgent',
+  name: brand.name,
+  legalName: COMPANY.names.legal,
+  description: brand.tagline,
+  url: canonical,
+  email: COMPANY.email.primary,
+  telephone: COMPANY.phones.map((p) => p.display),
+  address: {
+    '@type': 'PostalAddress',
+    streetAddress: COMPANY.address.street,
+    postalCode: COMPANY.address.postalCode,
+    addressLocality: COMPANY.address.city,
+    addressCountry: COMPANY.address.countryCode,
+  },
+};
+
+const STRINGS = {
+  de: {
+    intro:
+      'FODEL vermittelt ungarische Immobilien an Käufer in den Niederlanden, Belgien, Deutschland, Österreich, der Schweiz, Großbritannien und den USA — ohne Alleinauftrag.',
+    browse: 'Zum vollständigen Angebot (Niederländisch)',
+    contact: 'Kontakt aufnehmen',
+    categories: 'Immobilienarten',
+    languageNote: 'Diese Seite ist derzeit auf Ungarisch und Niederländisch vollständig verfügbar.',
+  },
+  en: {
+    intro:
+      'FODEL advertises Hungarian property to buyers across the Netherlands, Belgium, Germany, Austria, Switzerland, the UK and the US — with no exclusivity contract.',
+    browse: 'Browse the full listings (Dutch)',
+    contact: 'Get in touch',
+    categories: 'Property types',
+    languageNote: 'This site is currently fully available in Hungarian and Dutch.',
+  },
+  fr: {
+    intro:
+      "FODEL annonce des biens immobiliers hongrois auprès d'acheteurs néerlandais, belges, allemands et suisses — sans contrat d'exclusivité.",
+    browse: 'Voir toutes les annonces (en néerlandais)',
+    contact: 'Nous contacter',
+    categories: "Types de biens",
+    languageNote: 'Ce site est actuellement disponible intégralement en hongrois et en néerlandais.',
+  },
+}[locale];
+---
+
+<!doctype html>
+<html lang={meta.htmlLang}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{brand.name} — {brand.tagline}</title>
+    <meta name="description" content={STRINGS.intro} />
+    <link rel="canonical" href={canonical} />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={brand.name} />
+    <meta property="og:locale" content={meta.ogLocale} />
+    <meta property="og:title" content={`${brand.name} — ${brand.tagline}`} />
+    <meta property="og:description" content={STRINGS.intro} />
+    <meta property="og:url" content={canonical} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <script type="application/ld+json" set:html={JSON.stringify(organisationSchema)} is:inline />
+  </head>
+  <body>
+    <main class="bridge">
+      <p class="eyebrow">{brand.positioning}</p>
+      <h1>{brand.tagline}</h1>
+      <p class="signature">{brand.signature}</p>
+      <p class="intro">{STRINGS.intro}</p>
+      <p class="note">{STRINGS.languageNote}</p>
+
+      <div class="actions">
+        <a class="btn" href="/nl/">{STRINGS.browse}</a>
+        <a class="btn outline" href="/nl/contact/">{STRINGS.contact}</a>
+      </div>
+
+      <section class="categories">
+        <h2>{STRINGS.categories}</h2>
+        <ul>
+          {Object.values(CATEGORIES).map((c) => <li>{(c as any)[locale]?.label ?? (c as any).en.label}</li>)}
+        </ul>
+      </section>
+
+      <section class="contact-facts">
+        {COMPANY.phones.slice(0, 1).map((p) => <a href={p.href}>{p.display}</a>)}
+        <a href={`mailto:${COMPANY.email.primary}`}>{COMPANY.email.primary}</a>
+        <p class="address">{COMPANY.address.oneLine}</p>
+      </section>
+    </main>
+  </body>
+</html>
+
+<style>
+  .bridge {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 96px var(--pad-x) var(--section-y);
+    text-align: center;
+  }
+  .eyebrow {
+    font-size: var(--fs-eyebrow);
+    letter-spacing: var(--ls-eyebrow);
+    text-transform: uppercase;
+    color: var(--taupe);
+    margin-bottom: 16px;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-weight: var(--fw-display);
+    font-size: clamp(30px, 4vw, 46px);
+    line-height: 1.15;
+    color: var(--ink);
+    margin-bottom: 12px;
+  }
+  .signature {
+    font-size: var(--fs-lead);
+    color: var(--taupe);
+    margin-bottom: 32px;
+  }
+  .intro {
+    font-size: var(--fs-body-lg);
+    line-height: 1.85;
+    color: var(--taupe);
+    margin-bottom: 12px;
+  }
+  .note {
+    font-size: var(--fs-small);
+    color: var(--taupe);
+    margin-bottom: 32px;
+  }
+  .actions {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 64px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    padding: 14px 30px;
+    font-size: var(--fs-micro);
+    letter-spacing: var(--ls-button);
+    text-transform: uppercase;
+    background: var(--ink);
+    color: var(--cream);
+  }
+  .btn.outline {
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid var(--ink);
+  }
+  .categories {
+    padding-top: 40px;
+    border-top: 1px solid var(--border);
+    margin-bottom: 40px;
+  }
+  .categories h2 {
+    font-size: var(--fs-eyebrow);
+    letter-spacing: var(--ls-label);
+    text-transform: uppercase;
+    color: var(--taupe);
+    margin-bottom: 16px;
+  }
+  .categories ul {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px 10px;
+    list-style: none;
+  }
+  .categories li {
+    font-size: var(--fs-small);
+    color: var(--ink);
+    border: 1px solid var(--border);
+    padding: 6px 14px;
+  }
+  .contact-facts {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: var(--fs-small);
+    color: var(--taupe);
+  }
+  .contact-facts a {
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+</style>
