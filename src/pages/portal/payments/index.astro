@@ -1,0 +1,156 @@
+---
+/**
+ * Admin ledger — every order FODEL has raised, and where each one stands.
+ *
+ * "Manual" is not an anomaly on this screen, it is the normal case: bank
+ * transfer is FODEL's published payment method and card is the addition. The
+ * status column distinguishes how money arrived, not whether it did.
+ *
+ * Deliberately not linked for owners — they see their own outstanding amount
+ * on the listing itself, which is where the pay button lives.
+ */
+export const prerender = false;
+
+import Portal from '~/layouts/Portal.astro';
+import { formatCents, type OrderLine } from '~/lib/orders';
+
+const { supabase, profile } = Astro.locals;
+if (profile?.role !== 'admin') return Astro.redirect('/portal/dashboard');
+
+const filter = Astro.url.searchParams.get('status') ?? '';
+
+let query = supabase
+  .from('payments')
+  .select('id, property_id, owner_id, amount_cents, currency, status, line_items, created_at, paid_at')
+  .order('created_at', { ascending: false })
+  .limit(300);
+if (filter) query = query.eq('status', filter);
+
+const { data: orders } = await query;
+
+const propertyIds = [...new Set((orders ?? []).map((o) => o.property_id).filter(Boolean))];
+const ownerIds = [...new Set((orders ?? []).map((o) => o.owner_id).filter(Boolean))];
+
+const { data: properties } = propertyIds.length
+  ? await supabase.from('properties').select('id, ref, settlement, status').in('id', propertyIds)
+  : { data: [] };
+const { data: owners } = ownerIds.length
+  ? await supabase.from('profiles').select('id, full_name, email').in('id', ownerIds)
+  : { data: [] };
+
+const propertyById = new Map((properties ?? []).map((p: any) => [p.id, p]));
+const ownerById = new Map((owners ?? []).map((o: any) => [o.id, o]));
+
+const STATUS_LABEL: Record<string, string> = {
+  pending: 'Fizetésre vár',
+  paid: 'Fizetve (kártya)',
+  manual: 'Fizetve (átutalás)',
+  cancelled: 'Visszavonva',
+};
+
+// Settled money only — a pending order is an invoice, not income.
+const settled = (orders ?? []).filter((o) => o.status === 'paid' || o.status === 'manual');
+const settledTotal = settled.reduce((sum, o) => sum + o.amount_cents, 0);
+const outstanding = (orders ?? [])
+  .filter((o) => o.status === 'pending')
+  .reduce((sum, o) => sum + o.amount_cents, 0);
+
+const dateFmt = new Intl.DateTimeFormat('hu-HU', { year: 'numeric', month: 'short', day: 'numeric' });
+
+const summarise = (lines: OrderLine[]) =>
+  lines.map((l) => (l.quantity > 1 ? `${l.label} ×${l.quantity}` : l.label)).join(' · ');
+---
+
+<Portal title="Fizetések">
+  <header class="head">
+    <p class="eyebrow">Fizetések</p>
+    <h1>{orders?.length ?? 0} tétel</h1>
+  </header>
+
+  <section class="totals">
+    <div class="total">
+      <span class="n">{formatCents(settledTotal)}</span>
+      <span class="label">Beérkezett{filter ? ' (szűrve)' : ''}</span>
+    </div>
+    <div class="total">
+      <span class="n">{formatCents(outstanding)}</span>
+      <span class="label">Kintlévőség</span>
+    </div>
+  </section>
+
+  <div class="filters">
+    <a href="/portal/payments" aria-current={!filter ? 'page' : undefined}>Mind</a>
+    {Object.entries(STATUS_LABEL).map(([value, label]) => (
+      <a href={`/portal/payments?status=${value}`} aria-current={filter === value ? 'page' : undefined}>{label}</a>
+    ))}
+  </div>
+
+  {orders && orders.length > 0 ? (
+    <table class="list">
+      <thead>
+        <tr><th>Dátum</th><th>Hirdetés</th><th>Hirdető</th><th>Tételek</th><th class="right">Összeg</th><th>Állapot</th></tr>
+      </thead>
+      <tbody>
+        {orders.map((o) => {
+          const property = o.property_id ? propertyById.get(o.property_id) : null;
+          const owner = o.owner_id ? ownerById.get(o.owner_id) : null;
+          return (
+            <tr class:list={{ muted: o.status === 'cancelled' }}>
+              <td>
+                {dateFmt.format(new Date(o.created_at))}
+                {o.paid_at && <><br /><span class="sub">Fizetve: {dateFmt.format(new Date(o.paid_at))}</span></>}
+              </td>
+              <td>
+                {property ? (
+                  <a href={`/portal/properties/${o.property_id}`}>#{property.ref}</a>
+                ) : '—'}
+                {property && <><br /><span class="sub">{property.settlement}</span></>}
+              </td>
+              <td>{owner?.full_name ?? owner?.email ?? '—'}</td>
+              <td class="items">{summarise((o.line_items ?? []) as OrderLine[])}</td>
+              <td class="right amount">{formatCents(o.amount_cents)}</td>
+              <td><span class:list={['pill', `pill-${o.status}`]}>{STATUS_LABEL[o.status] ?? o.status}</span></td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  ) : (
+    <p class="empty">Ehhez a szűréshez nincs tétel.</p>
+  )}
+</Portal>
+
+<style>
+  .head { margin-bottom: 20px; }
+  .eyebrow { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--taupe); margin-bottom: 8px; }
+  h1 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 26px; color: var(--ink); }
+
+  .totals { display: flex; gap: 1px; background: var(--border); border: 1px solid var(--border); margin-bottom: 24px; max-width: 460px; }
+  .total { flex: 1; background: var(--cream); padding: 18px 20px; }
+  .total .n { display: block; font-family: var(--serif); font-weight: var(--fw-medium); font-size: 22px; color: var(--ink); }
+  .total .label { display: block; margin-top: 4px; font-size: var(--fs-micro); color: var(--taupe); }
+
+  .filters { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 22px; }
+  .filters a { padding: 7px 14px; font-size: var(--fs-micro); letter-spacing: 0.04em; color: var(--taupe); border: 1px solid var(--border); }
+  .filters a[aria-current='page'] { background: var(--ink); color: var(--cream); border-color: var(--ink); }
+
+  .empty { color: var(--taupe); font-size: var(--fs-small); padding: 32px 0; }
+
+  .list { width: 100%; border-collapse: collapse; font-size: var(--fs-small); }
+  .list th { text-align: left; font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; color: var(--taupe); padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .list td { padding: 12px; border-bottom: 1px solid var(--border); color: var(--ink); vertical-align: top; }
+  .list tr.muted td { opacity: 0.5; }
+  .list a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+  .sub { font-size: var(--fs-micro); color: var(--taupe); }
+  .items { font-size: var(--fs-micro); color: var(--taupe); max-width: 30ch; }
+  .right { text-align: right; }
+  .amount { white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+  .pill { display: inline-block; font-size: var(--fs-micro); padding: 3px 10px; border: 1px solid var(--border); white-space: nowrap; }
+  .pill-paid, .pill-manual { background: rgba(16, 42, 67, 0.08); border-color: var(--ink); }
+  .pill-pending { background: rgba(200, 150, 0, 0.1); border-color: #96700b; color: #6b4f08; }
+
+  @media (max-width: 860px) {
+    .list { display: block; overflow-x: auto; }
+  }
+</style>

@@ -14,9 +14,12 @@ export const prerender = false;
 
 import Portal from '~/layouts/Portal.astro';
 import Field from '~/components/forms/Field.astro';
-import { getProperty, STATUS_LABEL, CATEGORY_LABEL, EPC_OPTIONS, LOCALE_OPTIONS } from '~/lib/portal/properties';
+import { getProperty, STATUS_LABEL, CATEGORY_LABEL, EPC_OPTIONS, LOCALE_OPTIONS, OWNER_EDITABLE } from '~/lib/portal/properties';
 import { FEATURES, COUNTIES } from '~/data/features';
 import { resolveImage } from '~/lib/property-images';
+import { formatCents, type OrderLine } from '~/lib/orders';
+import { isStripeEnabled } from '~/lib/stripe';
+import { COMPANY } from '~/config/company';
 
 /** A demo photo (bare filename) needs Astro's asset pipeline to become a real URL; a real upload already is one. */
 function mediaSrc(storagePath: string): string {
@@ -38,14 +41,67 @@ if (!isAdmin && !isOwnProperty) {
   return new Response('Nincs hozzáférése ehhez az ingatlanhoz.', { status: 403 });
 }
 
-const editable = isAdmin || ['draft', 'changes_requested'].includes(property.status);
+const editable = isAdmin || OWNER_EDITABLE.includes(property.status);
 
 const saved = Astro.url.searchParams.get('saved') === '1';
 const err = Astro.url.searchParams.get('error');
+const payment = Astro.url.searchParams.get('payment');
 
 const trByLocale = Object.fromEntries(property.translations.map((t) => [t.locale, t]));
 const hero = property.media.find((m) => m.is_hero) ?? property.media[0];
 const gallery = property.media.filter((m) => m !== hero);
+
+/** The description an owner wrote for a photo. Empty until they fill it in. */
+const captionOf = (m: (typeof property.media)[number]) =>
+  (m.alt as Record<string, string> | null)?.hu ?? '';
+
+// Why the listing was sent back. In 1.0 the changes-requested email quoted the
+// admin's note but this screen — the one the email tells them to go to —
+// could not read it back, because review_notes was admin-only. Migration 0005
+// opens it to the listing's owner; this is what that fixes.
+const { data: reviewNotes } =
+  property.status === 'changes_requested'
+    ? await supabase
+        .from('review_notes')
+        .select('note, created_at')
+        .eq('property_id', property.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+    : { data: null };
+const latestNote = reviewNotes?.[0] ?? null;
+
+// What is outstanding on this listing, if anything.
+const { data: order } = await supabase
+  .from('payments')
+  .select('amount_cents, line_items, status')
+  .eq('property_id', property.id)
+  .in('status', ['pending', 'paid', 'manual'])
+  .order('created_at', { ascending: false })
+  .limit(1)
+  .maybeSingle();
+
+const awaitingPayment = property.status === 'awaiting_payment';
+const orderLines = (order?.line_items ?? []) as OrderLine[];
+const cardEnabled = isStripeEnabled();
+
+/**
+ * What still stands between this listing and being submitted.
+ *
+ * The endpoint already refuses a submission with no photos, but in 1.0 the
+ * owner only discovered that after clicking. Showing the same rules up front
+ * is the difference between a form that guides and a form that scolds.
+ */
+const blockers: string[] = [];
+if (property.media.length === 0) blockers.push('Legalább egy fényképet fel kell tölteni.');
+if (!trByLocale.hu?.title?.trim()) blockers.push('A magyar cím kitöltése kötelező.');
+if (!trByLocale.hu?.description?.trim()) blockers.push('A magyar rövid leírás kitöltése kötelező.');
+if (!property.settlement || !property.county || !property.region) {
+  blockers.push('A helyszín mezők (település, megye, régió) kitöltése kötelező.');
+}
+if (property.price_eur <= 1 || property.price_huf <= 1) blockers.push('Adja meg az irányárat.');
+
+/** Not a blocker — but it costs the listing real search traffic. */
+const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).length;
 ---
 
 <Portal title={`Ingatlan #${property.ref}`}>
@@ -61,11 +117,33 @@ const gallery = property.media.filter((m) => m !== hero);
 
   {saved && <p class="notice ok">Mentve.</p>}
   {err && <p class="notice error">Nem sikerült menteni: {err}</p>}
+  {payment === 'success' && (
+    <p class="notice ok">
+      Köszönjük, a fizetés megérkezett. A hirdetés élesítve — a visszaigazolást e-mailben is elküldtük.
+    </p>
+  )}
+  {payment === 'cancelled' && (
+    <p class="notice warn">
+      A fizetés félbeszakadt, a hirdetés még nem élesedett. Bármikor újrapróbálhatja alább.
+    </p>
+  )}
+
+  {latestNote && (
+    <section class="review-note">
+      <p class="eyebrow">Munkatársunk megjegyzése</p>
+      <blockquote>{latestNote.note}</blockquote>
+      <p class="review-note-foot">
+        Kérjük, végezze el a javítást, majd küldje be ismét — a folyamat innen ugyanúgy folytatódik.
+      </p>
+    </section>
+  )}
 
   {!editable && (
     <p class="notice warn">
       Ez a hirdetés jelenleg <strong>{STATUS_LABEL[property.status]}</strong> állapotban van, ezért
-      a mezők nem szerkeszthetők. {property.status === 'submitted' && 'Amint elbírálásra kerül, ismét szerkesztheti, ha javítás szükséges.'}
+      a mezők nem szerkeszthetők.
+      {property.status === 'submitted' && ' Amint elbírálásra kerül, ismét szerkesztheti, ha javítás szükséges.'}
+      {awaitingPayment && ' A díj rendezése után a hirdetés automatikusan élesedik.'}
     </p>
   )}
 
@@ -95,8 +173,11 @@ const gallery = property.media.filter((m) => m !== hero);
           <Field locale="hu" name="precision" label="Pontosság" type="select" value={property.precision}
             options={[{ value: 'approximate', label: 'Közelítő (a pontos cím rejtve marad)' }, { value: 'exact', label: 'Pontos' }]} />
           <Field locale="hu" name="lat" label="Szélesség (lat)" type="number" required value={String(property.lat)}
-            hint="Pl. 46.79 — Google Maps-en jobb klikk a helyre megadja." />
-          <Field locale="hu" name="lng" label="Hosszúság (lng)" type="number" required value={String(property.lng)} />
+            min={45.7} max={48.6}
+            hint="Pl. 46.79 — Google Maps-en jobb klikk a helyre megadja. Magyarországon belül: 45.7–48.6." />
+          <Field locale="hu" name="lng" label="Hosszúság (lng)" type="number" required value={String(property.lng)}
+            min={16} max={22.9}
+            hint="Magyarországon belül: 16–22.9." />
         </div>
       </section>
 
@@ -200,9 +281,77 @@ const gallery = property.media.filter((m) => m !== hero);
     </fieldset>
   </form>
 
+  {awaitingPayment && order && (
+    <section class="pay">
+      <h2>Fizetendő díj</h2>
+      <p class="hint">
+        Hirdetését jóváhagytuk. A fizetés beérkezése után azonnal megjelenik a fodel.nl oldalon.
+      </p>
+
+      <table class="order-table">
+        <tbody>
+          {orderLines.map((line) => (
+            <tr>
+              <td>{line.label}</td>
+              <td class="amount">{formatCents(line.unitCents * line.quantity)}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td>Fizetendő</td>
+            <td class="amount total">{formatCents(order.amount_cents)}</td>
+          </tr>
+        </tfoot>
+      </table>
+      <p class="vat-note">Az ár tartalmazza a 21% holland áfát.</p>
+
+      {cardEnabled ? (
+        <>
+          <button type="button" class="btn" id="pay-btn">Fizetés bankkártyával</button>
+          <p class="hint">
+            A fizetés a Stripe biztonságos felületén történik. A kártyaadatokat a FODEL nem látja
+            és nem tárolja.
+          </p>
+        </>
+      ) : (
+        <p class="hint">A díj banki átutalással rendezhető, az alábbi számlaszámok egyikére.</p>
+      )}
+
+      <h3>Banki átutalás</h3>
+      <dl class="bank">
+        <div><dt>IBAN</dt><dd>{COMPANY.banks.nl.iban}</dd></div>
+        <div><dt>BIC</dt><dd>{COMPANY.banks.nl.bic}</dd></div>
+        <div><dt>Magyar számla</dt><dd>{COMPANY.banks.hu.account}</dd></div>
+        <div><dt>Közlemény</dt><dd>#{property.ref}</dd></div>
+      </dl>
+      <p class="hint">
+        Az átutalás beérkezése után munkatársunk élesíti a hirdetést — ez néhány munkanapot vehet
+        igénybe. Bankkártyás fizetésnél a hirdetés azonnal megjelenik.
+      </p>
+      <p class="workflow-status" id="pay-status" role="status"></p>
+    </section>
+  )}
+
   <section class="workflow">
-    {['draft', 'changes_requested'].includes(property.status) && (
-      <button type="button" class="btn" id="submit-btn">Beküldés elbírálásra</button>
+    {OWNER_EDITABLE.includes(property.status) && (
+      <>
+        {blockers.length > 0 && (
+          <div class="checklist">
+            <p class="checklist-head">Beküldés előtt még hiányzik:</p>
+            <ul>{blockers.map((b) => <li>{b}</li>)}</ul>
+          </div>
+        )}
+        <button type="button" class="btn" id="submit-btn" disabled={blockers.length > 0}>
+          Beküldés elbírálásra
+        </button>
+        {blockers.length === 0 && missingCaptions > 0 && (
+          <p class="soft-warn">
+            {missingCaptions} fénykép még leírás nélkül van. Beküldheti így is, de a leírásokkal
+            a hirdetés jóval több érdeklődőt ér el a Google képkeresőjéből.
+          </p>
+        )}
+      </>
     )}
     {property.status === 'published' && (
       <button type="button" class="btn ghost" id="sold-btn">Megjelölés eladottként</button>
@@ -214,19 +363,34 @@ const gallery = property.media.filter((m) => m !== hero);
     <h2>Fényképek</h2>
     <p class="hint">Húzza ide a képeket, vagy kattintson a tallózáshoz. JPG, PNG vagy WebP, max. 12 MB.</p>
 
+    <p class="hint">
+      Írjon minden képhez egy rövid leírást (pl. „Nappali cserépkályhával”). Ezt olvassa fel a
+      képernyőolvasó a látássérült érdeklődőknek, és ez alapján találja meg a Google képkeresője
+      is a hirdetést.
+    </p>
+
     <div class="media-grid" id="media-grid" data-property-id={property.id}>
-      {hero && (
-        <figure class="media-item" data-media-id={hero.id} data-hero="true">
-          <img src={mediaSrc(hero.storage_path)} alt="" />
-          <span class="hero-badge">Címlapkép</span>
-          <button type="button" class="remove" data-remove-media={hero.id} aria-label="Törlés">×</button>
-        </figure>
-      )}
-      {gallery.map((m) => (
-        <figure class="media-item" data-media-id={m.id}>
-          <img src={mediaSrc(m.storage_path)} alt="" />
-          <button type="button" class="set-hero" data-set-hero={m.id}>Címlapképnek</button>
-          <button type="button" class="remove" data-remove-media={m.id} aria-label="Törlés">×</button>
+      {[hero, ...gallery].filter(Boolean).map((m) => (
+        <figure class="media-item" data-media-id={m!.id} data-hero={m === hero ? 'true' : undefined}>
+          <div class="media-thumb">
+            <img src={mediaSrc(m!.storage_path)} alt={captionOf(m!)} />
+            {m === hero && <span class="hero-badge">Címlapkép</span>}
+            {m !== hero && <button type="button" class="set-hero" data-set-hero={m!.id}>Címlapképnek</button>}
+            <button type="button" class="remove" data-remove-media={m!.id} aria-label="Kép törlése">×</button>
+          </div>
+          <figcaption>
+            <label class="sr-only" for={`caption-${m!.id}`}>Kép leírása</label>
+            <input
+              id={`caption-${m!.id}`}
+              class="caption"
+              type="text"
+              maxlength="160"
+              placeholder="Mi látható a képen?"
+              value={captionOf(m!)}
+              data-caption-for={m!.id}
+              disabled={!editable}
+            />
+          </figcaption>
         </figure>
       ))}
     </div>
@@ -313,6 +477,53 @@ const gallery = property.media.filter((m) => m !== hero);
     if (confirm('Megjelöli ezt a hirdetést eladottként? A hirdetés lekerül az élő listáról.')) doAction('mark_sold');
   });
 
+  // Captions save on blur rather than behind a button: they are a dozen small
+  // independent edits, and a "save all photos" button would be one more thing
+  // to forget before hitting submit.
+  grid?.addEventListener('change', async (e) => {
+    const input = e.target;
+    if (!(input instanceof HTMLInputElement)) return;
+    const mediaId = input.getAttribute('data-caption-for');
+    if (!mediaId) return;
+
+    input.classList.remove('saved', 'failed');
+    try {
+      const res = await fetch(`/api/portal/properties/${propertyId}/media/${mediaId}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ alt: input.value }),
+      });
+      if (!res.ok) throw new Error('save-failed');
+      input.classList.add('saved');
+    } catch {
+      input.classList.add('failed');
+      status.textContent = 'A képleírást nem sikerült menteni.';
+    }
+  });
+
+  // Card payment. The session is minted on click, not when the approval email
+  // was sent — a Stripe session created days earlier would already have expired.
+  const payBtn = document.getElementById('pay-btn');
+  payBtn?.addEventListener('click', async () => {
+    const payStatus = document.getElementById('pay-status');
+    payBtn.setAttribute('disabled', 'true');
+    payStatus.textContent = 'Átirányítás a fizetéshez…';
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ propertyId }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok || !json.url) throw new Error(json.error ?? 'checkout-failed');
+      window.location.href = json.url;
+    } catch (error) {
+      payBtn.removeAttribute('disabled');
+      payStatus.textContent =
+        'A bankkártyás fizetés most nem érhető el. Kérjük, utaljon a fenti számlaszámra, vagy próbálja újra később.';
+    }
+  });
+
   grid?.addEventListener('click', async (e) => {
     const target = e.target;
     if (!(target instanceof HTMLElement)) return;
@@ -376,12 +587,52 @@ const gallery = property.media.filter((m) => m !== hero);
   .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--ink); }
 
   .workflow { padding: 24px 0; border-top: 1px solid var(--border); }
-  .workflow-status { font-size: var(--fs-small); color: var(--taupe); margin-top: 12px; }
+  .workflow-status { font-size: var(--fs-small); color: var(--taupe); margin-top: 12px; min-height: 1.4em; }
+
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .checklist { padding: 14px 18px; background: var(--linen); border-left: 2px solid var(--taupe); margin-bottom: 18px; max-width: 68ch; }
+  .checklist-head { font-size: var(--fs-small); color: var(--ink); margin-bottom: 8px; }
+  .checklist ul { margin: 0; padding-left: 20px; }
+  .checklist li { font-size: var(--fs-small); line-height: 1.7; color: var(--taupe); }
+  .soft-warn { font-size: var(--fs-small); line-height: 1.7; color: #6b4f08; margin-top: 14px; max-width: 68ch; }
+
+  .review-note { padding: 20px 22px; background: rgba(179, 38, 30, 0.05); border-left: 2px solid #b3261e; margin-bottom: 24px; }
+  .review-note .eyebrow { color: #b3261e; margin-bottom: 10px; }
+  .review-note blockquote { font-size: var(--fs-body); line-height: 1.8; color: var(--ink); margin: 0 0 12px; white-space: pre-line; }
+  .review-note-foot { font-size: var(--fs-small); line-height: 1.7; color: var(--taupe); }
+
+  .pay { padding: 28px 0; border-top: 1px solid var(--border); }
+  .pay h2 { font-family: var(--serif); font-size: 19px; color: var(--ink); margin-bottom: 10px; }
+  .pay h3 { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--taupe); margin: 28px 0 12px; }
+
+  .order-table { width: 100%; max-width: 460px; border-collapse: collapse; margin-bottom: 6px; }
+  .order-table td { padding: 11px 0; font-size: var(--fs-body); color: var(--ink); border-bottom: 1px solid var(--border); }
+  .order-table .amount { text-align: right; white-space: nowrap; }
+  .order-table tfoot td { border-bottom: none; padding-top: 14px; }
+  .order-table .total { font-family: var(--serif); font-size: 20px; font-weight: var(--fw-medium); }
+  .vat-note { font-size: var(--fs-micro); color: var(--taupe); margin-bottom: 22px; }
+
+  .bank { display: grid; grid-template-columns: max-content 1fr; gap: 8px 20px; max-width: 460px; margin-bottom: 16px; }
+  .bank > div { display: contents; }
+  .bank dt { font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; color: var(--taupe); }
+  .bank dd { font-size: var(--fs-small); color: var(--ink); }
 
   .media-section { padding-top: 28px; border-top: 1px solid var(--border); margin-top: 8px; }
-  .media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; margin: 18px 0; }
-  .media-item { position: relative; aspect-ratio: 4/3; background: var(--mist); overflow: hidden; }
+  .media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 18px 14px; margin: 18px 0; }
+  .media-item { display: flex; flex-direction: column; gap: 8px; }
+  .media-thumb { position: relative; aspect-ratio: 4/3; background: var(--mist); overflow: hidden; }
   .media-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  .caption { width: 100%; border: 1px solid var(--border); background: #fff; padding: 8px 10px; font-size: var(--fs-small); color: var(--ink); }
+  .caption:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+  .caption:disabled { background: var(--linen); color: var(--taupe); }
+  /* A brief confirmation on the field itself — a photo grid full of toasts is
+     unreadable, and the field is where the eye already is. */
+  .caption.saved { border-color: var(--ink); }
+  .caption.failed { border-color: #b3261e; }
+
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
   .hero-badge { position: absolute; top: 6px; left: 6px; background: var(--ink); color: var(--cream); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 8px; }
   .set-hero { position: absolute; bottom: 6px; left: 6px; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; background: rgba(244,244,242,0.92); color: var(--ink); padding: 4px 8px; }
   .remove { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; background: rgba(16,42,67,0.85); color: var(--cream); border-radius: 50%; line-height: 1; }

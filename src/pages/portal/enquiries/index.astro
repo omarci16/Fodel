@@ -1,0 +1,181 @@
+---
+/**
+ * Enquiries — buyers who contacted FODEL about a listing.
+ *
+ * Everything on this screen already existed in 1.0 and nothing displayed it:
+ * the `enquiries` table was populated by /api/enquiry, and the RLS policy
+ * already let an owner read enquiries on their own listings. The data was
+ * simply invisible unless someone opened the Supabase dashboard.
+ *
+ * No role check here on purpose. The query returns what RLS permits — every
+ * enquiry for an admin, only their own listings' for an owner — which is the
+ * same rule the database enforces regardless of what this page believes.
+ */
+export const prerender = false;
+
+import Portal from '~/layouts/Portal.astro';
+
+const { supabase, profile } = Astro.locals;
+const isAdmin = profile?.role === 'admin';
+
+const filter = Astro.url.searchParams.get('show') ?? 'open';
+
+let query = supabase
+  .from('enquiries')
+  .select('id, name, email, phone, message, locale, handled, created_at, property_id')
+  .order('created_at', { ascending: false })
+  .limit(200);
+if (filter === 'open') query = query.eq('handled', false);
+
+const { data: enquiries } = await query;
+
+// One lookup for the listings involved, rather than a join per row.
+const propertyIds = [...new Set((enquiries ?? []).map((e) => e.property_id).filter(Boolean))];
+const { data: properties } = propertyIds.length
+  ? await supabase
+      .from('properties')
+      .select('id, ref, settlement, property_translations(locale, title)')
+      .in('id', propertyIds)
+  : { data: [] };
+
+const propertyById = new Map(
+  (properties ?? []).map((p: any) => [
+    p.id,
+    {
+      ref: p.ref,
+      settlement: p.settlement,
+      title:
+        p.property_translations?.find((t: any) => t.locale === 'hu')?.title ??
+        `#${p.ref}`,
+    },
+  ])
+);
+
+const dateFmt = new Intl.DateTimeFormat('hu-HU', {
+  year: 'numeric',
+  month: 'short',
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+---
+
+<Portal title="Érdeklődők">
+  <header class="head">
+    <p class="eyebrow">Érdeklődők</p>
+    <h1>{enquiries?.length ?? 0} érdeklődés</h1>
+  </header>
+
+  <div class="filters">
+    <a href="/portal/enquiries?show=open" aria-current={filter === 'open' ? 'page' : undefined}>Elintézetlen</a>
+    <a href="/portal/enquiries?show=all" aria-current={filter === 'all' ? 'page' : undefined}>Mind</a>
+  </div>
+
+  <p class="status-line" id="status" role="status"></p>
+
+  {enquiries && enquiries.length > 0 ? (
+    <ul class="cards">
+      {enquiries.map((e) => {
+        const property = e.property_id ? propertyById.get(e.property_id) : null;
+        return (
+          <li class:list={['card', e.handled && 'done']}>
+            <div class="card-head">
+              <div>
+                <p class="who">{e.name}</p>
+                <p class="meta">
+                  <a href={`mailto:${e.email}`}>{e.email}</a>
+                  {e.phone && <> · <a href={`tel:${e.phone}`}>{e.phone}</a></>}
+                  {' · '}{e.locale === 'nl' ? 'Holland' : 'Magyar'}
+                </p>
+              </div>
+              <p class="when">{dateFmt.format(new Date(e.created_at))}</p>
+            </div>
+
+            {property && (
+              <p class="about">
+                <a href={`/portal/properties/${e.property_id}`}>#{property.ref} — {property.title}</a>
+                <span class="meta"> · {property.settlement}</span>
+              </p>
+            )}
+
+            {e.message && <blockquote>{e.message}</blockquote>}
+
+            <div class="card-foot">
+              <a class="reply" href={`mailto:${e.email}?subject=${encodeURIComponent(
+                property ? `FODEL #${property.ref}` : 'FODEL'
+              )}`}>Válasz e-mailben</a>
+              <button type="button" data-enquiry={e.id} data-handled={String(!e.handled)}>
+                {e.handled ? 'Visszajelölés elintézetlenre' : 'Elintézettnek jelölöm'}
+              </button>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  ) : (
+    <p class="empty">
+      {filter === 'open'
+        ? 'Nincs elintézetlen érdeklődés. Szép munka.'
+        : isAdmin
+          ? 'Még nem érkezett érdeklődés egyik hirdetésre sem.'
+          : 'Még nem érkezett érdeklődés az Ön hirdetéseire. Amint valaki jelentkezik, e-mailben is értesítjük.'}
+    </p>
+  )}
+</Portal>
+
+<script>
+  const status = document.getElementById('status');
+
+  document.addEventListener('click', async (e) => {
+    const btn = e.target;
+    if (!(btn instanceof HTMLButtonElement)) return;
+    const id = btn.dataset.enquiry;
+    if (!id) return;
+
+    status!.textContent = 'Mentés…';
+    const res = await fetch(`/api/portal/enquiries/${id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ handled: btn.dataset.handled === 'true' }),
+    });
+    if (!res.ok) {
+      status!.textContent = 'Nem sikerült menteni.';
+      return;
+    }
+    location.reload();
+  });
+</script>
+
+<style>
+  .head { margin-bottom: 20px; }
+  .eyebrow { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--taupe); margin-bottom: 8px; }
+  h1 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 26px; color: var(--ink); }
+
+  .filters { display: flex; gap: 4px; margin-bottom: 20px; }
+  .filters a { padding: 7px 14px; font-size: var(--fs-micro); letter-spacing: 0.04em; color: var(--taupe); border: 1px solid var(--border); }
+  .filters a[aria-current='page'] { background: var(--ink); color: var(--cream); border-color: var(--ink); }
+
+  .status-line { font-size: var(--fs-small); color: var(--taupe); min-height: 1.4em; margin-bottom: 8px; }
+  .empty { color: var(--taupe); font-size: var(--fs-body); line-height: 1.8; padding: 32px 0; max-width: 60ch; }
+
+  .cards { list-style: none; display: flex; flex-direction: column; gap: 14px; }
+  .card { border: 1px solid var(--border); padding: 20px 22px; background: var(--cream); }
+  .card.done { opacity: 0.6; }
+
+  .card-head { display: flex; justify-content: space-between; gap: 20px; align-items: baseline; flex-wrap: wrap; }
+  .who { font-size: var(--fs-body-lg); color: var(--ink); }
+  .meta { font-size: var(--fs-small); color: var(--taupe); }
+  .meta a { color: var(--taupe); text-decoration: underline; text-underline-offset: 2px; }
+  .meta a:hover { color: var(--ink); }
+  .when { font-size: var(--fs-micro); color: var(--taupe); white-space: nowrap; }
+
+  .about { margin-top: 12px; font-size: var(--fs-small); }
+  .about a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+
+  blockquote { margin: 14px 0 0; padding-left: 16px; border-left: 2px solid var(--border); font-size: var(--fs-body); line-height: 1.8; color: var(--taupe); white-space: pre-line; }
+
+  .card-foot { display: flex; gap: 12px; align-items: center; margin-top: 18px; flex-wrap: wrap; }
+  .reply { font-size: var(--fs-micro); letter-spacing: var(--ls-button); text-transform: uppercase; background: var(--ink); color: var(--cream); padding: 9px 18px; }
+  .card-foot button { font-size: var(--fs-micro); letter-spacing: 0.04em; padding: 8px 14px; border: 1px solid var(--border); background: transparent; color: var(--taupe); cursor: pointer; }
+  .card-foot button:hover { border-color: var(--ink); color: var(--ink); }
+</style>

@@ -16,9 +16,11 @@ import { createSupabaseServerClient } from '~/lib/supabase-server';
 const PUBLIC_PORTAL_PATHS = [
   '/portal/login',
   '/portal/invite/', // /portal/invite/[token] — the token itself is the credential
+  '/portal/forgot',
+  '/portal/reset/', // /portal/reset/[token] — likewise
 ];
 
-const ADMIN_ONLY_PREFIXES = ['/portal/users', '/portal/review'];
+const ADMIN_ONLY_PREFIXES = ['/portal/users', '/portal/review', '/portal/payments'];
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const { pathname } = context.url;
@@ -51,8 +53,14 @@ export const onRequest = defineMiddleware(async (context, next) => {
     return context.redirect(`/portal/login?next=${encodeURIComponent(pathname)}`);
   }
 
+  // Every endpoint reachable while signed out. Each one authenticates by its
+  // own means — a single-use token, or the password itself — rather than by a
+  // session, which is precisely why it cannot require one.
   const isPublicPortalApi =
-    pathname.startsWith('/api/portal/invite') || pathname === '/api/portal/login';
+    pathname.startsWith('/api/portal/invite') ||
+    pathname === '/api/portal/login' ||
+    pathname === '/api/portal/forgot' ||
+    pathname === '/api/portal/reset';
   if (pathname.startsWith('/api/portal') && !isPublicPortalApi && !user) {
     return new Response(JSON.stringify({ ok: false, error: 'unauthenticated' }), {
       status: 401,

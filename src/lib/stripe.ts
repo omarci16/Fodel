@@ -1,13 +1,24 @@
 /**
- * Stripe plumbing (Stage 8) — inert by default. FODEL's live process is
- * form → díjbekérő by email → bank transfer, and that stays exactly as it
- * is; nothing here changes what a seller sees today. This exists so that if
- * FODEL later wants card payment as an option, turning it on is flipping
- * STRIPE_ENABLED to "true" and setting the two Stripe env vars — not writing
- * new code under launch pressure.
+ * Stripe client and the on/off switch.
+ *
+ * FODEL 1.1 uses card payment for one thing: an owner settling the order for a
+ * listing FODEL has already approved. Bank transfer remains the primary,
+ * published method and is a first-class path through the portal — this is the
+ * addition, not the replacement.
+ *
+ * Everything stays inert while STRIPE_ENABLED is anything but "true". With it
+ * off, an approved listing still moves to `awaiting_payment` and the owner
+ * still gets the "approved — here's what it costs" email; it simply carries
+ * bank details and no card button. Nothing breaks in either state, which is
+ * what makes the switch safe to flip without a release.
+ *
+ * Price resolution deliberately does NOT live here any more. In 1.0 this file
+ * resolved a catalogue item to an amount, which invited the pattern of a
+ * browser naming what it was buying. Orders are now built and stored by an
+ * admin at approval time — see src/lib/orders.ts — and Stripe is handed a
+ * stored order, never a request body.
  */
 import Stripe from 'stripe';
-import { LISTING_PACKAGES, LISTING_EXTRAS } from '~/config/company';
 
 export function isStripeEnabled(): boolean {
   return import.meta.env.STRIPE_ENABLED === 'true';
@@ -21,22 +32,4 @@ export function getStripe(): Stripe {
   if (!key) throw new Error('STRIPE_SECRET_KEY must be set to use Stripe (see .env.example).');
   client = new Stripe(key);
   return client;
-}
-
-export type CheckoutItem =
-  | { kind: 'package'; id: (typeof LISTING_PACKAGES)[number]['id']; aboveThreshold?: boolean }
-  | { kind: 'extra'; id: (typeof LISTING_EXTRAS)[number]['id']; quantity?: number };
-
-/** Resolves a catalog item to a price in cents — never trusts a client-supplied amount. */
-export function priceForItem(item: CheckoutItem): { cents: number; label: string } {
-  if (item.kind === 'package') {
-    const pkg = LISTING_PACKAGES.find((p) => p.id === item.id);
-    if (!pkg) throw new Error(`Unknown package: ${item.id}`);
-    const eur = 'priceEurAbove' in pkg && item.aboveThreshold ? pkg.priceEurAbove! : pkg.priceEur;
-    return { cents: eur * 100, label: `FODEL hirdetés — ${pkg.months} hónap` };
-  }
-  const extra = LISTING_EXTRAS.find((e) => e.id === item.id);
-  if (!extra) throw new Error(`Unknown extra: ${item.id}`);
-  const quantity = item.quantity ?? 1;
-  return { cents: extra.priceEur * 100 * quantity, label: `FODEL — ${extra.id}` };
 }

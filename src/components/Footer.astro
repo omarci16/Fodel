@@ -146,6 +146,13 @@ const featuredCategories: CategoryKey[] = [
             </li>
           ))
         }
+        {/* The portal's only entry point from the public site. Deliberately
+            here rather than in the main navigation: it is for the handful of
+            people who advertise with FODEL, not for the buyers the top nav
+            exists to serve. rel=nofollow because /portal is noindex anyway. */}
+        <li>
+          <a href="/portal/login" rel="nofollow">{ui.footer.portalLogin}</a>
+        </li>
       </ul>
     </nav>
   </div>

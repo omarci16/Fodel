@@ -1,11 +1,16 @@
 /**
- * Scripted pass through the whole approval workflow (Stage 9): draft →
- * submitted → changes_requested → resubmitted → approved → published,
- * asserting who can see the listing at each step and that only the right
- * role can make each transition. This drives the database directly (the
- * same status rules src/pages/api/portal/properties/[id]/status.ts
- * enforces), so it's really testing the RLS/status-machine combination the
- * portal depends on, independent of the API route code.
+ * Scripted pass through the whole approval workflow: draft → submitted →
+ * changes_requested → resubmitted → approved (awaiting_payment) → paid →
+ * published, asserting who can see the listing at each step and that only the
+ * right role can make each transition. This drives the database directly (the
+ * same status rules src/pages/api/portal/properties/[id]/status.ts enforces),
+ * so it's really testing the RLS/status-machine combination the portal depends
+ * on, independent of the API route code.
+ *
+ * FODEL 1.1 added the payment gate in the middle. The assertion that matters
+ * most here is the new one: an approved listing must stay invisible to the
+ * public until it is paid for, and its owner must not be able to publish it
+ * themselves.
  *
  * Needs SUPABASE_URL, SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY.
  * Usage: node scripts/verify-workflow.mjs
@@ -92,32 +97,95 @@ async function main() {
   await admin.from('properties').update({ status: 'submitted' }).eq('id', id);
   pass('resubmitted after changes_requested');
 
-  // submitted → published (approve).
+  // submitted → awaiting_payment (approve). FODEL 1.1: approving raises an
+  // order and does NOT publish. Money is what publishes.
+  await admin
+    .from('properties')
+    .update({
+      status: 'awaiting_payment',
+      approved_at: new Date().toISOString(),
+      approved_by: adminUser.id,
+    })
+    .eq('id', id);
+
+  const { data: order, error: orderError } = await admin
+    .from('payments')
+    .insert({
+      property_id: id,
+      owner_id: owner.id,
+      amount_cents: 6900,
+      currency: 'eur',
+      status: 'pending',
+      line_items: [
+        { kind: 'package', id: 'cheap-6m', quantity: 1, unitCents: 6900, label: 'Hirdetés — 6 hónap' },
+      ],
+    })
+    .select('id')
+    .single();
+  if (orderError) fail(`could not raise an order: ${orderError.message}`);
+  else pass('approving raises a pending order');
+
+  if (await isPubliclyVisible(id)) fail('approved-but-unpaid listing is publicly visible (should not be)');
+  else pass('approved listing stays hidden until it is paid for');
+
+  const ownerClient = createClient(url, anonKey, { auth: { persistSession: false } });
+  await ownerClient.auth.signInWithPassword({ email: 'workflow-owner@fodel-test.local', password: 'workflow-test-password-not-real-123!' });
+
+  // The owner must not be able to publish their own listing by editing the
+  // status column — that would be paying for nothing.
+  const { data: selfPublish } = await ownerClient
+    .from('properties')
+    .update({ status: 'published' })
+    .eq('id', id)
+    .select();
+  if (selfPublish && selfPublish.length > 0) fail('owner could publish their own awaiting_payment listing (must require payment)');
+  else pass('owner cannot self-publish an awaiting_payment listing');
+
+  // The owner must be able to READ their own order — it is what the pay panel
+  // on the listing renders from.
+  const { data: ownerOrder } = await ownerClient.from('payments').select('id, amount_cents').eq('property_id', id);
+  if (!ownerOrder || ownerOrder.length === 0) fail('owner cannot read their own order (the pay panel would render empty)');
+  else pass('owner can read their own order');
+
+  // The owner must NOT be able to mark it paid.
+  const { data: selfPaid } = await ownerClient
+    .from('payments')
+    .update({ status: 'paid' })
+    .eq('property_id', id)
+    .select();
+  if (selfPaid && selfPaid.length > 0) fail('owner could mark their own order paid');
+  else pass('owner cannot mark their own order paid');
+
+  // The owner must be able to read the review note about their own listing —
+  // the changes-requested email sends them to a screen that has to show it.
+  const { data: ownerNotes } = await ownerClient.from('review_notes').select('note').eq('property_id', id);
+  if (!ownerNotes || ownerNotes.length === 0) fail('owner cannot read the review note on their own listing');
+  else pass('owner can read the review note on their own listing');
+
+  // payment settles → published (what the Stripe webhook does).
   const months = 6;
   const expires = new Date();
   expires.setMonth(expires.getMonth() + months);
+  await admin.from('payments').update({ status: 'paid', paid_at: new Date().toISOString() }).eq('property_id', id);
   await admin
     .from('properties')
     .update({
       status: 'published',
       published_at: new Date().toISOString(),
-      approved_at: new Date().toISOString(),
-      approved_by: adminUser.id,
       expires_at: expires.toISOString(),
     })
     .eq('id', id);
 
-  if (!(await isPubliclyVisible(id))) fail('published listing is not publicly visible (should be)');
-  else pass('published listing is publicly visible');
+  if (!(await isPubliclyVisible(id))) fail('paid listing is not publicly visible (should be)');
+  else pass('paid listing is publicly visible');
 
   // Owner should no longer be able to edit directly (RLS: owner_update requires draft/changes_requested).
-  const ownerClient = createClient(url, anonKey, { auth: { persistSession: false } });
-  await ownerClient.auth.signInWithPassword({ email: 'workflow-owner@fodel-test.local', password: 'workflow-test-password-not-real-123!' });
   const { data: editAttempt } = await ownerClient.from('properties').update({ settlement: 'edited' }).eq('id', id).select();
   if (editAttempt && editAttempt.length > 0) fail('owner could edit a published listing directly (should require going through the workflow)');
   else pass('owner cannot edit a published listing directly');
 
   // Cleanup.
+  await admin.from('payments').delete().eq('property_id', id);
   await admin.from('review_notes').delete().eq('property_id', id);
   await admin.from('properties').delete().eq('id', id);
 

@@ -1,8 +1,7 @@
 ---
 export const prerender = false;
 
-import Portal from '~/layouts/Portal.astro';
-import Logo from '~/components/Logo.astro';
+import AuthPanel from '~/components/portal/AuthPanel.astro';
 
 // Already signed in — no reason to see the login form again.
 if (Astro.locals.user) {
@@ -11,109 +10,40 @@ if (Astro.locals.user) {
 
 const next = Astro.url.searchParams.get('next') ?? '/portal/dashboard';
 const error = Astro.url.searchParams.get('error');
+const justReset = Astro.url.searchParams.get('reset') === '1';
 ---
 
-<Portal title="Bejelentkezés" bare>
-  <div class="login">
-    <div class="brand">
-      <Logo locale="hu" href="/hu/" />
-    </div>
-    <h1>Portál bejelentkezés</h1>
-
-    {
-      error && (
-        <p class="error" role="alert">
-          {error === 'invalid'
-            ? 'Hibás e-mail cím vagy jelszó.'
+<AuthPanel title="Bejelentkezés" heading="Portál bejelentkezés">
+  {justReset && <p class="notice ok">Jelszava megváltozott. Kérjük, jelentkezzen be az új jelszavával.</p>}
+  {
+    error && (
+      <p class="notice error" role="alert">
+        {error === 'invalid'
+          ? 'Hibás e-mail cím vagy jelszó.'
+          : error === 'rate-limited'
+            ? 'Túl sok próbálkozás. Kérjük, várjon egy percet, majd próbálja újra.'
             : 'Nem sikerült bejelentkezni. Kérjük próbálja újra.'}
-        </p>
-      )
-    }
+      </p>
+    )
+  }
 
-    <form method="POST" action="/api/portal/login">
-      <input type="hidden" name="next" value={next} />
-      <div class="field">
-        <label for="email">E-mail cím</label>
-        <input id="email" name="email" type="email" required autocomplete="username" autofocus />
-      </div>
-      <div class="field">
-        <label for="password">Jelszó</label>
-        <input id="password" name="password" type="password" required autocomplete="current-password" />
-      </div>
-      <button type="submit" class="submit">Bejelentkezés</button>
-    </form>
+  <form method="POST" action="/api/portal/login">
+    <input type="hidden" name="next" value={next} />
+    <div class="field">
+      <label for="email">E-mail cím</label>
+      <input id="email" name="email" type="email" required autocomplete="username" autofocus />
+    </div>
+    <div class="field">
+      <label for="password">Jelszó</label>
+      <input id="password" name="password" type="password" required autocomplete="current-password" />
+    </div>
+    <button type="submit" class="submit">Bejelentkezés</button>
+  </form>
 
-    <p class="hint">
-      Meghívót kapott a FODEL-től? A meghívó e-mailben lévő linkre kattintva állíthatja be a jelszavát.
-    </p>
-  </div>
-</Portal>
-
-<style>
-  .login {
-    width: 100%;
-    padding: 48px 40px;
-    border: 1px solid var(--border);
-    background: var(--cream);
-  }
-  .brand {
-    margin-bottom: 32px;
-  }
-  h1 {
-    font-family: var(--serif);
-    font-weight: var(--fw-display);
-    font-size: 26px;
-    color: var(--ink);
-    margin-bottom: 24px;
-  }
-  .error {
-    font-size: var(--fs-small);
-    color: #b3261e;
-    padding: 10px 14px;
-    border-left: 2px solid #b3261e;
-    background: rgba(179, 38, 30, 0.06);
-    margin-bottom: 20px;
-  }
-  .field {
-    display: flex;
-    flex-direction: column;
-    margin-bottom: 18px;
-  }
-  label {
-    font-size: var(--fs-eyebrow);
-    letter-spacing: var(--ls-label);
-    text-transform: uppercase;
-    color: var(--taupe);
-    margin-bottom: 8px;
-  }
-  input {
-    border: 1px solid var(--border);
-    background: #fff;
-    padding: 11px 12px;
-    font-size: var(--fs-body);
-    color: var(--ink);
-  }
-  input:focus-visible {
-    outline: var(--focus-ring);
-    outline-offset: 2px;
-  }
-  .submit {
-    width: 100%;
-    margin-top: 8px;
-    padding: 13px;
-    background: var(--ink);
-    color: var(--cream);
-    font-size: var(--fs-micro);
-    letter-spacing: var(--ls-button);
-    text-transform: uppercase;
-  }
-  .submit:hover {
-    opacity: 0.9;
-  }
-  .hint {
-    margin-top: 24px;
-    font-size: var(--fs-micro);
-    line-height: 1.6;
-    color: var(--taupe);
-  }
-</style>
+  <p class="hint">
+    <a href="/portal/forgot">Elfelejtette a jelszavát?</a>
+  </p>
+  <p class="hint">
+    Meghívót kapott a FODEL-től? A meghívó e-mailben lévő linkre kattintva állíthatja be a jelszavát.
+  </p>
+</AuthPanel>

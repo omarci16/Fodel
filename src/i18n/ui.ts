@@ -279,6 +279,12 @@ export const UI = {
       results: (n: number) => (n === 1 ? '1 ingatlan' : `${n} ingatlan`),
       noResults: 'Nincs a szűrésnek megfelelő ingatlan.',
       noResultsHint: 'Próbálja tágabb feltételekkel, vagy kérjen ingyenes kerestetést.',
+      county: 'Megye',
+      areaFrom: 'Alapterület',
+      viewMap: 'Megtekintés térképen',
+      viewList: 'Vissza a listához',
+      /** Shown on the map page when a bounding box came from "search this area". */
+      areaFiltered: 'A térkép kijelölt területére szűrve',
     },
 
     form: {
@@ -313,6 +319,9 @@ export const UI = {
       companyDetails: 'Cégadatok',
       hours: 'Nyitvatartás',
       callbackNote: 'A visszahívást mi fizetjük — Önnek semmibe nem kerül.',
+      /** Portal entry point. Until 1.1 nothing on the public site linked to
+       *  /portal at all, so an owner could not find their own login page. */
+      portalLogin: 'Hirdetői belépés',
     },
 
     a11y: {
@@ -407,6 +416,11 @@ export const UI = {
       results: (n: number) => (n === 1 ? '1 woning' : `${n} woningen`),
       noResults: 'Geen woningen gevonden met deze filters.',
       noResultsHint: 'Probeer ruimere criteria, of plaats een gratis zoekopdracht.',
+      county: 'Provincie',
+      areaFrom: 'Woonoppervlak',
+      viewMap: 'Op de kaart bekijken',
+      viewList: 'Terug naar de lijst',
+      areaFiltered: 'Gefilterd op het gekozen kaartgebied',
     },
 
     form: {
@@ -441,6 +455,7 @@ export const UI = {
       companyDetails: 'Bedrijfsgegevens',
       hours: 'Openingstijden',
       callbackNote: 'Wij bellen u terug — dat kost u niets.',
+      portalLogin: 'Inloggen voor adverteerders',
     },
 
     a11y: {

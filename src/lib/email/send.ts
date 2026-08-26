@@ -1,11 +1,51 @@
 /**
- * Thin Resend wrapper for the portal's lifecycle emails, same pattern as
- * src/lib/form-handler.ts uses for the public forms: log instead of failing
- * when RESEND_API_KEY isn't set, so the portal is still testable offline.
+ * Resend wrapper for the portal's lifecycle emails.
+ *
+ * Same log-instead-of-fail contract as src/lib/form-handler.ts uses for the
+ * public forms: with no RESEND_API_KEY the portal is still fully testable
+ * offline, it just narrates what it would have sent.
+ *
+ * A lifecycle email is a courtesy, never the source of truth — by the time one
+ * is sent, the status change that triggered it has already been committed. So
+ * a send failure must never fail the request that caused it. What 1.1 adds
+ * over 1.0 is that a *transient* failure now gets two more chances before we
+ * accept the loss, because the most common Resend failure is a momentary 429
+ * or 5xx, and one retry a second later almost always succeeds.
+ *
+ * What this deliberately is NOT: a durable queue with a dead-letter table. If
+ * the process dies mid-retry the email is gone. Building persistence properly
+ * (an outbox table, a worker, replay, idempotency keys) is its own project,
+ * and a half-built queue is worse than an honest lack of one — it looks like a
+ * guarantee it cannot keep. Flagged in the 1.1 plan as known and unbuilt.
  */
 import { Resend } from 'resend';
+import type { BuiltEmail } from './templates';
+import type { EmailLocale } from './layout';
 
-export async function sendEmail(opts: { to: string; subject: string; html: string }): Promise<void> {
+export type { EmailLocale } from './layout';
+export { templates } from './templates';
+
+const MAX_ATTEMPTS = 3;
+const RETRY_BASE_MS = 400;
+
+/** Resend rejects outright on a bad payload; retrying that just wastes time. */
+function isRetryable(error: unknown): boolean {
+  const status = (error as { statusCode?: number; status?: number } | null)?.statusCode
+    ?? (error as { status?: number } | null)?.status;
+  if (typeof status !== 'number') return true; // network-level failure — worth another go
+  return status === 429 || status >= 500;
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export async function sendEmail(opts: {
+  to: string;
+  subject: string;
+  html: string;
+  /** Plain-text alternative. Always pass it — see the note in layout.ts. */
+  text?: string;
+  replyTo?: string;
+}): Promise<void> {
   const apiKey = import.meta.env.RESEND_API_KEY;
   const from = import.meta.env.FODEL_FROM ?? 'FODEL Portál <portal@fodel.nl>';
 
@@ -14,98 +54,73 @@ export async function sendEmail(opts: { to: string; subject: string; html: strin
     return;
   }
 
-  try {
-    const resend = new Resend(apiKey);
-    await resend.emails.send({ from, to: opts.to, subject: opts.subject, html: opts.html });
-  } catch (error) {
-    // Lifecycle emails are a courtesy, not the source of truth — the status
-    // change itself already happened in the database. Log and move on
-    // rather than failing the request that triggered it.
-    console.error(`[email] failed to send "${opts.subject}" to ${opts.to}`, error);
+  const resend = new Resend(apiKey);
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const { error } = await resend.emails.send({
+        from,
+        to: opts.to,
+        subject: opts.subject,
+        html: opts.html,
+        text: opts.text,
+        replyTo: opts.replyTo,
+      });
+      if (!error) return;
+      if (!isRetryable(error) || attempt === MAX_ATTEMPTS) {
+        console.error(
+          `[email] giving up on "${opts.subject}" to ${opts.to} after ${attempt} attempt(s)`,
+          error
+        );
+        return;
+      }
+    } catch (error) {
+      if (!isRetryable(error) || attempt === MAX_ATTEMPTS) {
+        console.error(
+          `[email] giving up on "${opts.subject}" to ${opts.to} after ${attempt} attempt(s)`,
+          error
+        );
+        return;
+      }
+    }
+    await sleep(RETRY_BASE_MS * 2 ** (attempt - 1));
   }
 }
 
-function layout(title: string, bodyHtml: string): string {
-  return `<div style="font-family:system-ui,-apple-system,sans-serif;max-width:560px;color:#102A43">
-  <h2 style="font-size:18px;margin:0 0 20px">${title}</h2>
-  ${bodyHtml}
-  <p style="font-size:12px;color:#5E6E72;margin-top:32px">FODEL Ingatlan · fodel.nl</p>
-</div>`;
+/** Sends a template's output. The one call site shape every trigger should use. */
+export async function deliver(to: string, email: BuiltEmail, replyTo?: string): Promise<void> {
+  await sendEmail({ to, subject: email.subject, html: email.html, text: email.text, replyTo });
 }
 
-export const templates = {
-  invite(opts: { role: 'admin' | 'owner'; acceptUrl: string }) {
-    return {
-      subject: 'Meghívó a FODEL portálra',
-      html: layout(
-        'Meghívást kapott a FODEL portálra',
-        `<p>A FODEL meghívta Önt, hogy ${
-          opts.role === 'admin' ? 'adminisztrátorként' : 'hirdetőként'
-        } csatlakozzon a portálhoz, ahol ingatlanhirdetéseit kezelheti.</p>
-         <p><a href="${opts.acceptUrl}" style="background:#102A43;color:#F4F4F2;padding:12px 24px;text-decoration:none;display:inline-block">Meghívó elfogadása</a></p>
-         <p style="font-size:13px;color:#5E6E72">A link 7 napig érvényes.</p>`
-      ),
-    };
-  },
+/**
+ * Which language to write to someone in.
+ *
+ * `profiles.locale` is the recipient's own stated language and is always
+ * populated (the column is `not null default 'hu'`). Anything outside the two
+ * built markets falls back to Hungarian, which is FODEL's default and the
+ * language of the office.
+ */
+export function localeOf(profile: { locale?: string | null } | null | undefined): EmailLocale {
+  return profile?.locale === 'nl' ? 'nl' : 'hu';
+}
 
-  welcome(opts: { name: string }) {
-    return {
-      subject: 'Üdvözöljük a FODEL portálon',
-      html: layout(
-        `Üdvözöljük, ${opts.name}!`,
-        `<p>Fiókja aktiválva. Innentől kezelheti ingatlanhirdetéseit, tölthet fel fotókat, és követheti azok elbírálását.</p>
-         <p><a href="https://fodel.nl/portal/dashboard">Ugrás a portálra</a></p>`
-      ),
-    };
-  },
-
-  submissionReceived(opts: { ref: string; title: string }) {
-    return {
-      subject: `Hirdetését megkaptuk — #${opts.ref}`,
-      html: layout(
-        'Hirdetését elbírálásra megkaptuk',
-        `<p><strong>${opts.title}</strong> (#${opts.ref}) hirdetését megkaptuk, munkatársunk hamarosan átnézi.</p>
-         <p>Amint elbírálásra kerül, e-mailben értesítjük.</p>`
-      ),
-    };
-  },
-
-  approved(opts: { ref: string; title: string; url: string }) {
-    return {
-      subject: `Hirdetése élesedett — #${opts.ref}`,
-      html: layout(
-        'Hirdetése mostantól élő',
-        `<p><strong>${opts.title}</strong> (#${opts.ref}) hirdetése jóváhagyásra került és mostantól látható a fodel.nl oldalon.</p>
-         <p><a href="${opts.url}">Hirdetés megtekintése</a></p>`
-      ),
-    };
-  },
-
-  changesRequested(opts: { ref: string; title: string; note: string }) {
-    return {
-      subject: `Javítás szükséges — #${opts.ref}`,
-      html: layout(
-        'Kérjük, javítsa hirdetését',
-        `<p><strong>${opts.title}</strong> (#${opts.ref}) hirdetésével kapcsolatban munkatársunk megjegyzést fűzött:</p>
-         <blockquote style="border-left:2px solid #102A43;padding-left:16px;margin:16px 0;color:#5E6E72">${opts.note.replace(/\n/g, '<br>')}</blockquote>
-         <p>Kérjük, végezze el a javításokat a portálon, majd küldje be ismét.</p>
-         <p><a href="https://fodel.nl/portal/properties">Ugrás a hirdetéshez</a></p>`
-      ),
-    };
-  },
-
-  newEnquiry(opts: { ref: string; title: string; name: string; email: string; phone?: string; message?: string }) {
-    return {
-      subject: `Új érdeklődő — #${opts.ref}`,
-      html: layout(
-        'Új érdeklődő a hirdetésére',
-        `<p><strong>${opts.title}</strong> (#${opts.ref}) hirdetésére új érdeklődő jelentkezett:</p>
-         <table style="font-size:14px"><tr><td style="color:#5E6E72;padding-right:12px">Név</td><td>${opts.name}</td></tr>
-         <tr><td style="color:#5E6E72;padding-right:12px">E-mail</td><td>${opts.email}</td></tr>
-         ${opts.phone ? `<tr><td style="color:#5E6E72;padding-right:12px">Telefon</td><td>${opts.phone}</td></tr>` : ''}
-         </table>
-         ${opts.message ? `<p>${opts.message.replace(/\n/g, '<br>')}</p>` : ''}`
-      ),
-    };
-  },
-};
+/**
+ * Every admin's address, for the "new submission" alert.
+ *
+ * Uses the admin (service-role) client because the person triggering it is an
+ * *owner* — RLS would correctly stop them reading the admin roster, and the
+ * alternative (a single hardcoded inbox) silently breaks the moment FODEL adds
+ * a second reviewer. Falls back to FODEL_INBOX if no admin profile exists yet.
+ */
+export async function adminRecipients(adminClient: {
+  from: (table: string) => any;
+}): Promise<string[]> {
+  const fallback = import.meta.env.FODEL_INBOX ?? 'info@fodel.nl';
+  try {
+    const { data } = await adminClient.from('profiles').select('email').eq('role', 'admin');
+    const emails = (data ?? []).map((row: { email: string }) => row.email).filter(Boolean);
+    return emails.length ? emails : [fallback];
+  } catch {
+    return [fallback];
+  }
+}

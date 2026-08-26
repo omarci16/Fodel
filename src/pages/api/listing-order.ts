@@ -1,20 +1,39 @@
 import type { APIRoute } from 'astro';
+import crypto from 'node:crypto';
 import { handleForm } from '~/lib/form-handler';
+import { createSupabaseAdminClient } from '~/lib/supabase-server';
+import { deliver, templates } from '~/lib/email/send';
 
 export const prerender = false;
 
+const INVITE_DAYS = 7;
+
 /**
- * Seller ad submission — FODEL's revenue page.
+ * Seller ad submission — FODEL's revenue page, and since 1.1 the front door to
+ * the portal.
  *
- * Deliberately no payment gateway. FODEL's published process is: form →
- * díjbekérő (payment request) by email → bank transfer → upload rights →
- * translation → publication. This endpoint is step one of that flow, so the
- * site matches how the business already works.
+ * In 1.0 this endpoint emailed the office and stopped there. Someone who
+ * wanted to advertise filled in a detailed form, FODEL read it, and then
+ * invited them by hand — which meant every single seller cost staff time
+ * before they had done anything, and the portal itself was unreachable from
+ * the public site.
+ *
+ * Now the same submission also opens an account. Deliberately as an *invite*
+ * rather than by creating the user outright: the token in the email proves the
+ * person actually controls that mailbox. An unauthenticated endpoint that
+ * creates accounts directly lets anyone register under someone else's address,
+ * and the invite mechanism (hashed token, single use, expiring) already exists
+ * and is already exercised by the admin flow.
+ *
+ * What has NOT changed: nothing publishes without FODEL approving it. This
+ * removes the manual invite, not the editorial gate.
  */
 export const POST: APIRoute = (context) =>
   handleForm(context, {
     id: 'listing-order',
     subject: 'ÚJ HIRDETÉSFELADÁS / Nieuwe advertentie-aanvraag',
+    // The registration email below is the acknowledgement, and a better one.
+    skipAck: true,
     fields: [
       { name: 'name', label: 'Név', required: true, maxLength: 120 },
       { name: 'email', label: 'E-mail', type: 'email', required: true, maxLength: 160 },
@@ -34,4 +53,71 @@ export const POST: APIRoute = (context) =>
       { name: 'billingName', label: 'Számlázási név', maxLength: 160 },
       { name: 'billingAddress', label: 'Számlázási cím', maxLength: 300 },
     ],
+    onSuccess: async (values, extras) => {
+      const email = values.email.toLowerCase();
+      const locale = extras.Locale === 'nl' ? 'nl' : 'hu';
+      const admin = createSupabaseAdminClient();
+
+      // Already has an account: they should sign in, not be invited again.
+      // FODEL still received the submission by email, so nothing is lost — an
+      // admin can attach it to their existing account.
+      const { data: existingProfile } = await admin
+        .from('profiles')
+        .select('id')
+        .eq('email', email)
+        .maybeSingle();
+      if (existingProfile) return;
+
+      // Already invited and not yet accepted: don't mint a second token, which
+      // would invalidate nothing but would leave two live links in their inbox
+      // and two rows for an admin to interpret.
+      const { data: openInvite } = await admin
+        .from('invites')
+        .select('id')
+        .eq('email', email)
+        .is('accepted_at', null)
+        .gt('expires_at', new Date().toISOString())
+        .maybeSingle();
+      if (openInvite) return;
+
+      const token = crypto.randomBytes(32).toString('hex');
+      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+      const expiresAt = new Date(Date.now() + INVITE_DAYS * 24 * 60 * 60 * 1000);
+
+      // The form answers ride along on the invite and become a pre-filled
+      // draft when it is accepted — see api/portal/invite/accept.ts. Asking
+      // someone to retype what they just submitted is how you lose them
+      // between the website and the portal.
+      const { error } = await admin.from('invites').insert({
+        email,
+        token_hash: tokenHash,
+        role: 'owner',
+        expires_at: expiresAt.toISOString(),
+        payload: {
+          locale,
+          phone: values.phone,
+          propertyType: values.propertyType,
+          settlement: values.settlement,
+          county: values.county,
+          priceHuf: values.priceHuf,
+          floorM2: values.floorM2,
+          plotM2: values.plotM2,
+          description: values.description,
+          package: values.package,
+          speaks: values.speaks,
+          ownerVisible: values.ownerVisible,
+        },
+      });
+      if (error) throw new Error(error.message);
+
+      const origin = new URL(context.request.url).origin;
+      await deliver(
+        email,
+        templates.registrationConfirm(locale, {
+          name: values.name,
+          acceptUrl: `${origin}/portal/invite/${token}`,
+          settlement: values.settlement,
+        })
+      );
+    },
   });

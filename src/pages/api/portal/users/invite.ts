@@ -6,7 +6,7 @@
  */
 import type { APIRoute } from 'astro';
 import crypto from 'node:crypto';
-import { sendEmail, templates } from '~/lib/email/send';
+import { deliver, templates } from '~/lib/email/send';
 
 export const prerender = false;
 
@@ -22,6 +22,11 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   const form = await request.formData();
   const email = String(form.get('email') ?? '').trim().toLowerCase();
   const role = form.get('role') === 'admin' ? 'admin' : 'owner';
+  // Which language to write the invite in. There is no profile to read a
+  // preference from yet — this is the first contact — so the admin choosing
+  // it on the invite form is the only signal available, and it is also what
+  // seeds `profiles.locale` when the invite is accepted.
+  const locale = form.get('locale') === 'nl' ? 'nl' : 'hu';
 
   if (!email || !email.includes('@')) {
     return redirect(`/portal/users/invite?error=${encodeURIComponent('érvénytelen e-mail cím')}`);
@@ -46,14 +51,14 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     role,
     invited_by: locals.user!.id,
     expires_at: expiresAt.toISOString(),
+    payload: { locale },
   });
   if (error) {
     return redirect(`/portal/users/invite?error=${encodeURIComponent(error.message)}`);
   }
 
   const acceptUrl = `${new URL(request.url).origin}/portal/invite/${token}`;
-  const { subject, html } = templates.invite({ role, acceptUrl });
-  await sendEmail({ to: email, subject, html });
+  await deliver(email, templates.invite(locale, { role, acceptUrl }));
 
   return redirect(`/portal/users/invite?sent=${encodeURIComponent(email)}`);
 };

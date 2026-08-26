@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { handleForm } from '~/lib/form-handler';
 import { createSupabaseAdminClient } from '~/lib/supabase-server';
-import { sendEmail, templates } from '~/lib/email/send';
+import { deliver, localeOf, templates } from '~/lib/email/send';
 
 export const prerender = false;
 
@@ -45,17 +45,27 @@ export const POST: APIRoute = (context) =>
       });
 
       if (property.owner_id) {
-        const { data: owner } = await admin.from('profiles').select('email').eq('id', property.owner_id).maybeSingle();
+        const { data: owner } = await admin
+          .from('profiles')
+          .select('email, locale')
+          .eq('id', property.owner_id)
+          .maybeSingle();
         if (owner?.email) {
-          const { subject, html } = templates.newEnquiry({
-            ref,
-            title: extras.propertyTitle ?? `Ingatlan #${ref}`,
-            name: values.name,
-            email: values.email,
-            phone: values.phone,
-            message: values.message,
-          });
-          await sendEmail({ to: owner.email, subject, html });
+          const locale = localeOf(owner);
+          await deliver(
+            owner.email,
+            templates.newEnquiry(locale, {
+              ref,
+              title: extras.propertyTitle ?? `#${ref}`,
+              name: values.name,
+              email: values.email,
+              phone: values.phone,
+              message: values.message,
+            }),
+            // The owner can reply straight to the buyer from their inbox —
+            // FODEL's whole model is putting the two in direct contact.
+            values.email
+          );
         }
       }
     },

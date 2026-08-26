@@ -179,9 +179,15 @@ const pmtilesUrl = import.meta.env.PMTILES_URL ?? '';
     const searchBtn = document.getElementById('search-this-area');
     searchBtn?.addEventListener('click', () => {
       const b = map.getBounds();
-      const params = new URLSearchParams({
-        bbox: [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map((n) => n.toFixed(4)).join(','),
-      });
+      // Keep whatever filters the visitor arrived with and add the bounds to
+      // them. Replacing the query string instead of extending it would quietly
+      // discard the type/price/region choices they made on the list.
+      const params = new URLSearchParams(window.location.search);
+      params.delete('page');
+      params.set(
+        'bbox',
+        [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map((n) => n.toFixed(4)).join(',')
+      );
       window.location.href = `${listUrl}?${params}`;
     });
   });

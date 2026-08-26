@@ -14,7 +14,11 @@
   --mist: #e0e2e4;
   --ink: #102a43;
   --accent: #102a43;
-  --taupe: #5e6e72;
+  /* ADJUSTED: was #5e6e72 (4.83:1 on --cream — barely clears AA, and reads
+     thin/hard-to-read at --fw-light on a lot of body copy). Same slate hue,
+     darkened to 7.1:1 (AAA) — same colour identity, just legible for real
+     reading, not just barely-passing swatches. */
+  --taupe: #475457;
   --border: #d0d4d6;
 
   /* ── Typefaces (self-hosted; the prototype loaded these from Google) ── */

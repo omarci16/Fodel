@@ -1,0 +1,37 @@
+---
+export const prerender = false;
+
+import AuthPanel from '~/components/portal/AuthPanel.astro';
+
+if (Astro.locals.user) return Astro.redirect('/portal/dashboard');
+
+const sent = Astro.url.searchParams.get('sent') === '1';
+---
+
+<AuthPanel title="Elfelejtett jelszó" heading="Elfelejtett jelszó">
+  {
+    sent ? (
+      <>
+        <p class="notice ok">
+          Ha ehhez az e-mail címhez tartozik fiók, elküldtük rá a jelszó-visszaállító linket.
+          Nézze meg a postaládáját — és a spam mappát is.
+        </p>
+        <p class="hint">A link egy óráig érvényes. <a href="/portal/login">Vissza a bejelentkezéshez</a></p>
+      </>
+    ) : (
+      <>
+        <p class="body">
+          Adja meg az e-mail címét, és küldünk egy linket, amivel új jelszót állíthat be.
+        </p>
+        <form method="POST" action="/api/portal/forgot">
+          <div class="field">
+            <label for="email">E-mail cím</label>
+            <input id="email" name="email" type="email" required autocomplete="username" autofocus />
+          </div>
+          <button type="submit" class="submit">Link küldése</button>
+        </form>
+        <p class="hint"><a href="/portal/login">Vissza a bejelentkezéshez</a></p>
+      </>
+    )
+  }
+</AuthPanel>

@@ -25,7 +25,15 @@ const profile = Astro.locals.profile;
 const NAV = [
   { href: '/portal/dashboard', label: 'Áttekintés' },
   { href: '/portal/properties', label: 'Ingatlanok' },
-  ...(profile?.role === 'admin' ? [{ href: '/portal/users', label: 'Felhasználók' }] : []),
+  // Owners see their own listings' enquiries, admins see all — the same query
+  // scoped by RLS, so one nav entry serves both.
+  { href: '/portal/enquiries', label: 'Érdeklődők' },
+  ...(profile?.role === 'admin'
+    ? [
+        { href: '/portal/payments', label: 'Fizetések' },
+        { href: '/portal/users', label: 'Felhasználók' },
+      ]
+    : []),
   { href: '/portal/settings', label: 'Beállítások' },
 ];
 

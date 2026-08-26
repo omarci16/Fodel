@@ -1,0 +1,56 @@
+---
+/**
+ * Public by necessity — the token in the URL is the credential, exactly as on
+ * the invite screen. Validated by hashing it and comparing to the stored hash;
+ * the raw value never round-trips through the database.
+ */
+export const prerender = false;
+
+import crypto from 'node:crypto';
+import AuthPanel from '~/components/portal/AuthPanel.astro';
+import { createSupabaseAdminClient } from '~/lib/supabase-server';
+
+const { token } = Astro.params;
+const err = Astro.url.searchParams.get('error');
+
+const tokenHash = crypto.createHash('sha256').update(token!).digest('hex');
+const admin = createSupabaseAdminClient();
+const { data: reset } = await admin
+  .from('password_resets')
+  .select('expires_at, used_at')
+  .eq('token_hash', tokenHash)
+  .maybeSingle();
+
+const usable = reset && !reset.used_at && new Date(reset.expires_at) >= new Date();
+---
+
+<AuthPanel title="Új jelszó" heading={usable ? 'Új jelszó beállítása' : 'A link nem érvényes'}>
+  {
+    usable ? (
+      <>
+        {err && <p class="notice error">{decodeURIComponent(err)}</p>}
+        <form method="POST" action="/api/portal/reset">
+          <input type="hidden" name="token" value={token} />
+          <div class="field">
+            <label for="password">Új jelszó</label>
+            <input id="password" name="password" type="password" required minlength="8" autocomplete="new-password" autofocus />
+          </div>
+          <div class="field">
+            <label for="password2">Új jelszó ismét</label>
+            <input id="password2" name="password2" type="password" required minlength="8" autocomplete="new-password" />
+          </div>
+          <button type="submit" class="submit">Jelszó mentése</button>
+        </form>
+        <p class="hint">Legalább 8 karakter.</p>
+      </>
+    ) : (
+      <>
+        <p class="body">
+          Ez a jelszó-visszaállító link lejárt, vagy már felhasználták. A biztonság kedvéért
+          minden link csak egyszer és csak egy óráig működik.
+        </p>
+        <p class="hint"><a href="/portal/forgot">Új link kérése</a></p>
+      </>
+    )
+  }
+</AuthPanel>

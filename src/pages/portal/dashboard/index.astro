@@ -2,28 +2,38 @@
 export const prerender = false;
 
 import Portal from '~/layouts/Portal.astro';
+import { STATUS_LABEL } from '~/lib/portal/properties';
+import { formatCents } from '~/lib/orders';
 
 const { supabase, profile } = Astro.locals;
 const isAdmin = profile?.role === 'admin';
 
-// Row-Level Security already scopes this to "my own properties" for an
-// owner and "everything" for an admin — the query itself doesn't need to
-// know which one it is.
+// Row-Level Security already scopes this to "my own properties" for an owner
+// and "everything" for an admin — the query itself doesn't need to know which.
 const { data: rows } = await supabase.from('properties').select('id, status, ref');
-const counts = {
+
+const counts: Record<string, number> = {
   draft: 0,
   submitted: 0,
+  awaiting_payment: 0,
   changes_requested: 0,
   published: 0,
   sold: 0,
-  archived: 0,
 };
 for (const row of rows ?? []) {
-  if (row.status in counts) counts[row.status as keyof typeof counts]++;
+  if (row.status in counts) counts[row.status]++;
 }
+
+// Enquiries needing a reply — scoped by RLS the same way, so this is "mine"
+// for an owner and "everyone's" for an admin.
+const { count: openEnquiries } = await supabase
+  .from('enquiries')
+  .select('id', { count: 'exact', head: true })
+  .eq('handled', false);
 
 let pendingReview = 0;
 let ownerCount = 0;
+let outstandingCents = 0;
 if (isAdmin) {
   const { count } = await supabase
     .from('properties')
@@ -36,16 +46,16 @@ if (isAdmin) {
     .select('id', { count: 'exact', head: true })
     .eq('role', 'owner');
   ownerCount = owners ?? 0;
+
+  const { data: openOrders } = await supabase
+    .from('payments')
+    .select('amount_cents')
+    .eq('status', 'pending');
+  outstandingCents = (openOrders ?? []).reduce((sum, o) => sum + o.amount_cents, 0);
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  draft: 'Piszkozat',
-  submitted: 'Elbírálásra vár',
-  changes_requested: 'Javítás szükséges',
-  published: 'Élő hirdetés',
-  sold: 'Eladva',
-  archived: 'Archiválva',
-};
+/** An owner's own listing waiting on them to pay — the one thing they must act on. */
+const myAwaitingPayment = !isAdmin ? counts.awaiting_payment : 0;
 ---
 
 <Portal title="Áttekintés">
@@ -58,6 +68,23 @@ const STATUS_LABEL: Record<string, string> = {
     isAdmin && pendingReview > 0 && (
       <a class="callout" href="/portal/properties?status=submitted">
         <strong>{pendingReview}</strong> hirdetés vár elbírálásra →
+      </a>
+    )
+  }
+
+  {
+    myAwaitingPayment > 0 && (
+      <a class="callout" href="/portal/properties?status=awaiting_payment">
+        <strong>{myAwaitingPayment}</strong> jóváhagyott hirdetése fizetésre vár — a díj
+        rendezése után azonnal megjelenik →
+      </a>
+    )
+  }
+
+  {
+    (openEnquiries ?? 0) > 0 && (
+      <a class="callout ghost" href="/portal/enquiries">
+        <strong>{openEnquiries}</strong> elintézetlen érdeklődés →
       </a>
     )
   }
@@ -79,6 +106,10 @@ const STATUS_LABEL: Record<string, string> = {
         <a class="stat" href="/portal/users">
           <span class="n">{ownerCount}</span>
           <span class="label">Regisztrált hirdető</span>
+        </a>
+        <a class="stat" href="/portal/payments?status=pending">
+          <span class="n">{formatCents(outstandingCents)}</span>
+          <span class="label">Kintlévőség</span>
         </a>
       </section>
     )
@@ -113,25 +144,38 @@ const STATUS_LABEL: Record<string, string> = {
     background: var(--ink);
     color: var(--cream);
     padding: 16px 20px;
-    margin-bottom: 28px;
+    margin-bottom: 12px;
     font-size: var(--fs-body);
+    line-height: 1.6;
   }
   .callout:hover {
     opacity: 0.92;
+  }
+  .callout.ghost {
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid var(--border);
+  }
+  .callout.ghost:hover {
+    border-color: var(--ink);
+    opacity: 1;
   }
 
   .stats,
   .admin-row {
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
     gap: 1px;
     background: var(--border);
     border: 1px solid var(--border);
     margin-bottom: 16px;
   }
+  .stats {
+    grid-template-columns: repeat(6, 1fr);
+    margin-top: 20px;
+  }
   .admin-row {
-    grid-template-columns: repeat(3, 1fr);
-    max-width: 300px;
+    grid-template-columns: repeat(2, 1fr);
+    max-width: 420px;
   }
   .stat {
     background: var(--cream);
@@ -145,13 +189,14 @@ const STATUS_LABEL: Record<string, string> = {
     display: block;
     font-family: var(--serif);
     font-weight: var(--fw-medium);
-    font-size: 28px;
+    font-size: 26px;
     color: var(--ink);
   }
   .stat .label {
     display: block;
     margin-top: 4px;
     font-size: var(--fs-micro);
+    line-height: 1.4;
     color: var(--taupe);
   }
 
@@ -174,9 +219,14 @@ const STATUS_LABEL: Record<string, string> = {
     border: 1px solid var(--ink);
   }
 
-  @media (max-width: 720px) {
+  @media (max-width: 900px) {
     .stats {
       grid-template-columns: repeat(3, 1fr);
+    }
+  }
+  @media (max-width: 520px) {
+    .stats {
+      grid-template-columns: repeat(2, 1fr);
     }
   }
 </style>

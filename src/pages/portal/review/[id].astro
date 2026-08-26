@@ -1,10 +1,26 @@
 ---
-/** Admin-only. Guarded by src/middleware.ts (ADMIN_ONLY_PREFIXES includes /portal/review). */
+/**
+ * Admin review — the screen where a submitted listing is accepted, sent back,
+ * or priced.
+ *
+ * FODEL 1.1 added the order panel. Approving no longer publishes: it assembles
+ * what this listing costs (package + extras) and moves it to "awaiting
+ * payment", so FODEL never holds money for a listing it later rejected. The
+ * panel arrives pre-ticked from the listing itself — the package the owner
+ * chose, one translation per non-Hungarian language they actually wrote, video
+ * if they supplied a URL — because an admin re-deriving that by eye is how two
+ * similar listings end up priced differently.
+ *
+ * Admin-only, guarded by src/middleware.ts (ADMIN_ONLY_PREFIXES includes
+ * /portal/review) and independently by RLS.
+ */
 export const prerender = false;
 
 import Portal from '~/layouts/Portal.astro';
 import { getProperty, CATEGORY_LABEL, STATUS_LABEL } from '~/lib/portal/properties';
 import { resolveImage } from '~/lib/property-images';
+import { catalogue, suggestSelection, isAboveThreshold } from '~/lib/orders';
+import { eur, huf } from '~/lib/format';
 
 function mediaSrc(storagePath: string): string {
   if (storagePath.startsWith('http')) return storagePath;
@@ -25,6 +41,38 @@ const { data: notes } = await supabase
   .select('note, created_at')
   .eq('property_id', id)
   .order('created_at', { ascending: false });
+
+// The order the owner will be asked to pay. Prices come from
+// src/config/company.ts via the catalogue — never typed in here.
+const cat = catalogue('hu');
+const suggested = suggestSelection({
+  package: property.package,
+  price_huf: property.price_huf,
+  video_url: property.video_url,
+  homepage_featured: property.homepage_featured,
+  featured: property.featured,
+  locales: property.translations.map((t) => t.locale),
+});
+const suggestedExtras = new Map(suggested.extras.map((e) => [e.id, e.quantity]));
+const aboveThreshold = isAboveThreshold(property.price_huf);
+
+const reviewable = property.status === 'submitted';
+const awaitingPayment = property.status === 'awaiting_payment';
+
+// What the owner has been asked to pay, if anything is outstanding.
+const { data: openOrder } = await supabase
+  .from('payments')
+  .select('amount_cents, line_items, status, created_at')
+  .eq('property_id', id)
+  .in('status', ['pending', 'paid', 'manual'])
+  .order('created_at', { ascending: false })
+  .limit(1)
+  .maybeSingle();
+
+/** Photos with no description fail the site's own accessibility check once published. */
+const missingCaptions = property.media.filter(
+  (m) => !(m.alt as Record<string, string>)?.hu?.trim()
+).length;
 ---
 
 <Portal title={`Elbírálás — #${property.ref}`}>
@@ -34,8 +82,15 @@ const { data: notes } = await supabase
     <a href={`/portal/properties/${property.id}`} class="edit-link">Szerkesztő megnyitása →</a>
   </header>
 
-  {property.status !== 'submitted' && (
+  {!reviewable && !awaitingPayment && (
     <p class="notice warn">Ez a hirdetés jelenleg nem vár elbírálásra ({STATUS_LABEL[property.status]}).</p>
+  )}
+
+  {awaitingPayment && (
+    <p class="notice warn">
+      Ez a hirdetés jóváhagyva, fizetésre vár{openOrder ? ` — ${(openOrder.amount_cents / 100).toLocaleString('de-DE')} €` : ''}.
+      Ha az átutalás megérkezett, alább élesítheti.
+    </p>
   )}
 
   <div class="preview">
@@ -43,9 +98,9 @@ const { data: notes } = await supabase
     <dl class="facts">
       <div><dt>Típus</dt><dd>{CATEGORY_LABEL[property.category] ?? property.category}</dd></div>
       <div><dt>Település</dt><dd>{property.settlement}, {property.county}</dd></div>
-      <div><dt>Ár</dt><dd>€{property.price_eur.toLocaleString('de-DE')} / {property.price_huf.toLocaleString('hu-HU')} Ft</dd></div>
+      <div><dt>Ár</dt><dd>{eur(property.price_eur)} / {huf(property.price_huf, 'hu')}</dd></div>
       <div><dt>Alapterület</dt><dd>{property.floor_m2 ?? '—'} m² / {property.plot_m2} m² telek</dd></div>
-      <div><dt>Fotók</dt><dd>{property.media.length} db</dd></div>
+      <div><dt>Fotók</dt><dd>{property.media.length} db{missingCaptions > 0 && <span class="flag"> · {missingCaptions} leírás nélkül</span>}</dd></div>
       <div><dt>Nyelvek</dt><dd>{property.translations.map((t) => t.locale.toUpperCase()).join(', ')}</dd></div>
     </dl>
     <p class="description">{hu?.description}</p>
@@ -55,14 +110,87 @@ const { data: notes } = await supabase
     <section class="notes">
       <h2>Korábbi megjegyzések</h2>
       {notes.map((n) => (
-        <p class="note">{n.note}</p>
+        <p class="note">
+          {n.note}
+          <span class="note-date">{new Date(n.created_at).toLocaleDateString('hu-HU')}</span>
+        </p>
       ))}
     </section>
   )}
 
-  {property.status === 'submitted' && (
+  {reviewable && (
+    <section class="order" id="order">
+      <h2>Fizetendő díj</h2>
+      <p class="hint">
+        A hirdetés adataiból előre kitöltve. Ellenőrizze, módosítsa, ha kell — a jóváhagyás után
+        a hirdető ezt az összeget kapja meg e-mailben, és ezt fizeti bankkártyával vagy átutalással.
+      </p>
+
+      <fieldset class="pkg">
+        <legend>Csomag</legend>
+        {cat.packages.map((pkg) => {
+          const price = pkg.id === 'normal-12m' && aboveThreshold ? pkg.priceEurAbove! : pkg.priceEur;
+          return (
+            <label class="radio">
+              <input
+                type="radio"
+                name="package"
+                value={pkg.id}
+                checked={pkg.id === suggested.packageId}
+                data-price={price}
+              />
+              <span>{pkg.label} — {eur(price)}</span>
+            </label>
+          );
+        })}
+        {aboveThreshold && (
+          <p class="threshold">
+            Az irányár meghaladja a 150 M Ft-ot, ezért a 12 hónapos csomag a magasabb sávba esik.
+          </p>
+        )}
+      </fieldset>
+
+      <fieldset class="extras">
+        <legend>Kiegészítők</legend>
+        {cat.extras.map((extra) => (
+          <div class="extra-row">
+            <label class="checkbox">
+              <input
+                type="checkbox"
+                name="extra"
+                value={extra.id}
+                checked={suggestedExtras.has(extra.id)}
+                data-price={extra.priceEur}
+              />
+              <span>{extra.label} — {eur(extra.priceEur)}{extra.unit ? ` / ${extra.unit}` : ''}</span>
+            </label>
+            {extra.unit && (
+              <input
+                class="qty"
+                type="number"
+                min={extra.minMonths ?? 1}
+                max="60"
+                value={suggestedExtras.get(extra.id) ?? extra.minMonths ?? 1}
+                data-qty-for={extra.id}
+                aria-label={`${extra.label} mennyiség (${extra.unit})`}
+              />
+            )}
+          </div>
+        ))}
+      </fieldset>
+
+      <p class="total">Összesen: <strong id="order-total">—</strong> <span class="vat">(21% áfával)</span></p>
+    </section>
+  )}
+
+  {(reviewable || awaitingPayment) && (
     <section class="actions">
-      <button type="button" class="btn" id="approve-btn">Jóváhagyás és publikálás</button>
+      {reviewable && (
+        <button type="button" class="btn" id="approve-btn">Jóváhagyás és díjbekérő küldése</button>
+      )}
+      {awaitingPayment && (
+        <button type="button" class="btn" id="publish-btn">Átutalás megérkezett — élesítés</button>
+      )}
 
       <div class="changes-form">
         <label for="note">Javítási megjegyzés (ha visszaküldi)</label>
@@ -75,29 +203,78 @@ const { data: notes } = await supabase
   )}
 </Portal>
 
-<script define:vars={{ propertyId: property.id }}>
-  async function doAction(action, note) {
-    const status = document.getElementById('action-status');
+<script define:vars={{ propertyId: property.id, aboveThreshold }}>
+  const statusEl = document.getElementById('action-status');
+  const totalEl = document.getElementById('order-total');
+
+  /** Reads the order panel. Ids and counts only — the server prices it. */
+  function readOrder() {
+    const pkg = document.querySelector('input[name="package"]:checked');
+    if (!pkg) return null;
+    const extras = [...document.querySelectorAll('input[name="extra"]:checked')].map((box) => {
+      const qtyInput = document.querySelector(`[data-qty-for="${box.value}"]`);
+      return { id: box.value, quantity: qtyInput ? Number(qtyInput.value) || 1 : 1 };
+    });
+    return { packageId: pkg.value, aboveThreshold, extras };
+  }
+
+  /** Display only. The authoritative total is computed server-side from the catalogue. */
+  function renderTotal() {
+    if (!totalEl) return;
+    const pkg = document.querySelector('input[name="package"]:checked');
+    let sum = pkg ? Number(pkg.dataset.price) : 0;
+    document.querySelectorAll('input[name="extra"]:checked').forEach((box) => {
+      const qtyInput = document.querySelector(`[data-qty-for="${box.value}"]`);
+      const qty = qtyInput ? Number(qtyInput.value) || 1 : 1;
+      sum += Number(box.dataset.price) * qty;
+    });
+    totalEl.textContent = `€ ${sum.toLocaleString('de-DE')}`;
+  }
+
+  document.getElementById('order')?.addEventListener('input', renderTotal);
+  renderTotal();
+
+  async function doAction(action, payload) {
+    statusEl.textContent = 'Feldolgozás…';
     const res = await fetch(`/api/portal/properties/${propertyId}/status`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ action, note }),
+      body: JSON.stringify({ action, ...payload }),
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok || !json.ok) {
-      status.textContent = 'Nem sikerült végrehajtani.';
+      const messages = {
+        'not-submitted': 'Ez a hirdetés már nem vár elbírálásra — frissítse az oldalt.',
+        'not-awaiting-payment': 'Ez a hirdetés nem fizetésre vár — frissítse az oldalt.',
+        'note-required': 'Írjon megjegyzést a javítás kéréséhez.',
+        'unknown-extra': 'Ismeretlen kiegészítő — frissítse az oldalt.',
+        'bad-quantity': 'A mennyiség 1 és 60 között lehet.',
+      };
+      statusEl.textContent = messages[json.error] || 'Nem sikerült végrehajtani.';
       return;
     }
     location.href = '/portal/properties?status=submitted';
   }
 
   document.getElementById('approve-btn')?.addEventListener('click', () => {
-    if (confirm('Jóváhagyja és publikálja ezt a hirdetést?')) doAction('approve');
+    const order = readOrder();
+    if (!order) { alert('Válasszon csomagot.'); return; }
+    const shown = totalEl?.textContent ?? '';
+    if (confirm(`Jóváhagyja a hirdetést és kiküldi a ${shown} összegű díjbekérőt?`)) {
+      doAction('approve', { order });
+    }
   });
+
+  document.getElementById('publish-btn')?.addEventListener('click', () => {
+    if (confirm('Megerősíti, hogy az átutalás megérkezett? A hirdetés azonnal élesedik.')) {
+      doAction('publish_manually');
+    }
+  });
+
   document.getElementById('reject-btn')?.addEventListener('click', () => {
     const note = document.getElementById('note').value.trim();
     if (!note) { alert('Írjon megjegyzést a javítás kéréséhez.'); return; }
-    doAction('request_changes', note);
+    doAction('request_changes', { note });
   });
 </script>
 
@@ -108,18 +285,39 @@ const { data: notes } = await supabase
   h1 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 28px; color: var(--ink); }
   .edit-link { font-size: var(--fs-small); text-decoration: underline; }
 
-  .notice.warn { padding: 12px 16px; font-size: var(--fs-small); background: rgba(200, 150, 0, 0.08); border-left: 2px solid #96700b; color: #6b4f08; margin-bottom: 20px; }
+  .notice { padding: 12px 16px; font-size: var(--fs-small); line-height: 1.7; margin-bottom: 20px; }
+  .notice.warn { background: rgba(200, 150, 0, 0.08); border-left: 2px solid #96700b; color: #6b4f08; }
 
   .preview { padding: 24px 0; border-top: 1px solid var(--border); }
   .hero { width: 100%; max-width: 480px; aspect-ratio: 4/3; object-fit: cover; margin-bottom: 20px; }
   .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
   .facts dt { font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: 0.06em; color: var(--taupe); }
   .facts dd { font-size: var(--fs-body); color: var(--ink); }
+  .flag { color: #96700b; }
   .description { font-size: var(--fs-body); line-height: 1.8; color: var(--taupe); max-width: 68ch; }
 
   .notes { padding: 24px 0; border-top: 1px solid var(--border); }
   .notes h2 { font-size: 16px; margin-bottom: 12px; }
-  .note { font-size: var(--fs-small); color: var(--taupe); padding: 10px 14px; background: var(--linen); margin-bottom: 8px; }
+  .note { font-size: var(--fs-small); line-height: 1.7; color: var(--taupe); padding: 10px 14px; background: var(--linen); margin-bottom: 8px; }
+  .note-date { display: block; margin-top: 4px; font-size: var(--fs-micro); color: var(--taupe); opacity: 0.75; }
+
+  .order { padding: 28px 0; border-top: 1px solid var(--border); }
+  .order h2 { font-family: var(--serif); font-size: 19px; color: var(--ink); margin-bottom: 10px; }
+  .hint { font-size: var(--fs-small); line-height: 1.7; color: var(--taupe); margin-bottom: 22px; max-width: 68ch; }
+
+  fieldset { border: none; padding: 0; margin: 0 0 24px; }
+  legend { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--taupe); margin-bottom: 12px; }
+
+  .radio, .checkbox { display: flex; align-items: center; gap: 9px; font-size: var(--fs-small); color: var(--ink); margin-bottom: 10px; }
+  .threshold { font-size: var(--fs-micro); color: #6b4f08; margin-top: 4px; }
+
+  .extra-row { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+  .extra-row .checkbox { flex: 1; margin-bottom: 0; }
+  .qty { width: 68px; border: 1px solid var(--border); background: #fff; padding: 7px 9px; font-size: var(--fs-small); color: var(--ink); }
+
+  .total { font-size: var(--fs-body); color: var(--taupe); padding-top: 16px; border-top: 1px solid var(--border); }
+  .total strong { font-family: var(--serif); font-size: 22px; color: var(--ink); }
+  .vat { font-size: var(--fs-micro); }
 
   .actions { padding: 28px 0; border-top: 1px solid var(--border); }
   .btn { padding: 13px 32px; background: var(--ink); color: var(--cream); font-size: var(--fs-micro); letter-spacing: var(--ls-button); text-transform: uppercase; }
@@ -127,7 +325,7 @@ const { data: notes } = await supabase
   .changes-form { max-width: 480px; margin-top: 24px; }
   .changes-form label { display: block; font-size: var(--fs-eyebrow); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--taupe); margin-bottom: 8px; }
   .changes-form textarea { width: 100%; border: 1px solid var(--border); padding: 12px; font-size: var(--fs-body); }
-  .action-status { font-size: var(--fs-small); color: var(--taupe); margin-top: 14px; }
+  .action-status { font-size: var(--fs-small); color: var(--taupe); margin-top: 14px; min-height: 1.5em; }
 
   @media (max-width: 720px) {
     .facts { grid-template-columns: 1fr 1fr; }

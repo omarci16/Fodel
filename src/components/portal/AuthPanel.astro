@@ -1,0 +1,125 @@
+---
+/**
+ * The signed-out portal chrome: login, invite acceptance, forgot password,
+ * reset password.
+ *
+ * Extracted in 1.1 because those four screens had carried four independent
+ * copies of the same 60 lines of CSS since 1.0, and the fourth and fifth
+ * (forgot/reset) would have made six. Astro scopes styles per component, so
+ * the duplication was not merely untidy — it was the only way the pages could
+ * look alike, and it guaranteed they would drift apart the first time one was
+ * touched.
+ */
+import Portal from '~/layouts/Portal.astro';
+import Logo from '~/components/Logo.astro';
+
+interface Props {
+  /** Browser title. */
+  title: string;
+  /** Heading shown on the panel. */
+  heading: string;
+}
+
+const { title, heading } = Astro.props;
+---
+
+<Portal title={title} bare>
+  <div class="panel">
+    <div class="brand"><Logo locale="hu" href="/hu/" /></div>
+    <h1>{heading}</h1>
+    <slot />
+  </div>
+</Portal>
+
+<style is:global>
+  /* Global rather than scoped: the form fields these rules style are supplied
+     by each page through <slot>, so they carry the *page's* scope id, not this
+     component's. Scoped styles here would match nothing — the same Astro
+     scoping trap documented in the README's "corrections" section. Confined to
+     .panel so nothing outside the signed-out screens is affected. */
+  .panel {
+    width: 100%;
+    padding: 48px 40px;
+    border: 1px solid var(--border);
+    background: var(--cream);
+  }
+  .panel .brand {
+    margin-bottom: 32px;
+  }
+  .panel h1 {
+    font-family: var(--serif);
+    font-weight: var(--fw-display);
+    font-size: 24px;
+    color: var(--ink);
+    margin-bottom: 20px;
+  }
+  .panel .body {
+    font-size: var(--fs-body);
+    line-height: 1.8;
+    color: var(--taupe);
+    margin-bottom: 24px;
+  }
+  .panel .notice {
+    font-size: var(--fs-small);
+    line-height: 1.7;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+  }
+  .panel .notice.error {
+    color: #b3261e;
+    border-left: 2px solid #b3261e;
+    background: rgba(179, 38, 30, 0.06);
+  }
+  .panel .notice.ok {
+    color: var(--ink);
+    border-left: 2px solid var(--ink);
+    background: rgba(16, 42, 67, 0.06);
+  }
+  .panel .field {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 18px;
+  }
+  .panel label {
+    font-size: var(--fs-eyebrow);
+    letter-spacing: var(--ls-label);
+    text-transform: uppercase;
+    color: var(--taupe);
+    margin-bottom: 8px;
+  }
+  .panel input {
+    border: 1px solid var(--border);
+    background: #fff;
+    padding: 11px 12px;
+    font-size: var(--fs-body);
+    color: var(--ink);
+  }
+  .panel input:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: 2px;
+  }
+  .panel .submit {
+    width: 100%;
+    margin-top: 8px;
+    padding: 13px;
+    background: var(--ink);
+    color: var(--cream);
+    font-size: var(--fs-micro);
+    letter-spacing: var(--ls-button);
+    text-transform: uppercase;
+  }
+  .panel .submit:hover {
+    opacity: 0.9;
+  }
+  .panel .hint {
+    margin-top: 24px;
+    font-size: var(--fs-micro);
+    line-height: 1.7;
+    color: var(--taupe);
+  }
+  .panel .hint a {
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+</style>

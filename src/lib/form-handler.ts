@@ -31,10 +31,20 @@ export interface FormDefinition {
   /**
    * Fires after FODEL's notification email is sent, before the response goes
    * out. Used by the enquiry form to also persist to Supabase and notify the
-   * property's owner — a side effect specific to one form, so it lives here
-   * as an opt-in hook rather than complicating this shared handler.
+   * property's owner, and by the ad-submission form to open a portal account —
+   * side effects specific to one form each, so they live here as an opt-in
+   * hook rather than complicating this shared handler.
    */
   onSuccess?: (values: Record<string, string>, extras: Record<string, string>) => Promise<void>;
+  /**
+   * Suppresses the generic "thanks for your message" acknowledgement.
+   *
+   * Set by the ad-submission form, whose `onSuccess` sends a far better email:
+   * a branded, localised "one more step — set a password and carry on with
+   * your listing". Two acknowledgements for one submission reads as a system
+   * that doesn't know what it already sent.
+   */
+  skipAck?: boolean;
 }
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/;
@@ -157,6 +167,26 @@ const ACK = {
   },
 } as const;
 
+/**
+ * Runs a form's side effect.
+ *
+ * Best-effort by contract: a failure here must not turn a successfully
+ * delivered enquiry into an error for the visitor who submitted it. FODEL
+ * already has the submission by email either way.
+ */
+async function runHook(
+  def: FormDefinition,
+  values: Record<string, string>,
+  extras: Record<string, string>
+): Promise<void> {
+  if (!def.onSuccess) return;
+  try {
+    await def.onSuccess(values, extras);
+  } catch (error) {
+    console.error(`[form:${def.id}] onSuccess hook failed`, error);
+  }
+}
+
 export async function handleForm(
   context: APIContext,
   def: FormDefinition
@@ -217,6 +247,11 @@ export async function handleForm(
     // Local development: log rather than fail, so forms are testable offline.
     console.warn(`[form:${def.id}] RESEND_API_KEY unset — submission logged, not sent`);
     console.info(result.values, extras);
+    // The hook still runs. It is what opens a portal account from the ad form
+    // and persists an enquiry — real state changes, not email side effects, so
+    // skipping them offline would make the whole registration flow untestable
+    // without a Resend key.
+    await runHook(def, result.values, extras);
     return respond(200, { ok: true, delivered: false });
   }
 
@@ -235,7 +270,7 @@ export async function handleForm(
     });
 
     // Acknowledge to the sender so they know it arrived.
-    if (result.values.email) {
+    if (result.values.email && !def.skipAck) {
       const ack = ACK[locale];
       await resend.emails.send({
         from,
@@ -245,15 +280,7 @@ export async function handleForm(
       });
     }
 
-    if (def.onSuccess) {
-      // Best-effort — a failure here shouldn't turn a successfully-delivered
-      // enquiry into an error response for the visitor who submitted it.
-      try {
-        await def.onSuccess(result.values, extras);
-      } catch (error) {
-        console.error(`[form:${def.id}] onSuccess hook failed`, error);
-      }
-    }
+    await runHook(def, result.values, extras);
 
     return respond(200, { ok: true, delivered: true });
   } catch (error) {

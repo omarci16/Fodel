@@ -5,12 +5,23 @@ import Portal from '~/layouts/Portal.astro';
 import { listProperties, STATUS_LABEL, CATEGORY_LABEL } from '~/lib/portal/properties';
 
 const { supabase, profile } = Astro.locals;
+const isAdmin = profile?.role === 'admin';
 const statusFilter = Astro.url.searchParams.get('status') ?? '';
 
 const properties = await listProperties(supabase, statusFilter ? { status: statusFilter } : {});
 
 const title = (p: (typeof properties)[number]) =>
   p.translations.find((t) => t.locale === 'hu')?.title || 'Névtelen hirdetés';
+
+// Who owns what. An admin's list is everyone's listings, and without this
+// column the only way to tell them apart is to open each one.
+const ownerIds = isAdmin
+  ? [...new Set(properties.map((p) => p.owner_id).filter(Boolean))]
+  : [];
+const { data: owners } = ownerIds.length
+  ? await supabase.from('profiles').select('id, full_name, email').in('id', ownerIds as string[])
+  : { data: [] };
+const ownerById = new Map((owners ?? []).map((o: any) => [o.id, o.full_name || o.email]));
 ---
 
 <Portal title="Ingatlanok">
@@ -30,13 +41,18 @@ const title = (p: (typeof properties)[number]) =>
   </div>
 
   {properties.length === 0 ? (
-    <p class="empty">Nincs ehhez a szűréshez tartozó ingatlan.</p>
+    <p class="empty">
+      {statusFilter
+        ? 'Nincs ehhez a szűréshez tartozó ingatlan.'
+        : 'Még nincs hirdetése. Az „Új ingatlan” gombbal indíthat egyet — mentheti félkészen, és bármikor visszatérhet hozzá.'}
+    </p>
   ) : (
     <table class="list">
       <thead>
         <tr>
           <th>Azonosító</th>
           <th>Cím</th>
+          {isAdmin && <th>Hirdető</th>}
           <th>Típus</th>
           <th>Település</th>
           <th>Ár</th>
@@ -48,6 +64,7 @@ const title = (p: (typeof properties)[number]) =>
           <tr>
             <td><a href={`/portal/properties/${p.id}`}>#{p.ref}</a></td>
             <td><a href={`/portal/properties/${p.id}`}>{title(p)}</a></td>
+            {isAdmin && <td class="owner">{(p.owner_id && ownerById.get(p.owner_id)) || '—'}</td>}
             <td>{CATEGORY_LABEL[p.category] ?? p.category}</td>
             <td>{p.settlement}</td>
             <td>€{p.price_eur.toLocaleString('de-DE')}</td>
@@ -80,6 +97,8 @@ const title = (p: (typeof properties)[number]) =>
   .pill-published { background: rgba(16, 42, 67, 0.08); border-color: var(--ink); }
   .pill-submitted { background: rgba(200, 150, 0, 0.1); border-color: #96700b; color: #6b4f08; }
   .pill-changes_requested { background: rgba(179, 38, 30, 0.08); border-color: #b3261e; color: #b3261e; }
+  .pill-awaiting_payment { background: rgba(200, 150, 0, 0.1); border-color: #96700b; color: #6b4f08; }
+  .owner { font-size: var(--fs-micro); color: var(--taupe); }
 
   @media (max-width: 720px) {
     .list { display: block; overflow-x: auto; }

@@ -8,8 +8,7 @@
 export const prerender = false;
 
 import crypto from 'node:crypto';
-import Portal from '~/layouts/Portal.astro';
-import Logo from '~/components/Logo.astro';
+import AuthPanel from '~/components/portal/AuthPanel.astro';
 import { createSupabaseAdminClient } from '~/lib/supabase-server';
 
 const { token } = Astro.params;
@@ -23,40 +22,47 @@ const tokenHash = crypto.createHash('sha256').update(token!).digest('hex');
 const admin = createSupabaseAdminClient();
 const { data: invite } = await admin
   .from('invites')
-  .select('email, role, expires_at, accepted_at')
+  .select('email, role, expires_at, accepted_at, payload')
   .eq('token_hash', tokenHash)
   .maybeSingle();
 
 const invalid = !invite;
 const expired = invite && new Date(invite.expires_at) < new Date();
 const used = invite && invite.accepted_at;
+const usable = !invalid && !expired && !used;
+
+// A self-service registration carries the listing they described on the public
+// form. Saying so here is what makes the next screen unsurprising: they arrive
+// in a half-filled editor rather than wondering where their answers went.
+const intake = (invite?.payload ?? {}) as { settlement?: string };
+const hasIntake = Boolean(intake.settlement);
 ---
 
-<Portal title="Meghívó elfogadása" bare>
-  <div class="panel">
-    <div class="brand"><Logo locale="hu" href="/hu/" /></div>
-
-    {invalid || expired || used ? (
+<AuthPanel
+  title={usable ? 'Meghívó elfogadása' : 'Meghívó'}
+  heading={usable ? 'Üdvözöljük a FODEL portálon' : 'A meghívó nem érvényes'}
+>
+  {
+    usable ? (
       <>
-        <h1>A meghívó nem érvényes</h1>
         <p class="body">
-          {invalid && 'Ez a meghívó link nem található.'}
-          {expired && 'Ez a meghívó lejárt. Kérjen újat a FODEL-től.'}
-          {used && 'Ezt a meghívót már felhasználták.'}
+          Fiók létrehozása ehhez: <strong>{invite!.email}</strong>
+          {hasIntake && (
+            <>
+              <br />
+              A(z) {intake.settlement} településen lévő ingatlanhoz megadott adatait megőriztük —
+              a jelszó beállítása után rögtön a hirdetésénél folytathatja.
+            </>
+          )}
         </p>
-      </>
-    ) : (
-      <>
-        <h1>Üdvözöljük a FODEL portálon</h1>
-        <p class="body">Fiók létrehozása ehhez: <strong>{invite!.email}</strong></p>
 
-        {err && <p class="error">{decodeURIComponent(err)}</p>}
+        {err && <p class="notice error">{decodeURIComponent(err)}</p>}
 
         <form method="POST" action="/api/portal/invite/accept">
           <input type="hidden" name="token" value={token} />
           <div class="field">
             <label for="full_name">Teljes név</label>
-            <input id="full_name" name="full_name" required autofocus />
+            <input id="full_name" name="full_name" required autofocus autocomplete="name" />
           </div>
           <div class="field">
             <label for="password">Jelszó</label>
@@ -64,22 +70,17 @@ const used = invite && invite.accepted_at;
           </div>
           <button type="submit" class="submit">Fiók létrehozása</button>
         </form>
+        <p class="hint">A jelszó legalább 8 karakter legyen.</p>
       </>
-    )}
-  </div>
-</Portal>
-
-<style>
-  .panel { width: 100%; padding: 48px 40px; border: 1px solid var(--border); background: var(--cream); }
-  .brand { margin-bottom: 32px; }
-  h1 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 24px; color: var(--ink); margin-bottom: 16px; }
-  .body { font-size: var(--fs-body); line-height: 1.8; color: var(--taupe); margin-bottom: 24px; }
-  .error { font-size: var(--fs-small); color: #b3261e; padding: 10px 14px; border-left: 2px solid #b3261e; background: rgba(179, 38, 30, 0.06); margin-bottom: 20px; }
-
-  .field { display: flex; flex-direction: column; margin-bottom: 18px; }
-  label { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--taupe); margin-bottom: 8px; }
-  input { border: 1px solid var(--border); background: #fff; padding: 11px 12px; font-size: var(--fs-body); color: var(--ink); }
-  input:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
-
-  .submit { width: 100%; margin-top: 8px; padding: 13px; background: var(--ink); color: var(--cream); font-size: var(--fs-micro); letter-spacing: var(--ls-button); text-transform: uppercase; }
-</style>
+    ) : (
+      <>
+        <p class="body">
+          {invalid && 'Ez a meghívó link nem található.'}
+          {expired && 'Ez a meghívó lejárt. Kérjen újat a FODEL-től.'}
+          {used && 'Ezt a meghívót már felhasználták — ha Öné a fiók, jelentkezzen be.'}
+        </p>
+        <p class="hint"><a href="/portal/login">Bejelentkezés</a></p>
+      </>
+    )
+  }
+</AuthPanel>

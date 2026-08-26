@@ -1,20 +1,55 @@
 ---
-/** Admin-only. Guarded by src/middleware.ts. */
+/** Admin-only. Guarded by src/middleware.ts and independently by RLS. */
 export const prerender = false;
 
 import Portal from '~/layouts/Portal.astro';
+import { createSupabaseAdminClient } from '~/lib/supabase-server';
 
-const { supabase } = Astro.locals;
+const { supabase, user } = Astro.locals;
+
 const { data: profiles } = await supabase
   .from('profiles')
-  .select('id, role, full_name, email, phone, created_at')
+  .select('id, role, full_name, email, phone, created_at, locale')
   .order('created_at', { ascending: false });
 
 const { data: pendingInvites } = await supabase
   .from('invites')
-  .select('email, role, expires_at')
+  .select('id, email, role, expires_at, created_at')
   .is('accepted_at', null)
-  .order('expires_at', { ascending: true });
+  .order('created_at', { ascending: false });
+
+// How many listings each person has, so an admin can see at a glance who is
+// actually using the portal before deactivating anyone.
+const { data: ownedCounts } = await supabase.from('properties').select('owner_id');
+const listingsByOwner = new Map<string, number>();
+for (const row of ownedCounts ?? []) {
+  if (row.owner_id) listingsByOwner.set(row.owner_id, (listingsByOwner.get(row.owner_id) ?? 0) + 1);
+}
+
+/**
+ * Who is currently locked out.
+ *
+ * `banned_until` lives on the auth user, not the profile, so this needs the
+ * admin client — RLS has no view of auth.users at all. Listing is capped at
+ * the same page size as the profile query; FODEL will not have thousands of
+ * accounts, and a real paging story can wait until it does.
+ */
+let bannedIds = new Set<string>();
+try {
+  const admin = createSupabaseAdminClient();
+  const { data: authUsers } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
+  bannedIds = new Set(
+    (authUsers?.users ?? [])
+      .filter((u: any) => u.banned_until && new Date(u.banned_until) > new Date())
+      .map((u: any) => u.id)
+  );
+} catch (error) {
+  // A missing service-role key must not take the whole screen down — the list
+  // is still useful without the active/inactive column.
+  console.error('[users] could not read auth status', error);
+}
+
+const now = Date.now();
 ---
 
 <Portal title="Felhasználók">
@@ -24,52 +59,161 @@ const { data: pendingInvites } = await supabase
     <a class="btn" href="/portal/users/invite">+ Meghívás</a>
   </header>
 
+  <p class="status-line" id="status" role="status"></p>
+
   <table class="list">
     <thead>
-      <tr><th>Név</th><th>E-mail</th><th>Szerep</th><th>Telefon</th></tr>
+      <tr>
+        <th>Név</th><th>E-mail</th><th>Szerep</th><th>Hirdetés</th><th>Állapot</th><th class="actions-col">Műveletek</th>
+      </tr>
     </thead>
     <tbody>
-      {(profiles ?? []).map((p) => (
-        <tr>
-          <td>{p.full_name ?? '—'}</td>
-          <td>{p.email}</td>
-          <td><span class:list={['pill', p.role === 'admin' && 'pill-admin']}>{p.role === 'admin' ? 'Admin' : 'Hirdető'}</span></td>
-          <td>{p.phone ?? '—'}</td>
-        </tr>
-      ))}
+      {(profiles ?? []).map((p) => {
+        const isSelf = p.id === user?.id;
+        const banned = bannedIds.has(p.id);
+        return (
+          <tr class:list={{ inactive: banned }}>
+            <td>{p.full_name ?? '—'}<br /><span class="sub">{p.phone ?? ''}</span></td>
+            <td>{p.email}<br /><span class="sub">{p.locale === 'nl' ? 'Holland' : 'Magyar'}</span></td>
+            <td><span class:list={['pill', p.role === 'admin' && 'pill-admin']}>{p.role === 'admin' ? 'Admin' : 'Hirdető'}</span></td>
+            <td>{listingsByOwner.get(p.id) ?? 0}</td>
+            <td>{banned ? <span class="pill pill-off">Letiltva</span> : <span class="sub">Aktív</span>}</td>
+            <td class="actions-col">
+              {isSelf ? (
+                <span class="sub">Ez az Ön fiókja</span>
+              ) : (
+                <div class="row-actions">
+                  <button type="button" data-user={p.id} data-action="set_role" data-role={p.role === 'admin' ? 'owner' : 'admin'}>
+                    {p.role === 'admin' ? 'Hirdetővé' : 'Adminná'}
+                  </button>
+                  <button type="button" data-user={p.id} data-action={banned ? 'reactivate' : 'deactivate'}>
+                    {banned ? 'Visszaállítás' : 'Letiltás'}
+                  </button>
+                </div>
+              )}
+            </td>
+          </tr>
+        );
+      })}
     </tbody>
   </table>
 
-  {pendingInvites && pendingInvites.length > 0 && (
-    <>
-      <h2 class="sub">Függőben lévő meghívók</h2>
-      <table class="list">
-        <thead><tr><th>E-mail</th><th>Szerep</th><th>Lejár</th></tr></thead>
-        <tbody>
-          {pendingInvites.map((i) => (
-            <tr>
+  <h2 class="sub-head">Függőben lévő meghívók</h2>
+  {pendingInvites && pendingInvites.length > 0 ? (
+    <table class="list">
+      <thead>
+        <tr><th>E-mail</th><th>Szerep</th><th>Lejár</th><th class="actions-col">Műveletek</th></tr>
+      </thead>
+      <tbody>
+        {pendingInvites.map((i) => {
+          const expired = new Date(i.expires_at).getTime() < now;
+          return (
+            <tr class:list={{ inactive: expired }}>
               <td>{i.email}</td>
               <td>{i.role === 'admin' ? 'Admin' : 'Hirdető'}</td>
-              <td>{new Date(i.expires_at).toLocaleDateString('hu-HU')}</td>
+              <td>
+                {new Date(i.expires_at).toLocaleDateString('hu-HU')}
+                {expired && <span class="pill pill-off">Lejárt</span>}
+              </td>
+              <td class="actions-col">
+                <div class="row-actions">
+                  <button type="button" data-invite={i.id} data-action="resend">Újraküldés</button>
+                  <button type="button" data-invite={i.id} data-action="revoke">Visszavonás</button>
+                </div>
+              </td>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </>
+          );
+        })}
+      </tbody>
+    </table>
+  ) : (
+    <p class="empty">Nincs függőben lévő meghívó.</p>
   )}
 </Portal>
 
+<script>
+  const status = document.getElementById('status');
+
+  const MESSAGES: Record<string, string> = {
+    self: 'A saját fiókját nem módosíthatja innen.',
+    'last-admin': 'Ez az utolsó adminisztrátori fiók — előbb nevezzen ki egy másik admint.',
+    'already-accepted': 'Ezt a meghívót már elfogadták — frissítse az oldalt.',
+    forbidden: 'Ehhez nincs jogosultsága.',
+  };
+
+  async function call(url: string, body: Record<string, unknown>, confirmText: string) {
+    if (!confirm(confirmText)) return;
+    status!.textContent = 'Feldolgozás…';
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json.ok) {
+      status!.textContent = MESSAGES[json.error] ?? 'Nem sikerült végrehajtani.';
+      return;
+    }
+    location.reload();
+  }
+
+  document.addEventListener('click', (e) => {
+    const btn = e.target;
+    if (!(btn instanceof HTMLButtonElement)) return;
+    const action = btn.dataset.action;
+    if (!action) return;
+
+    const userId = btn.dataset.user;
+    if (userId) {
+      const prompts: Record<string, string> = {
+        set_role:
+          btn.dataset.role === 'admin'
+            ? 'Adminná nevezi ki ezt a felhasználót? Ezután minden hirdetést lát és jóváhagyhat.'
+            : 'Hirdetővé fokozza le ezt a felhasználót? Elveszíti az adminisztrátori jogokat.',
+        deactivate: 'Letiltja ezt a fiókot? A felhasználó azonnal nem tud belépni. A hirdetései megmaradnak.',
+        reactivate: 'Visszaállítja ezt a fiókot? A felhasználó ismét be tud lépni.',
+      };
+      call(`/api/portal/users/${userId}`, { action, role: btn.dataset.role }, prompts[action]);
+      return;
+    }
+
+    const inviteId = btn.dataset.invite;
+    if (inviteId) {
+      const prompts: Record<string, string> = {
+        resend: 'Újraküldi a meghívót? A korábbi link ezzel érvénytelenné válik.',
+        revoke: 'Visszavonja ezt a meghívót? A link azonnal használhatatlan lesz.',
+      };
+      call(`/api/portal/users/invites/${inviteId}`, { action }, prompts[action]);
+    }
+  });
+</script>
+
 <style>
-  .head { display: flex; align-items: baseline; gap: 24px; margin-bottom: 24px; flex-wrap: wrap; }
+  .head { display: flex; align-items: baseline; gap: 24px; margin-bottom: 20px; flex-wrap: wrap; }
   .eyebrow { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--taupe); }
   h1 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 26px; color: var(--ink); flex: 1; }
-  .sub { font-family: var(--serif); font-size: 18px; color: var(--ink); margin: 32px 0 14px; }
+  .sub-head { font-family: var(--serif); font-size: 18px; color: var(--ink); margin: 40px 0 14px; }
   .btn { padding: 11px 22px; background: var(--ink); color: var(--cream); font-size: var(--fs-micro); letter-spacing: var(--ls-button); text-transform: uppercase; }
+
+  .status-line { font-size: var(--fs-small); color: var(--taupe); min-height: 1.4em; margin-bottom: 12px; }
+  .empty { color: var(--taupe); font-size: var(--fs-small); padding: 20px 0; }
 
   .list { width: 100%; border-collapse: collapse; font-size: var(--fs-small); }
   .list th { text-align: left; font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; color: var(--taupe); padding: 10px 12px; border-bottom: 1px solid var(--border); }
-  .list td { padding: 12px; border-bottom: 1px solid var(--border); color: var(--ink); }
+  .list td { padding: 12px; border-bottom: 1px solid var(--border); color: var(--ink); vertical-align: top; }
+  .list tr.inactive td { opacity: 0.55; }
+  .sub { font-size: var(--fs-micro); color: var(--taupe); }
 
-  .pill { font-size: var(--fs-micro); padding: 3px 10px; border: 1px solid var(--border); }
+  .pill { display: inline-block; font-size: var(--fs-micro); padding: 3px 10px; border: 1px solid var(--border); white-space: nowrap; }
   .pill-admin { background: rgba(16, 42, 67, 0.08); border-color: var(--ink); }
+  .pill-off { background: rgba(179, 38, 30, 0.06); border-color: #b3261e; color: #b3261e; margin-left: 8px; }
+
+  .actions-col { width: 1%; white-space: nowrap; }
+  .row-actions { display: flex; gap: 6px; }
+  .row-actions button { font-size: var(--fs-micro); letter-spacing: 0.04em; padding: 6px 12px; border: 1px solid var(--border); background: transparent; color: var(--taupe); cursor: pointer; }
+  .row-actions button:hover { border-color: var(--ink); color: var(--ink); }
+
+  @media (max-width: 860px) {
+    .list { display: block; overflow-x: auto; white-space: nowrap; }
+  }
 </style>

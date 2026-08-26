@@ -1,13 +1,19 @@
 ---
 /**
  * Map browse. A full-viewport clustered map of every active listing, with a
- * "search this area" action that hands the current bounds off to the Stage 6
- * search (see PropertiesPage.astro, which reads ?bbox= — Stage 6's own
- * search_properties() function doesn't filter by bbox itself yet, so today
- * this narrows results to properties whose settlement/region text matches
- * what's visible, which is an approximation; a real PostGIS bounding-box
- * filter is the natural next step once the inventory is large enough to need
- * it precisely).
+ * "search this area" action that hands the current bounds to the listings
+ * page as a `?bbox=` parameter.
+ *
+ * (The comment that stood here claimed bbox filtering was only approximate,
+ * matching on settlement text. That is no longer true and had not been since
+ * Stage 6: `search_properties()` takes a real `p_bbox` and compares lat/lng
+ * directly — see supabase/migrations/0004_search.sql. Plain range comparisons
+ * are exact and need no PostGIS, because Hungary is small and never crosses
+ * the antimeridian.)
+ *
+ * A secondary view by decision, not by accident: the list is the primary way
+ * to browse, and the map is reachable from it rather than from the main
+ * navigation. Until 1.1 nothing linked here at all.
  */
 import Base from '~/layouts/Base.astro';
 import Eyebrow from '~/components/Eyebrow.astro';
@@ -33,6 +39,18 @@ const trail = crumbs(locale, [
   { name: ui.nav.properties, url: path(locale, 'properties') },
   { name: title, url: path(locale, 'map') },
 ]);
+
+/**
+ * Filters arrive from the listings page and go back with the visitor.
+ * Switching view is meant to be a change of presentation, not a reset — the
+ * map hands `bbox` forward to the list, and this hands everything else back.
+ */
+const carried = new URLSearchParams(Astro.url.searchParams);
+carried.delete('page');
+const carriedQuery = carried.toString();
+const listHref = carriedQuery
+  ? `${path(locale, 'properties')}?${carriedQuery}`
+  : path(locale, 'properties');
 ---
 
 <Base
@@ -47,6 +65,7 @@ const trail = crumbs(locale, [
     <div class="map-head">
       <Eyebrow space="8px">{ui.nav.properties}</Eyebrow>
       <h1>{title}</h1>
+      <a href={listHref} class="list-link">{ui.filters.viewList}</a>
       <button type="button" id="search-this-area" class="area-btn">
         {locale === 'hu' ? 'Keresés ezen a területen' : 'Zoek in dit gebied'}
       </button>
@@ -85,6 +104,18 @@ const trail = crumbs(locale, [
     font-size: var(--fs-micro);
     letter-spacing: var(--ls-button);
     text-transform: uppercase;
+  }
+  .list-link {
+    font-size: var(--fs-micro);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--taupe);
+    border: 1px solid var(--border);
+    padding: 9px 16px;
+  }
+  .list-link:hover {
+    color: var(--ink);
+    border-color: var(--ink);
   }
   .map-wrap {
     flex: 1;

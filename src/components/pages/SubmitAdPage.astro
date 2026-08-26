@@ -30,19 +30,19 @@ const t = hu
   ? {
       metaTitle: 'Hirdetés feladása — Hirdesse ingatlanát Nyugat-Európában',
       metaDescription:
-        'Adja fel ingatlanhirdetését 69 €-tól. 5 nyelven, 8 országban, kizárólagossági szerződés nélkül. Töltse ki az űrlapot — a díjbekérőt e-mailben küldjük.',
+        'Adja fel ingatlanhirdetését 69 €-tól. 5 nyelven, 8 országban, kizárólagossági szerződés nélkül. Töltse ki az űrlapot — fizetni csak a jóváhagyás után kell.',
       eyebrow: 'Hirdetésfeladás',
       title: 'Hirdesse ingatlanát',
       titleEm: 'Nyugat-Európában',
-      body: 'Töltse ki az alábbi űrlapot. Munkatársunk átnézi az adatokat, majd e-mailben elküldi a díjbekérőt. A díj beérkezése után feltöltheti a képeket, mi pedig lefordítjuk és közzétesszük a hirdetést.',
+      body: 'Töltse ki az alábbi űrlapot. Azonnal kap egy e-mailt, amivel jelszót állíthat be, és saját felületén folytathatja a hirdetés összeállítását — a fényképekkel együtt. Munkatársunk átnézi, és csak a jóváhagyás után kell fizetnie.',
       processHead: 'A folyamat',
       steps: [
         { n: '01', t: 'Űrlap kitöltése', b: 'Megadja az ingatlan adatait és a kért csomagot.' },
-        { n: '02', t: 'Díjbekérő', b: 'E-mailben megküldjük a díjbekérőt a választott csomagról.' },
-        { n: '03', t: 'Banki átutalás', b: 'Magyar vagy holland bankszámlára egyaránt utalhat.' },
-        { n: '04', t: 'Képek feltöltése', b: 'Az átutalás után megkapja a képfeltöltési jogosultságot.' },
-        { n: '05', t: 'Fordítás', b: 'A szöveget anyanyelvi szinten lefordítjuk a kért nyelvekre.' },
-        { n: '06', t: 'Megjelenés', b: 'A hirdetés néhány munkanapon belül élesedik, 5 nyelven.' },
+        { n: '02', t: 'Fiók megnyitása', b: 'E-mailben küldünk egy linket, amivel jelszót állít be — az itt megadott adatok már be lesznek töltve.' },
+        { n: '03', t: 'Hirdetés összeállítása', b: 'Saját felületén kiegészíti a leírást és feltölti a fényképeket. Nem sürgeti semmi.' },
+        { n: '04', t: 'Ellenőrzés', b: 'Munkatársunk átnézi a hirdetést, és ha szükséges, javítást kér.' },
+        { n: '05', t: 'Fizetés', b: 'A jóváhagyás után rendezi a díjat — bankkártyával vagy átutalással. Elutasított hirdetésért soha nem kell fizetni.' },
+        { n: '06', t: 'Megjelenés', b: 'A fizetés beérkezése után a hirdetés azonnal élesedik, 5 nyelven, 8 országban.' },
       ],
       formHead: 'Hirdetésfeladási űrlap',
       formNote:
@@ -68,28 +68,28 @@ const t = hu
       yes: 'Igen, jelenjen meg a nevem és a telefonszámom',
       no: 'Nem, csak a FODEL elérhetősége jelenjen meg',
       bankHead: 'Bankszámlaszámaink',
-      bankNote: 'A díjbekérő megérkezése után ezekre a számlákra utalhat.',
+      bankNote: 'A hirdetés jóváhagyása után ezekre a számlákra utalhat — vagy fizethet bankkártyával a saját felületén.',
       submit: 'Hirdetés elküldése',
       successTitle: 'Köszönjük!',
       successBody:
-        'Megkaptuk a hirdetésfeladását. Munkatársunk átnézi az adatokat, és munkanapokon 09:00 és 18:00 között e-mailben elküldi a díjbekérőt.',
+        'Megkaptuk a hirdetésfeladását. Néhány percen belül küldünk egy e-mailt, amiben egy linkre kattintva jelszót állíthat be — utána rögtön folytathatja a hirdetés összeállítását és feltöltheti a fényképeket. Ha nem találja a levelet, nézze meg a spam mappát is.',
     }
   : {
       metaTitle: 'Advertentie plaatsen — Uw woning in West-Europa',
       metaDescription:
-        'Plaats uw advertentie vanaf € 69. In 5 talen, in 8 landen, zonder exclusiviteit. Vul het formulier in — het betaalverzoek ontvangt u per e-mail.',
+        'Plaats uw advertentie vanaf € 69. In 5 talen, in 8 landen, zonder exclusiviteit. Vul het formulier in — u betaalt pas na goedkeuring.',
       eyebrow: 'Adverteren',
       title: 'Plaats uw woning',
       titleEm: 'in West-Europa',
-      body: 'Vul onderstaand formulier in. Wij controleren de gegevens en sturen u per e-mail een betaalverzoek. Na ontvangst van de betaling kunt u foto’s uploaden en verzorgen wij de vertaling en publicatie.',
+      body: 'Vul onderstaand formulier in. U ontvangt direct een e-mail waarmee u een wachtwoord instelt en zelf verdergaat met uw advertentie — inclusief de foto’s. Wij beoordelen hem, en pas daarna betaalt u.',
       processHead: 'Het proces',
       steps: [
         { n: '01', t: 'Formulier invullen', b: 'U geeft de gegevens van de woning en het gewenste pakket door.' },
-        { n: '02', t: 'Betaalverzoek', b: 'U ontvangt per e-mail een betaalverzoek voor het gekozen pakket.' },
-        { n: '03', t: 'Bankoverschrijving', b: 'U kunt overmaken naar onze Nederlandse of Hongaarse rekening.' },
-        { n: '04', t: 'Foto’s uploaden', b: 'Na de betaling ontvangt u de rechten om foto’s te uploaden.' },
-        { n: '05', t: 'Vertaling', b: 'Wij laten de tekst door moedertaalsprekers vertalen.' },
-        { n: '06', t: 'Publicatie', b: 'Binnen enkele werkdagen staat de advertentie online, in 5 talen.' },
+        { n: '02', t: 'Account openen', b: 'U krijgt een e-mail met een link om een wachtwoord in te stellen — uw gegevens staan er al in.' },
+        { n: '03', t: 'Advertentie samenstellen', b: 'In uw eigen omgeving vult u de tekst aan en uploadt u de foto’s. Neem er rustig de tijd voor.' },
+        { n: '04', t: 'Beoordeling', b: 'Onze medewerker beoordeelt de advertentie en vraagt zo nodig om een aanpassing.' },
+        { n: '05', t: 'Betaling', b: 'Na goedkeuring betaalt u — met creditcard of per overschrijving. Voor een afgewezen advertentie betaalt u nooit.' },
+        { n: '06', t: 'Publicatie', b: 'Zodra de betaling binnen is staat de advertentie direct online, in 5 talen en 8 landen.' },
       ],
       formHead: 'Aanmeldformulier',
       formNote:
@@ -115,11 +115,11 @@ const t = hu
       yes: 'Ja, toon mijn naam en telefoonnummer',
       no: 'Nee, toon alleen de gegevens van FODEL',
       bankHead: 'Onze bankrekeningen',
-      bankNote: 'Na ontvangst van het betaalverzoek kunt u naar deze rekeningen overmaken.',
+      bankNote: 'Na goedkeuring van uw advertentie kunt u naar deze rekeningen overmaken — of in uw eigen omgeving met creditcard betalen.',
       submit: 'Advertentie aanmelden',
       successTitle: 'Dank u wel!',
       successBody:
-        'Wij hebben uw aanmelding ontvangen. Wij controleren de gegevens en sturen u op werkdagen tussen 09:00 en 18:00 per e-mail een betaalverzoek.',
+        'Wij hebben uw aanmelding ontvangen. Binnen enkele minuten ontvangt u een e-mail met een link om een wachtwoord in te stellen — daarna gaat u direct verder met uw advertentie en de foto’s. Kijk ook even in uw spammap.',
     };
 
 const categoryOptions = (Object.keys(CATEGORIES) as CategoryKey[]).map((key) => ({
@@ -164,6 +164,12 @@ const categoryOptions = (Object.keys(CATEGORIES) as CategoryKey[]).map((key) => 
     <div class="form-head">
       <Eyebrow space="20px">{t.formHead}</Eyebrow>
       <p class="form-note">{t.formNote}</p>
+      <p class="form-note">
+        {locale === 'hu' ? 'Már hirdet nálunk? ' : 'Adverteert u al bij ons? '}
+        <a href="/portal/login" rel="nofollow">
+          {locale === 'hu' ? 'Lépjen be a hirdetői felületre' : 'Log in op het adverteerdersportaal'}
+        </a>{locale === 'hu' ? ' — onnan új hirdetést is indíthat.' : ' — daar start u ook een nieuwe advertentie.'}
+      </p>
     </div>
 
     <div class="form-body">
@@ -376,6 +382,14 @@ const categoryOptions = (Object.keys(CATEGORIES) as CategoryKey[]).map((key) => 
     font-size: var(--fs-body);
     line-height: var(--lh-body);
     color: var(--taupe);
+  }
+  .form-note + .form-note {
+    margin-top: 14px;
+  }
+  .form-note a {
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
   .form-body {
     display: grid;

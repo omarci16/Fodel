@@ -1,14 +1,24 @@
 /**
- * Turns a valid invite into a real account: creates the Supabase Auth user
- * (the admin client is required for this — no ordinary session can create
- * another user), creates their profile row with the role the invite
- * specified, marks the invite used, then signs them in through the normal
- * session-aware client so the browser leaves with a real session cookie.
+ * Turns a valid invite into a real account.
+ *
+ * Creates the Supabase Auth user (the admin client is required — no ordinary
+ * session may create another user), creates their profile row with the role
+ * the invite specified, marks the invite used, then signs them in through the
+ * normal session-aware client so the browser leaves with a real session cookie.
+ *
+ * FODEL 1.1 adds one branch: an invite may carry a `payload` from the public
+ * ad-submission form. When it does, the answers that person already typed on
+ * the website become a pre-filled draft listing, and they land inside it
+ * rather than on an empty dashboard. Asking someone to retype the settlement,
+ * price and description they just submitted is the fastest way to lose them
+ * between the form and the portal.
  */
 import type { APIRoute } from 'astro';
 import crypto from 'node:crypto';
 import { createSupabaseAdminClient } from '~/lib/supabase-server';
-import { sendEmail, templates } from '~/lib/email/send';
+import { deliver, templates } from '~/lib/email/send';
+import { createDraft, applyIntake, type ListingIntake } from '~/lib/portal/properties';
+import { SITE_URL } from '~/config/site.mjs';
 
 export const prerender = false;
 
@@ -29,13 +39,16 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
 
   const { data: invite } = await admin
     .from('invites')
-    .select('id, email, role, expires_at, accepted_at')
+    .select('id, email, role, expires_at, accepted_at, payload')
     .eq('token_hash', tokenHash)
     .maybeSingle();
 
   if (!invite || invite.accepted_at || new Date(invite.expires_at) < new Date()) {
     return fail('a meghívó már nem érvényes');
   }
+
+  const payload = (invite.payload ?? {}) as Partial<ListingIntake> & { locale?: string };
+  const locale = payload.locale === 'nl' ? 'nl' : 'hu';
 
   const { data: created, error: createError } = await admin.auth.admin.createUser({
     email: invite.email,
@@ -51,6 +64,8 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     role: invite.role,
     full_name: fullName,
     email: invite.email,
+    phone: payload.phone ?? null,
+    locale,
   });
   if (profileError) {
     return fail(profileError.message);
@@ -58,8 +73,8 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
 
   await admin.from('invites').update({ accepted_at: new Date().toISOString() }).eq('id', invite.id);
 
-  // Establish a real session (sets cookies via the request/response pair),
-  // as opposed to the admin client above, which never touches cookies.
+  // Establish a real session (sets cookies via the request/response pair), as
+  // opposed to the admin client above, which never touches cookies.
   const { error: signInError } = await locals.supabase.auth.signInWithPassword({
     email: invite.email,
     password,
@@ -68,8 +83,25 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     return redirect('/portal/login');
   }
 
-  const { subject, html } = templates.welcome({ name: fullName });
-  await sendEmail({ to: invite.email, subject, html });
+  await deliver(
+    invite.email,
+    templates.welcome(locale, { name: fullName, portalUrl: `${SITE_URL}/portal/dashboard` })
+  );
+
+  // A self-service registration carries the listing they described on the
+  // public form. Build it now, through the admin client, because the draft is
+  // written before the freshly-created session has propagated.
+  if (payload.settlement || payload.description) {
+    try {
+      const draftId = await createDraft(admin, created.user.id);
+      await applyIntake(admin, draftId, payload as ListingIntake);
+      return redirect(`/portal/properties/${draftId}`);
+    } catch (error) {
+      // A failed pre-fill must never cost someone their account — they are
+      // signed in and can start a listing by hand.
+      console.error('[invite] failed to pre-fill draft from intake payload', error);
+    }
+  }
 
   return redirect('/portal/dashboard');
 };

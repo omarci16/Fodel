@@ -1,8 +1,8 @@
-# FODEL 1.0
+# FODEL 1.1
 
 Astro platform for **FODEL VASTGOED / FODEL INGATLAN** — Hungarian property
-advertised to Western European buyers, with an admin system and an
-invite-only seller portal behind it. Hungarian and Dutch are the two fully
+advertised to Western European buyers, with an admin system and a
+seller portal behind it. Hungarian and Dutch are the two fully
 built markets; German, English and French have a structural bridge page each
 (see [Locales](#locales-hunl-full-deenfr-structural) below).
 
@@ -42,7 +42,7 @@ instead of the real page until `SUPABASE_URL`/`SUPABASE_ANON_KEY` are set and
 | `npm run verify` | Build + full preflight. **Fails until the KvK number is set.** |
 | `npm run verify:dev` | Same, but waives the KvK gate |
 | `npm run verify:rls` | Proves one seller can't read/edit/delete another's listings or reach admin routes — needs a configured Supabase project |
-| `npm run verify:workflow` | Scripted pass through draft → submitted → changes requested → approved → published |
+| `npm run verify:workflow` | Scripted pass through draft → submitted → changes requested → approved → awaiting payment → paid → published, including that an owner cannot publish or settle their own listing |
 | `npm run seed:500` | Generates 500 synthetic listings for search/pagination load-testing |
 | `npm run build:pmtiles` | Builds the self-hosted map basemap (real data-engineering step, not part of `npm run build`) |
 | `npm run og` | Regenerates `public/og/fodel-default.jpg` |
@@ -58,7 +58,13 @@ images Astro emits alongside the optimised variants (11 MB, unreferenced).
    Frankfurt/`eu-central-1` recommended — closest to Hungary/Netherlands).
 2. SQL Editor → paste and run, in order: `supabase/migrations/0001_init.sql`,
    `0002_seed_properties.sql`, `0003_portal_infrastructure.sql`,
-   `0004_search.sql`.
+   `0004_search.sql`, `0005_fodel_11.sql`.
+
+   **`0005` must be run in two steps**, and it says so at the top of the file.
+   Its first statement adds a value to an enum, and PostgreSQL refuses to use a
+   newly-added enum value inside the same transaction that added it — pasting
+   the whole file at once fails with *"unsafe use of new value
+   'awaiting_payment'"*. Run the single `alter type` line, then the rest.
 3. Project Settings → API → copy the Project URL, `anon` key and
    `service_role` key into `.env` as `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
    `SUPABASE_SERVICE_ROLE_KEY`.
@@ -67,9 +73,11 @@ images Astro emits alongside the optimised variants (11 MB, unreferenced).
 
 To get into the portal, an admin account has to exist first — there's no
 "first admin" self-signup by design (an unauthenticated route that creates
-an admin account would be a real security hole). Create the first admin by
-hand once, in the Supabase SQL Editor, after signing up a user any way you
-like (e.g. Authentication → Users → Add user in the dashboard):
+an admin account would be a real security hole). Sellers do self-register in
+1.1, but only ever as `owner`, and only by proving they control the mailbox
+they signed up with. Create the first admin by hand once, in the Supabase SQL
+Editor, after signing up a user any way you like (e.g. Authentication → Users
+→ Add user in the dashboard):
 ```sql
 insert into profiles (id, role, email, full_name)
 values ('<the user''s auth.users id>', 'admin', 'you@example.com', 'Your Name');
@@ -112,13 +120,52 @@ sharp-optimised images. Layered on top:
   it ever reaches Supabase Storage (`src/lib/media.ts`) — strips EXIF/GPS,
   neutralises anything embedded outside the actual image data, caps
   resolution.
-- **Email**: `src/lib/email/send.ts` — six lifecycle emails (invite,
-  welcome, submission received, approved, changes requested, new enquiry),
-  same log-instead-of-fail pattern as the public forms when `RESEND_API_KEY`
-  is unset.
-- **Payments**: `src/lib/stripe.ts` — real plumbing, inert behind
-  `STRIPE_ENABLED=false`. FODEL's live process is bank transfer; nothing
-  changes for a visitor unless that flag is deliberately turned on.
+- **Email**: `src/lib/email/` — eleven lifecycle emails, each written in the
+  *recipient's* own language (`profiles.locale`), rendered through one
+  table-based, inline-styled shell built for real mail clients
+  (`layout.ts`), with a hand-written plain-text alternative for every one.
+  Copy lives in `copy/hu.ts` and `copy/nl.ts`, and `nl.ts` is type-checked
+  against `hu.ts` — adding a template without translating it is a compile
+  error, not a Hungarian email in a Dutch inbox. Same log-instead-of-fail
+  pattern as the public forms when `RESEND_API_KEY` is unset, plus two
+  retries on a transient failure. **Preview them all at `/dev/emails`**
+  (development only; 404s in production).
+- **Payments**: an admin approves a listing, the owner is emailed what it
+  costs, and paying publishes it — see **The listing lifecycle** below.
+  `src/lib/orders.ts` builds and prices orders from the catalogue in
+  `src/config/company.ts`; `src/lib/stripe.ts` is only the client and the
+  on/off switch. Behind `STRIPE_ENABLED=false` the whole flow still works —
+  the email carries bank details instead of a card button and an admin
+  publishes once the transfer lands.
+
+### The listing lifecycle
+
+```
+                    ┌──────────────── request_changes ◀───────────────┐
+                    ▼                                                 │
+  draft ──submit──▶ submitted ──approve──▶ awaiting_payment ──┬──[card]──▶ published
+    ▲                                                         │
+    │                                    publish_manually ────┘        published ──▶ sold
+    └── changes_requested ◀── (owner edits, submits again)              (bank transfer)
+```
+
+Who may do what is enforced twice: the status machine in
+`src/pages/api/portal/properties/[id]/status.ts` decides which transitions are
+legal, and Row-Level Security decides independently whose rows anyone may
+touch at all. RLS cannot express "only from exactly this status to exactly
+that one", which is why the first half lives in app code — but the half that
+matters for security is in the database.
+
+The two things worth knowing:
+
+- **`approve` does not publish.** It builds an order from the catalogue,
+  writes it to `payments`, and moves the listing to `awaiting_payment`. Money
+  publishes it — either the Stripe webhook or an admin confirming a transfer.
+- **`publishProperty()` (`src/lib/portal/publish.ts`) is the only place a
+  listing goes live**, and it is idempotent. Stripe retries webhooks; running
+  it twice must not send a second "you're online!" email.
+
+`npm run verify:workflow` walks this whole path against a real database.
 
 ### Locales: hu/nl full, de/en/fr structural
 
@@ -151,6 +198,9 @@ serves the real production output.
 
 ## Before this can go live
 
+0. **Run `supabase/migrations/0005_fodel_11.sql`** against the project, in the
+   two steps its header describes. Nothing in 1.1 — payment, password reset,
+   self-registration, photo captions — works without it.
 1. **KvK number.** Not published on any FODEL property, and Dutch law requires it
    on the website. Set `registration.kvk` in `src/config/company.ts`. Until then
    the footer and colofon render a red `—` and `npm run verify` fails.
@@ -166,6 +216,13 @@ serves the real production output.
    restatement. Diff against fodel.hu/gyik before launch.
 5. **`RESEND_API_KEY`** and a verified sender domain, or no form reaches anyone.
 6. **Photography rights** for the six demo listings.
+7. **`PMTILES_URL`.** Until it is set, *every* map on the site — the location
+   map on a listing as well as the browse map — renders "not available". Build
+   the basemap with `npm run build:pmtiles` and host the file anywhere public.
+8. **Stripe, only if card payment is wanted at launch.** Set the two keys, flip
+   `STRIPE_ENABLED`, and register the webhook endpoint (see `.env.example`).
+   Leaving it off is a supported, fully working configuration — not a
+   half-finished one.
 
 ---
 
@@ -190,9 +247,11 @@ src/
   lib/                      properties.ts (public, RLS-scoped reads + search)
                             · supabase.ts (anon client) · supabase-server.ts
                             (portal's session + admin clients) · media.ts
-                            (upload processing) · email/ (lifecycle emails)
-                            · stripe.ts · map-style.ts · seo.ts · format.ts
-                            · page.ts · form-handler.ts
+                            (upload processing) · orders.ts (pricing an
+                            approved listing) · portal/publish.ts (the only
+                            path to going live) · email/ (layout · templates ·
+                            copy/hu · copy/nl) · stripe.ts · map-style.ts
+                            · seo.ts · format.ts · page.ts · form-handler.ts
   middleware.ts              Portal auth/role gate — a convenience layer;
                             RLS is the real boundary
   layouts/Base.astro         Public-site head, canonical, hreflang, JSON-LD
@@ -238,9 +297,24 @@ first-visit win is worth more, and first visit is what converts a search visitor
 throttled connection the 111 kB image competed with the CSS for bandwidth and
 cost ~0.4s of LCP. The A/B is in the git history.
 
-**Payments are deliberately absent.** FODEL's published process is form →
-díjbekérő by email → bank transfer → photo upload → translation → publication.
-The ad-submission form is step one of that flow. No gateway is needed.
+**Money is taken after approval, never before.** FODEL approves a listing
+first, then the owner pays, then it publishes. The alternative — charging at
+submission — means holding money for listings that are then rejected, which
+needs a refund process, a policy in the terms, and someone to operate both.
+This way there is nothing to refund, ever.
+
+**Bank transfer is not the fallback, it is the primary method.** It is what
+FODEL publish and what most of their sellers use. Card payment is the
+addition. `publish_manually` in `status.ts` is a first-class action for
+exactly this reason, not a workaround.
+
+**Self-registration goes through the invite mechanism.** The public
+ad-submission form doesn't create an account directly — it writes an
+`invites` row carrying the form's answers and emails a link. The token proves
+the person controls that mailbox (an unauthenticated endpoint that creates
+accounts lets anyone register under someone else's address), and their
+answers become a pre-filled draft when they accept. Reusing the invite path
+meant no second, less-tested way into the portal.
 
 **Forms work without JavaScript.** With JS they post via `fetch` and swap in a
 success panel; without it the browser does a native POST and the endpoint
@@ -293,7 +367,16 @@ and explicit dimensions on every image · modern image formats · crawlable link
 everything except a map, a generous gzipped ceiling for pages that show one) ·
 legal preflight. `npm run verify:rls` and `npm run verify:workflow` need a
 configured Supabase project and aren't part of the default `verify` chain for
-that reason — run them once the database is set up.
+that reason — run them once the database is set up. Since 1.1 `verify:rls`
+also proves one seller cannot read another's orders or review notes, and that
+no signed-in user can read `password_resets` (a readable reset token is an
+account takeover).
+
+**The emails cannot be verified by a script.** Run `npm run dev`, open
+`/dev/emails`, and check them in Gmail, Outlook on Windows (the strictest
+renderer by a distance), Apple Mail and iOS, in both light and dark mode.
+Twenty-two pieces of HTML that have to survive Word's rendering engine is not
+something source review catches.
 
 `npm run verify:contrast` asserts the design tokens clear WCAG AA and guards
 against the prototype's failing alpha values returning.

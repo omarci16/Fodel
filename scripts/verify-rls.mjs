@@ -120,7 +120,52 @@ async function main() {
   if (invitesAttempt && invitesAttempt.length > 0) fail('owner B (non-admin) could read the invites table');
   else pass('owner B (non-admin) cannot read the invites table');
 
-  // 6. Once published, the SAME property must become publicly readable —
+  // 6. FODEL 1.1 — one owner must not see another's order. `payments` gained
+  // an owner-read policy so a seller can see what they owe; the risk that
+  // introduces is that it reads *everyone's*, which is FODEL's commercial data.
+  const { data: orderA } = await admin
+    .from('payments')
+    .insert({
+      property_id: propertyId,
+      owner_id: ownerA.id,
+      amount_cents: 12900,
+      currency: 'eur',
+      status: 'pending',
+      line_items: [{ kind: 'package', id: 'normal-12m', quantity: 1, unitCents: 12900, label: 'test' }],
+    })
+    .select('id')
+    .single();
+
+  const { data: paymentsAttempt } = await clientB.from('payments').select('id, amount_cents');
+  if (paymentsAttempt && paymentsAttempt.length > 0) fail("owner B could read owner A's orders");
+  else pass("owner B cannot read owner A's orders");
+
+  // 7. And must not be able to settle one.
+  const { data: paidAttempt } = await clientB
+    .from('payments')
+    .update({ status: 'paid' })
+    .eq('id', orderA.id)
+    .select();
+  if (paidAttempt && paidAttempt.length > 0) fail("owner B could mark an order paid");
+  else pass('owner B cannot mark an order paid');
+
+  // 8. review_notes opened to owners in 1.1 — same question, same risk.
+  await admin.from('review_notes').insert({
+    property_id: propertyId,
+    author_id: ownerA.id,
+    note: 'RLS test note',
+  });
+  const { data: notesAttempt } = await clientB.from('review_notes').select('note');
+  if (notesAttempt && notesAttempt.length > 0) fail("owner B could read review notes on owner A's listing");
+  else pass("owner B cannot read review notes on owner A's listing");
+
+  // 9. password_resets is service-role only — no signed-in user may read it,
+  // because a readable reset token is an account takeover.
+  const { data: resetAttempt } = await clientB.from('password_resets').select('token_hash');
+  if (resetAttempt && resetAttempt.length > 0) fail('a signed-in user could read password_resets');
+  else pass('password_resets is unreadable to signed-in users');
+
+  // 10. Once published, the SAME property must become publicly readable —
   // proves the policy is a real status-based gate, not just "always deny".
   await admin.from('properties').update({ status: 'published', published_at: new Date().toISOString() }).eq('id', propertyId);
   const publicClient = createClient(url, anonKey, { auth: { persistSession: false } });
@@ -129,6 +174,8 @@ async function main() {
   else pass('published property IS publicly readable — the gate is status-based, not a blanket deny');
 
   // Cleanup.
+  await admin.from('payments').delete().eq('property_id', propertyId);
+  await admin.from('review_notes').delete().eq('property_id', propertyId);
   await admin.from('properties').delete().eq('id', propertyId);
 
   console.log(`\n${failures === 0 ? 'PASS' : 'FAIL'} — ${failures} failure(s)\n`);

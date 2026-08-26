@@ -10,6 +10,7 @@
  */
 import type { APIRoute } from 'astro';
 import { LOCALE_OPTIONS } from '~/lib/portal/properties';
+import { extractYouTubeId } from '~/lib/video';
 
 export const prerender = false;
 
@@ -74,6 +75,27 @@ export const POST: APIRoute = async ({ request, params, locals, redirect }) => {
 
   if (!patch.settlement || !patch.county || !patch.region || patch.lat == null || patch.lng == null) {
     return back('error=' + encodeURIComponent('minden helyszín mező kitöltése kötelező'));
+  }
+  if (patch.lat < 45.7 || patch.lat > 48.6 || patch.lng < 16 || patch.lng > 22.9) {
+    return back('error=' + encodeURIComponent('a szélesség/hosszúság Magyarország határain kívül esik (szélesség: 45.7–48.6, hosszúság: 16–22.9)'));
+  }
+  if (patch.price_eur <= 0 || patch.price_huf <= 0) {
+    return back('error=' + encodeURIComponent('az árnak pozitív számnak kell lennie'));
+  }
+  if (patch.plot_m2 <= 0) {
+    return back('error=' + encodeURIComponent('a telekméretnek pozitív számnak kell lennie'));
+  }
+  // Reject a video link that won't embed, at the point of typing. The same
+  // extractor the public page uses decides — so if it passes here, the player
+  // on the listing will work. Otherwise the seller pays €36 for a video
+  // placement and finds out weeks later that nothing renders.
+  if (patch.video_url && !extractYouTubeId(patch.video_url)) {
+    return back(
+      'error=' +
+        encodeURIComponent(
+          'a videó URL nem ismerhető fel — YouTube-linket adjon meg (pl. https://www.youtube.com/watch?v=… vagy https://youtu.be/…)'
+        )
+    );
   }
 
   const { error: updateError } = await supabase.from('properties').update(patch).eq('id', id);

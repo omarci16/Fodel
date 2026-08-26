@@ -23,6 +23,7 @@ import {
   activeProperties,
   searchProperties,
   regionsOf,
+  countiesOf,
   categoriesOf,
   PRICE_BANDS,
   priceBandLabel,
@@ -46,13 +47,19 @@ const params = Astro.url.searchParams;
 // visitor pivot to a different filter instead of hitting a dead end.
 const facetSource = await activeProperties();
 const regions = regionsOf(facetSource);
+const counties = countiesOf(facetSource);
 const categories = categoriesOf(facetSource);
 
 const q = params.get('q') ?? '';
 const type = params.get('type') ?? '';
 const region = params.get('region') ?? '';
+// County was supported by search_properties() and searchProperties() from
+// Stage 6 but never had a control. Hungarian buyers navigate by county far
+// more naturally than by FODEL's larger marketing regions.
+const county = params.get('county') ?? '';
 const priceBandId = params.get('price') ?? '';
 const beds = params.get('beds') ?? '';
+const floor = params.get('floor') ?? '';
 const sort = (params.get('sort') as 'featured' | 'price-asc' | 'price-desc' | 'area-desc') || 'featured';
 const page = Math.max(1, Number(params.get('page') ?? '1') || 1);
 
@@ -68,14 +75,25 @@ const { properties, total, perPage } = await searchProperties({
   q,
   category: type || undefined,
   region: region || undefined,
+  county: county || undefined,
   priceMin: priceBand?.min,
   priceMax: priceBand?.max,
+  floorMin: floor ? Number(floor) : undefined,
   bedroomsMin: beds ? Number(beds) : undefined,
   bbox,
   sort,
   page,
 });
 const totalPages = Math.max(1, Math.ceil(total / perPage));
+
+/** Carries the current search onto the map, so switching view keeps the filters. */
+const mapHref = (() => {
+  const next = new URLSearchParams(params);
+  next.delete('page');
+  next.delete('bbox'); // the map sets its own bounds
+  const query = next.toString();
+  return query ? `${path(locale, 'map')}?${query}` : path(locale, 'map');
+})();
 
 const title = heading ?? (locale === 'hu' ? 'Ingatlanok' : 'Ons aanbod');
 const defaultDescription =
@@ -151,6 +169,14 @@ function withParam(key: string, value: string): string {
       </div>
 
       <div class="fcell">
+        <label for="f-county">{ui.filters.county}</label>
+        <select id="f-county" name="county">
+          <option value="">{ui.filters.all}</option>
+          {counties.map((c) => <option value={c} selected={c === county}>{c}</option>)}
+        </select>
+      </div>
+
+      <div class="fcell">
         <label for="f-price">{ui.filters.price}</label>
         <select id="f-price" name="price">
           <option value="">{ui.filters.all}</option>
@@ -167,6 +193,16 @@ function withParam(key: string, value: string): string {
       </div>
 
       <div class="fcell">
+        <label for="f-floor">{ui.filters.areaFrom}</label>
+        <select id="f-floor" name="floor">
+          <option value="">{ui.filters.any}</option>
+          {[60, 90, 120, 180, 250].map((n) => (
+            <option value={String(n)} selected={String(n) === floor}>{n}+ m²</option>
+          ))}
+        </select>
+      </div>
+
+      <div class="fcell">
         <label for="f-sort">{ui.filters.sort}</label>
         <select id="f-sort" name="sort">
           <option value="featured" selected={sort === 'featured'}>{ui.filters.sortFeatured}</option>
@@ -177,9 +213,25 @@ function withParam(key: string, value: string): string {
       </div>
     </div>
 
+    {
+      bbox && (
+        <>
+          {/* Preserved across a filter change: without this the hidden bbox is
+              dropped the moment someone touches a select, and "search this
+              area" silently stops applying. */}
+          <input type="hidden" name="bbox" value={bboxParam} />
+          <p class="area-note">
+            {ui.filters.areaFiltered} ·{' '}
+            <a href={withParam('bbox', '')}>{locale === 'hu' ? 'Szűrés törlése' : 'Filter wissen'}</a>
+          </p>
+        </>
+      )
+    }
+
     <div class="filter-foot">
       <p class="count" role="status">{ui.filters.results(total)}</p>
       <div class="filter-actions">
+        <a href={mapHref} class="reset map-link">{ui.filters.viewMap}</a>
         <a href={path(locale, 'properties')} class="reset">{ui.filters.reset}</a>
         <button type="submit" class="reset submit-btn">{ui.filters.search}</button>
       </div>
@@ -285,9 +337,16 @@ function withParam(key: string, value: string): string {
     outline: var(--focus-ring);
     outline-offset: 2px;
   }
+  /* Seven cells since 1.1 (type, region, county, price, beds, area, sort), so
+     the dividers are drawn by a 1px grid gap over a border-coloured ground
+     rather than per-cell borders. That was fine at a fixed five across; with a
+     count that wraps, `:last-child { border-right: none }` starts erasing the
+     wrong edges. This version doesn't care how many cells there are. */
   .filter-row {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--border);
     border: 1px solid var(--border);
   }
   .fcell {
@@ -295,11 +354,8 @@ function withParam(key: string, value: string): string {
     flex-direction: column;
     gap: 8px;
     padding: 18px 22px;
-    border-right: 1px solid var(--border);
+    background: var(--cream);
     min-width: 0;
-  }
-  .fcell:last-child {
-    border-right: none;
   }
   .fcell label {
     font-family: var(--sans);
@@ -325,12 +381,31 @@ function withParam(key: string, value: string): string {
     background-repeat: no-repeat;
   }
 
+  .area-note {
+    font-size: var(--fs-small);
+    color: var(--taupe);
+    padding-top: 14px;
+  }
+  .area-note a {
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
   .filter-foot {
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 16px;
     padding-top: 18px;
+  }
+  .map-link {
+    text-decoration: none;
+    border: 1px solid var(--border);
+    padding: 9px 16px;
+  }
+  .map-link:hover {
+    border-color: var(--ink);
   }
   .count {
     font-size: var(--fs-small);
@@ -400,16 +475,6 @@ function withParam(key: string, value: string): string {
   @media (max-width: 1000px) {
     .filter-row {
       grid-template-columns: 1fr 1fr;
-    }
-    .fcell {
-      border-bottom: 1px solid var(--border);
-    }
-    .fcell:nth-child(2n) {
-      border-right: none;
-    }
-    .fcell:last-child {
-      grid-column: 1 / -1;
-      border-bottom: none;
     }
     .grid {
       grid-template-columns: 1fr 1fr;

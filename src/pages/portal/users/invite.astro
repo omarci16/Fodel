@@ -28,6 +28,14 @@ const err = Astro.url.searchParams.get('error');
         <option value="admin">Admin</option>
       </select>
     </div>
+    <div class="field">
+      <label for="locale">Nyelv</label>
+      <select id="locale" name="locale">
+        <option value="hu">Magyar</option>
+        <option value="nl">Holland</option>
+      </select>
+      <p class="hint">Ezen a nyelven kapja a meghívót és az összes további értesítést.</p>
+    </div>
     <button type="submit" class="btn">Meghívó küldése</button>
   </form>
 
@@ -47,6 +55,8 @@ const err = Astro.url.searchParams.get('error');
   .field { display: flex; flex-direction: column; margin-bottom: 18px; }
   label { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--taupe); margin-bottom: 8px; }
   input, select { border: 1px solid var(--border); background: #fff; padding: 11px 12px; font-size: var(--fs-body); color: var(--ink); }
+
+  .hint { margin-top: 8px; font-size: var(--fs-micro); line-height: 1.6; color: var(--taupe); }
 
   .btn { padding: 12px 24px; background: var(--ink); color: var(--cream); font-size: var(--fs-micro); letter-spacing: var(--ls-button); text-transform: uppercase; }
   .back { display: inline-block; margin-top: 24px; font-size: var(--fs-small); text-decoration: underline; color: var(--taupe); }
