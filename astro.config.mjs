@@ -30,6 +30,34 @@ import { SITE_URL, LOCALES, DEFAULT_LOCALE } from './src/config/site.mjs';
 export default defineConfig({
   site: SITE_URL,
   output: 'server',
+  // Every POST form on the site (portal login, enquiries, ad submission,
+  // search requests…) was returning "Cross-site POST form submissions are
+  // forbidden" in production. Not a bug in the form code: Astro's CSRF check
+  // (security.checkOrigin, on by default) compares the browser's real Origin
+  // header against Astro's own reconstruction of the request's origin — and
+  // Astro has never trusted Host/X-Forwarded-Host for that reconstruction
+  // unless the real domain is explicitly allowlisted here (added in Astro
+  // 5.14.2, specifically to stop a spoofed forwarded-header attack). Without
+  // this, Astro fell back to "localhost" for every request, which can never
+  // match a real Origin header — so the check failed on every single
+  // same-site submission, not just cross-site ones. Verified directly: a
+  // POST to the live site with the *correct* Origin header still 403'd until
+  // this was added. Vercel's own dynamic per-deployment preview URLs
+  // (fodel-<hash>-….vercel.app) are deliberately left out — they already sit
+  // behind Vercel's own SSO gate (confirmed live: an anonymous request to
+  // one redirects to vercel.com/sso-api), so an attacker can't reach them to
+  // exploit the gap anyway, and they change on every deploy.
+  security: {
+    allowedDomains: [
+      { protocol: 'https', hostname: 'fodel.vercel.app' },
+      { protocol: 'https', hostname: 'fodel-marton-oroszs-projects.vercel.app' },
+      { protocol: 'https', hostname: 'fodel-git-main-marton-oroszs-projects.vercel.app' },
+      // The real domain, once DNS is pointed at Vercel — see README's
+      // "Before this can go live".
+      { protocol: 'https', hostname: 'fodel.nl' },
+      { protocol: 'https', hostname: 'www.fodel.nl' },
+    ],
+  },
   // imageService: true — deliberately NOT the build-time-sharp choice this
   // config used to make (see the `image` block below, and the equivalent
   // `imageCDN: false` this project shipped with on Netlify). Verified live:
