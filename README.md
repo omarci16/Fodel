@@ -285,7 +285,7 @@ matching their live `fodel.nl/woonhuis-te-koop-1550/`. When the real inventory
 migrates, the 301 map is mechanical.
 
 **Images are optimised at build time with sharp**, not handed to the host's
-image CDN. `netlify({ imageCDN: false })` in `astro.config.mjs` is deliberate:
+image CDN. `vercel({ imageService: false })` in `astro.config.mjs` is deliberate:
 the output is fast on any host and the file sizes are verifiable in `dist/`.
 
 **CSS is inlined** (`inlineStylesheets: 'always'`). Measured: it removes two
@@ -401,14 +401,15 @@ axe-core (pre-Stage-1): **0 violations** across 13 routes including 390px mobile
 
 ## Deploying
 
-Netlify is configured (`@astrojs/netlify`). Set every variable from
-`.env.example` in the site's environment — at minimum `SUPABASE_URL`,
-`SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`,
-`FODEL_INBOX` and `FODEL_FROM`; `PMTILES_URL` once the basemap is built and
-uploaded; the `STRIPE_*` vars only if card payment is deliberately turned on.
-To move host, swap the adapter in `astro.config.mjs` — nothing else is
-host-specific, though `output: 'server'` (needed for the database-backed
-pages) means the new host must support SSR, not just static hosting.
+Vercel is configured (`@astrojs/vercel`). Set every variable from
+`.env.example` in the project's Environment Variables settings — at minimum
+`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
+`RESEND_API_KEY`, `FODEL_INBOX` and `FODEL_FROM`; `PMTILES_URL` once the
+basemap is built and uploaded; the `STRIPE_*` vars only if card payment is
+deliberately turned on. To move host, swap the adapter in `astro.config.mjs`
+— nothing else is host-specific, though `output: 'server'` (needed for the
+database-backed pages) means the new host must support SSR, not just static
+hosting.
 
 **After launch:** submit `https://fodel.nl/sitemap-index.xml` to Search Console,
 and set up the 301 map from the old fodel.nl URLs when the real inventory

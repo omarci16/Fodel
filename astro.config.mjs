@@ -1,12 +1,12 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 import sitemap from '@astrojs/sitemap';
-import netlify from '@astrojs/netlify';
+import vercel from '@astrojs/vercel';
 
 import { SITE_URL, LOCALES, DEFAULT_LOCALE } from './src/config/site.mjs';
 
 /**
- * FODEL 1.0
+ * FODEL 1.1
  *
  * Hybrid rendering, not fully static any more: property data now lives in
  * Supabase, not in files the build can read once and freeze. Content pages
@@ -22,14 +22,19 @@ import { SITE_URL, LOCALES, DEFAULT_LOCALE } from './src/config/site.mjs';
  * gallery, mobile nav, consent) are small vanilla scripts over server-
  * rendered markup, so listings stay in the HTML for crawlers and JS stays
  * near zero.
+ *
+ * Hosted on Vercel. `output: 'server'` means every route below renders as a
+ * Vercel Serverless Function unless it declares `export const prerender =
+ * true` — nothing host-specific beyond the adapter line itself.
  */
 export default defineConfig({
   site: SITE_URL,
   output: 'server',
-  // imageCDN: false — the adapter otherwise hands every <Image> to Netlify's
-  // image CDN at runtime, which ships the unoptimised originals in dist/ and
-  // ties the build to one host. We optimise with sharp instead.
-  adapter: netlify({ imageCDN: false }),
+  // imageService: false — the adapter otherwise hands every <Image> to
+  // Vercel's own Image Optimization API at runtime, which ships the
+  // unoptimised originals and ties the build to one host. We optimise with
+  // sharp instead, same as the rest of this config's `image` block.
+  adapter: vercel({ imageService: false }),
 
   i18n: {
     defaultLocale: DEFAULT_LOCALE,

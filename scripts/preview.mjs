@@ -11,12 +11,12 @@
  * the defect the rebuild set out to fix.
  *
  * Zero dependencies — node:http only. `astro preview` refuses to run while the
- * Netlify adapter is configured, so this stands in for it.
+ * Vercel adapter is configured, so this stands in for it.
  *
  * Since Stage 1, this only serves the pages that are still static: about,
  * sellers, legal, blog, and so on. Home, the property list, property detail
  * pages and the sold archive now read from Supabase and render on request —
- * they are Netlify functions in the real build, not files in dist/, so this
+ * they are Vercel functions in the real build, not files in dist/, so this
  * server can't show them. Use `npm run dev` to see those.
  */
 import http from 'node:http';
@@ -92,7 +92,7 @@ const server = http.createServer(async (req, res) => {
   const file = await resolve(urlPath);
 
   if (!file) {
-    // These routes are real in the actual build (Netlify functions reading
+    // These routes are real in the actual build (Vercel functions reading
     // from Supabase) but don't exist as files here, so a plain 404 would be
     // misleading — tell the developer why and what to do instead.
     if (/^\/(hu|nl)\/(ingatlanok|woningen|eladva|verkocht)?\/?$|-(elado|te-koop)-\d+\/?$/.test(urlPath)) {
