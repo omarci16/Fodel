@@ -30,11 +30,21 @@ import { SITE_URL, LOCALES, DEFAULT_LOCALE } from './src/config/site.mjs';
 export default defineConfig({
   site: SITE_URL,
   output: 'server',
-  // imageService: false — the adapter otherwise hands every <Image> to
-  // Vercel's own Image Optimization API at runtime, which ships the
-  // unoptimised originals and ties the build to one host. We optimise with
-  // sharp instead, same as the rest of this config's `image` block.
-  adapter: vercel({ imageService: false }),
+  // imageService: true — deliberately NOT the build-time-sharp choice this
+  // config used to make (see the `image` block below, and the equivalent
+  // `imageCDN: false` this project shipped with on Netlify). Verified live:
+  // Astro's own on-demand /_image endpoint 404s once this adapter re-bundles
+  // the server function for a Vercel Serverless Function — every SSR page's
+  // images broke, not just remote ones, because Astro defers *all* <Image>
+  // processing to that endpoint on a page it can't fully pre-render (i.e.
+  // every page here, since all of them read Supabase). This is a known,
+  // reported Astro/adapter bundling bug (withastro/astro#13183 and related
+  // issues), not something fixable from this file alone. Routing every image
+  // through Vercel's own Image Optimization API instead sidesteps the broken
+  // endpoint entirely rather than working around it. The adapter carries our
+  // `image.remotePatterns` below into Vercel's image config automatically,
+  // so Supabase-hosted photos stay allowed with no extra setting here.
+  adapter: vercel({ imageService: true }),
 
   i18n: {
     defaultLocale: DEFAULT_LOCALE,
@@ -66,16 +76,19 @@ export default defineConfig({
   ],
 
   image: {
-    // Optimise at build time with sharp rather than delegating to the host's
-    // image CDN. Costs build seconds, but the output is fast on any host and
-    // the file sizes are verifiable in dist/ instead of taken on trust.
+    // `service` here is what `astro dev` and `astro build`'s own build-time
+    // image generation use (sharp — real, and still what processes every
+    // statically-known image at build time). In production on Vercel, the
+    // adapter's `imageService: true` above additionally takes over the
+    // *on-demand* transform path (astro/dist/assets/endpoint) and points it
+    // at Vercel's Image Optimization API instead — see the adapter comment.
     service: { entrypoint: 'astro/assets/services/sharp' },
     responsiveStyles: true,
     layout: 'constrained',
-    // Property photos a seller uploads through the portal (Stage 3) live in
-    // Supabase Storage, not the repo, so <Image> needs to be allowed to
-    // fetch and transform them on request — the same sharp service handles
-    // both local demo photos and these at request time under SSR.
+    // Property photos a seller uploads through the portal live in Supabase
+    // Storage, not the repo, so <Image> needs to be allowed to fetch and
+    // transform them on request. The Vercel adapter reads this same array to
+    // configure its own Image Optimization API — one list, not two.
     remotePatterns: [{ protocol: 'https', hostname: '*.supabase.co' }],
   },
 
