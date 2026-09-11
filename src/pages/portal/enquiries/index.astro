@@ -156,7 +156,7 @@ const dateFmt = new Intl.DateTimeFormat('hu-HU', {
   .filters a[aria-current='page'] { background: var(--ink); color: var(--cream); border-color: var(--ink); }
 
   .status-line { font-size: var(--fs-small); color: var(--taupe); min-height: 1.4em; margin-bottom: 8px; }
-  .empty { color: var(--taupe); font-size: var(--fs-body); line-height: 1.8; padding: 32px 0; max-width: 60ch; }
+  .empty { color: var(--taupe); font-size: var(--fs-body); line-height: var(--lh-body); padding: 32px 0; max-width: 60ch; }
 
   .cards { list-style: none; display: flex; flex-direction: column; gap: 14px; }
   .card { border: 1px solid var(--border); padding: 20px 22px; background: var(--cream); }
@@ -172,7 +172,7 @@ const dateFmt = new Intl.DateTimeFormat('hu-HU', {
   .about { margin-top: 12px; font-size: var(--fs-small); }
   .about a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
 
-  blockquote { margin: 14px 0 0; padding-left: 16px; border-left: 2px solid var(--border); font-size: var(--fs-body); line-height: 1.8; color: var(--taupe); white-space: pre-line; }
+  blockquote { margin: 14px 0 0; padding-left: 16px; border-left: 2px solid var(--border); font-size: var(--fs-body); line-height: var(--lh-body); color: var(--taupe); white-space: pre-line; }
 
   .card-foot { display: flex; gap: 12px; align-items: center; margin-top: 18px; flex-wrap: wrap; }
   .reply { font-size: var(--fs-micro); letter-spacing: var(--ls-button); text-transform: uppercase; background: var(--ink); color: var(--cream); padding: 9px 18px; }

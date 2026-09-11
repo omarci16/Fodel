@@ -10,11 +10,12 @@
 import Base from '~/layouts/Base.astro';
 import PageHeader from '~/components/PageHeader.astro';
 import Eyebrow from '~/components/Eyebrow.astro';
-import GoldRule from '~/components/GoldRule.astro';
 import Button from '~/components/Button.astro';
+import PackageCard from '~/components/PackageCard.astro';
 import { UI, path, type Locale } from '~/i18n/ui';
-import { COMMISSION, CONTRACT_PRICES } from '~/config/company';
+import { COMMISSION, CONTRACT_PRICES, LISTING_PACKAGES } from '~/config/company';
 import { alternatesFor } from '~/lib/page';
+import { listingServiceSchema } from '~/lib/seo';
 
 interface Props {
   locale: Locale;
@@ -160,6 +161,16 @@ const contractLabels: Record<string, { hu: string; nl: string }> = {
   'en-hu': { hu: 'Angol–magyar', nl: 'Engels–Hongaars' },
   'nl-hu': { hu: 'Holland–magyar', nl: 'Nederlands–Hongaars' },
 };
+
+const packageSchema = listingServiceSchema(locale, {
+  name: t.packagesHead,
+  description: t.metaDescription,
+  url: path(locale, 'priceList'),
+  packages: LISTING_PACKAGES.map((cfg, i) => ({
+    name: t.packages[i].name,
+    priceEur: cfg.priceEur,
+  })),
+});
 ---
 
 <Base
@@ -167,6 +178,7 @@ const contractLabels: Record<string, { hu: string; nl: string }> = {
   title={t.metaTitle}
   description={t.metaDescription}
   alternates={alternatesFor('priceList')}
+  schema={[packageSchema]}
 >
   <PageHeader
     eyebrow={t.eyebrow}
@@ -183,30 +195,7 @@ const contractLabels: Record<string, { hu: string; nl: string }> = {
     <div class="package-grid">
       {
         t.packages.map((pkg: any) => (
-          <article class:list={['package', { featured: pkg.featured }]}>
-            <header>
-              <h2>{pkg.name}</h2>
-              <p class="duration">{pkg.duration}</p>
-            </header>
-            <p class="price">{pkg.price}</p>
-            {pkg.priceAlt && (
-              <p class="price-alt">
-                <strong>{pkg.priceAlt}</strong> — {pkg.priceAltNote}
-              </p>
-            )}
-            <GoldRule class="pkg-rule" />
-            <ul>
-              {pkg.features.map((f: string) => (
-                <li>
-                  <span class="dash" aria-hidden="true" />
-                  <span>{f}</span>
-                </li>
-              ))}
-            </ul>
-            <Button variant={pkg.featured ? 'dark' : 'outline'} href={path(locale, 'submitAd')} block>
-              {t.cta}
-            </Button>
-          </article>
+          <PackageCard pkg={pkg} mode="link" ctaLabel={t.cta} ctaHref={path(locale, 'submitAd')} />
         ))
       }
     </div>
@@ -298,52 +287,6 @@ const contractLabels: Record<string, { hu: string; nl: string }> = {
     grid-template-columns: 1fr 1fr;
     gap: 32px;
   }
-  .package {
-    display: flex;
-    flex-direction: column;
-    border: 1px solid var(--border);
-    padding: 40px;
-  }
-  .package.featured {
-    background: var(--linen);
-    border-color: var(--ink);
-  }
-  .package h2 {
-    font-family: var(--serif);
-    font-weight: var(--fw-display);
-    font-size: 26px;
-    color: var(--ink);
-  }
-  .duration {
-    font-size: var(--fs-eyebrow);
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--taupe);
-    margin-top: 6px;
-  }
-  .price {
-    font-family: var(--serif);
-    font-weight: var(--fw-light);
-    font-size: clamp(44px, 5vw, 68px);
-    line-height: 1;
-    color: var(--ink);
-    margin: 24px 0 8px;
-  }
-  .price-alt {
-    font-size: var(--fs-small);
-    line-height: 1.7;
-    color: var(--taupe);
-    /* Reserved on both cards so the rules and feature lists line up, whether
-       or not the package has a second price tier. */
-    min-height: 2.6em;
-  }
-  .package:not(:has(.price-alt)) .pkg-rule {
-    margin-top: calc(24px + 2.6em);
-  }
-  :global(.pkg-rule) {
-    margin: 24px 0;
-  }
-  .package ul,
   .services ul {
     display: flex;
     flex-direction: column;
@@ -352,13 +295,12 @@ const contractLabels: Record<string, { hu: string; nl: string }> = {
     margin-bottom: 32px;
     flex: 1;
   }
-  .package li,
   .services li {
     display: flex;
     gap: 14px;
     align-items: flex-start;
     font-size: var(--fs-body);
-    line-height: 1.75;
+    line-height: var(--lh-body);
     color: var(--taupe);
   }
   .dash {
@@ -388,7 +330,7 @@ const contractLabels: Record<string, { hu: string; nl: string }> = {
     text-align: left;
     padding: 18px 0;
     border-bottom: 1px solid var(--border);
-    font-weight: var(--fw-light);
+    font-weight: var(--fw-body);
     font-size: var(--fs-body);
     line-height: 1.6;
     color: var(--taupe);
@@ -422,7 +364,7 @@ const contractLabels: Record<string, { hu: string; nl: string }> = {
   }
   .note {
     font-size: var(--fs-small);
-    line-height: 1.75;
+    line-height: var(--lh-body);
     color: var(--taupe);
     margin-top: 16px;
   }
@@ -467,9 +409,6 @@ const contractLabels: Record<string, { hu: string; nl: string }> = {
     .two-col {
       grid-template-columns: 1fr;
       gap: 28px;
-    }
-    .package {
-      padding: 28px 24px;
     }
     .extras,
     .two-col,

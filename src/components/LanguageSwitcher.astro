@@ -1,0 +1,238 @@
+---
+/**
+ * Replaces the flat HU | NL text list with a flag + code dropdown that can
+ * carry all seven markets FODEL sells in, without widening LOCALES —
+ * hu/nl link to their real alternate, en/de/fr point at the existing
+ * bridge pages, it/es render disabled with a "coming soon" chip.
+ *
+ * Used twice per page (desktop nav + mobile drawer), so ids are randomised
+ * per render rather than hardcoded, and the toggle script below is written
+ * to set up every `[data-switcher]` instance it finds.
+ */
+import Flag from './Flag.astro';
+import { LOCALE_META, SWITCHER_LOCALES, UI, type Locale } from '~/i18n/ui';
+
+interface Props {
+  locale: Locale;
+  alternates?: Partial<Record<Locale, string>>;
+  align?: 'left' | 'right';
+}
+
+const { locale, alternates = {}, align = 'right' } = Astro.props;
+const ui = UI[locale];
+const current = LOCALE_META[locale];
+const uid = Math.random().toString(36).slice(2, 8);
+const menuId = `lang-menu-${uid}`;
+
+const hrefFor = (code: keyof typeof LOCALE_META, status: (typeof SWITCHER_LOCALES)[number]['status']) => {
+  if (status === 'soon') return undefined;
+  if (code === 'hu' || code === 'nl') return alternates[code] ?? `/${code}/`;
+  return `/${code}/`;
+};
+---
+
+<div class="switcher" data-switcher data-align={align}>
+  <button
+    type="button"
+    class="switcher-toggle"
+    aria-expanded="false"
+    aria-controls={menuId}
+  >
+    <Flag code={current.flag} />
+    <span aria-hidden="true">{current.short}</span>
+    <span class="sr-only">{ui.a11y.langSwitch}</span>
+    <span class="switcher-caret" aria-hidden="true">▾</span>
+  </button>
+  <ul class="switcher-menu" id={menuId} inert>
+    {
+      SWITCHER_LOCALES.map(({ code, status }) => {
+        const meta = LOCALE_META[code];
+        const href = hrefFor(code, status);
+        const active = code === locale;
+        return (
+          <li>
+            {href ? (
+              <a
+                href={href}
+                hreflang={code === 'hu' || code === 'nl' ? meta.hreflang : undefined}
+                lang={meta.htmlLang}
+                class:list={['switcher-row', { active }]}
+                aria-current={active ? 'true' : undefined}
+              >
+                <Flag code={meta.flag} />
+                <span class="switcher-name">{meta.label}</span>
+                <span class="switcher-code" aria-hidden="true">
+                  {meta.short}
+                </span>
+              </a>
+            ) : (
+              <span class="switcher-row switcher-row-disabled" aria-disabled="true">
+                <Flag code={meta.flag} />
+                <span class="switcher-name">{meta.label}</span>
+                <span class="switcher-soon">{ui.comingSoon}</span>
+              </span>
+            )}
+          </li>
+        );
+      })
+    }
+  </ul>
+</div>
+
+<script>
+  function setupSwitcher(root: HTMLElement) {
+    const toggle = root.querySelector<HTMLButtonElement>('.switcher-toggle');
+    const menu = root.querySelector<HTMLElement>('.switcher-menu');
+    if (!toggle || !menu) return;
+
+    const setOpen = (open: boolean) => {
+      root.toggleAttribute('data-open', open);
+      toggle.setAttribute('aria-expanded', String(open));
+      menu.inert = !open;
+      if (open) menu.querySelector<HTMLElement>('a, [tabindex]')?.focus();
+    };
+
+    toggle.addEventListener('click', () => {
+      setOpen(toggle.getAttribute('aria-expanded') !== 'true');
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!root.contains(e.target as Node)) setOpen(false);
+    });
+
+    root.addEventListener('focusout', () => {
+      requestAnimationFrame(() => {
+        if (!root.contains(document.activeElement)) setOpen(false);
+      });
+    });
+
+    root.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setOpen(false);
+        toggle.focus();
+      }
+    });
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-switcher]').forEach(setupSwitcher);
+</script>
+
+<style>
+  .switcher {
+    position: relative;
+  }
+  .switcher-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--sans);
+    font-size: var(--fs-micro);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink);
+    background: none;
+    border: none;
+    padding: 6px 2px;
+    cursor: pointer;
+  }
+  .switcher-toggle:hover {
+    color: var(--taupe);
+  }
+  .switcher-caret {
+    font-size: 10px;
+    color: var(--taupe);
+    transition: transform var(--dur-fast) var(--ease);
+  }
+  .switcher[data-open] .switcher-caret {
+    transform: rotate(180deg);
+  }
+
+  .switcher-menu {
+    position: absolute;
+    top: calc(100% + 10px);
+    min-width: 200px;
+    background: var(--cream);
+    border: 1px solid var(--border);
+    box-shadow: 0 14px 34px rgba(16, 42, 67, 0.16);
+    list-style: none;
+    padding: 6px;
+    z-index: 1100;
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+    pointer-events: none;
+    transition:
+      opacity var(--dur-fast) var(--ease),
+      transform var(--dur-fast) var(--ease);
+  }
+  .switcher[data-align='right'] .switcher-menu {
+    right: 0;
+  }
+  .switcher[data-align='left'] .switcher-menu {
+    left: 0;
+  }
+  .switcher[data-open] .switcher-menu {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+  }
+
+  .switcher-row,
+  .switcher-row-disabled {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    font-family: var(--sans);
+    font-size: var(--fs-small);
+    color: var(--ink);
+  }
+  a.switcher-row:hover,
+  a.switcher-row.active {
+    background: var(--linen);
+  }
+  a.switcher-row.active {
+    font-weight: var(--fw-medium);
+  }
+  .switcher-name {
+    flex: 1;
+  }
+  .switcher-code {
+    color: var(--taupe);
+    font-size: var(--fs-micro);
+    letter-spacing: 0.08em;
+  }
+  .switcher-row-disabled {
+    color: var(--taupe);
+    cursor: default;
+  }
+  .switcher-soon {
+    font-size: var(--fs-micro);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    background: var(--linen);
+    border-radius: 999px;
+    padding: 2px 8px;
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .switcher-caret,
+    .switcher-menu {
+      transition: none;
+    }
+    .switcher[data-open] .switcher-menu {
+      transform: none;
+    }
+  }
+</style>

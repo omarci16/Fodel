@@ -47,6 +47,7 @@ export const POST: APIRoute = (context) =>
       { name: 'plotM2', label: 'Telek (m²)', type: 'number', maxLength: 12 },
       { name: 'translations', label: 'Kért fordítások', maxLength: 200 },
       { name: 'highlight', label: 'Kiemelés', maxLength: 120 },
+      { name: 'video', label: 'Videós bemutató', maxLength: 10 },
       { name: 'ownerVisible', label: 'Elérhetőség megjelenítése', maxLength: 20 },
       { name: 'speaks', label: 'Beszélt nyelvek', maxLength: 200 },
       { name: 'description', label: 'Leírás', maxLength: 6000 },
@@ -106,6 +107,8 @@ export const POST: APIRoute = (context) =>
           package: values.package,
           speaks: values.speaks,
           ownerVisible: values.ownerVisible,
+          billingName: values.billingName,
+          billingAddress: values.billingAddress,
         },
       });
       if (error) throw new Error(error.message);

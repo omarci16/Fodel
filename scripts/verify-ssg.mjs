@@ -18,13 +18,25 @@
  * and FODEL have not yet supplied.
  */
 import fs from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { gzipSync } from 'node:zlib';
 
 const root = path.dirname(fileURLToPath(new URL('../package.json', import.meta.url)));
-const dist = path.join(root, 'dist');
+
+// Where the *static* output actually lands. The Vercel adapter splits the
+// build into dist/client (browser-facing files) and dist/server (the function
+// bundle); the Netlify adapter this project shipped on before put everything
+// at dist/ directly. walk() kept finding pages either way, so the page checks
+// carried on passing, but every direct read below — robots.txt, the sitemap,
+// favicon, llms.txt, the OG image, and the legal preflight's colofon/impresszum
+// reads — resolved against the wrong root and either failed or threw ENOENT.
+// Resolve it from what is on disk rather than hard-coding either layout.
+const dist = existsSync(path.join(root, 'dist', 'client'))
+  ? path.join(root, 'dist', 'client')
+  : path.join(root, 'dist');
 const DEV_PORT = 4319;
 const DEV_BASE = `http://localhost:${DEV_PORT}`;
 
@@ -65,6 +77,8 @@ const LIVE_ROUTES = [
   ['nl/verkocht/index.html', '/nl/verkocht/'],
   ['hu/ingatlanok/index.html', '/hu/ingatlanok/'],
   ['nl/woningen/index.html', '/nl/woningen/'],
+  ['hu/hirdetes-feladasa/index.html', '/hu/hirdetes-feladasa/'],
+  ['nl/advertentie-plaatsen/index.html', '/nl/advertentie-plaatsen/'],
 ];
 
 async function fetchLivePages() {
@@ -159,6 +173,8 @@ console.log('Server-rendered content');
     ['hu/arlista/index.html', ['69', '129', '179', '25']],
     ['hu/gyik/index.html', ['ingatlanturistára', 'kizárólagosság']],
     ['nl/veelgestelde-vragen/index.html', ['courtage', 'volmacht']],
+    ['hu/hirdetes-feladasa/index.html', ['Hirdesse ingatlanát', 'Olcsó hirdetés', 'Normál hirdetés']],
+    ['nl/advertentie-plaatsen/index.html', ['Plaats uw woning', 'Voordelige advertentie', 'Normale advertentie']],
   ];
   for (const [name, needles] of checks) {
     const html = getHtml(name);

@@ -1,0 +1,107 @@
+---
+/**
+ * Inline SVG flags for the language switcher — not emoji, which don't
+ * render at all on Windows. Hand-drawn, one shared 4:3 viewBox.
+ */
+type Code = 'hu' | 'nl' | 'gb' | 'de' | 'fr' | 'it' | 'es';
+
+interface Props {
+  code: Code;
+  class?: string;
+}
+
+const { code, class: className } = Astro.props;
+const clipId = `flag-clip-${code}-${Math.random().toString(36).slice(2, 8)}`;
+---
+
+<svg
+  class:list={['flag', className]}
+  viewBox="0 0 24 18"
+  width="20"
+  height="15"
+  aria-hidden="true"
+  focusable="false"
+>
+  <defs>
+    <clipPath id={clipId}>
+      <rect width="24" height="18" rx="2.5" />
+    </clipPath>
+  </defs>
+  <g clip-path={`url(#${clipId})`}>
+    {
+      code === 'hu' && (
+        <>
+          <rect width="24" height="18" fill="#fff" />
+          <rect width="24" height="6" fill="#CE2939" />
+          <rect width="24" height="6" y="12" fill="#436F4D" />
+        </>
+      )
+    }
+    {
+      code === 'nl' && (
+        <>
+          <rect width="24" height="18" fill="#fff" />
+          <rect width="24" height="6" fill="#AE1C28" />
+          <rect width="24" height="6" y="12" fill="#21468B" />
+        </>
+      )
+    }
+    {
+      code === 'de' && (
+        <>
+          <rect width="24" height="6" fill="#000" />
+          <rect width="24" height="6" y="6" fill="#DD0000" />
+          <rect width="24" height="6" y="12" fill="#FFCE00" />
+        </>
+      )
+    }
+    {
+      code === 'fr' && (
+        <>
+          <rect width="24" height="18" fill="#fff" />
+          <rect width="8" height="18" fill="#0055A4" />
+          <rect width="8" height="18" x="16" fill="#EF4135" />
+        </>
+      )
+    }
+    {
+      code === 'it' && (
+        <>
+          <rect width="24" height="18" fill="#fff" />
+          <rect width="8" height="18" fill="#009246" />
+          <rect width="8" height="18" x="16" fill="#CE2B37" />
+        </>
+      )
+    }
+    {
+      code === 'es' && (
+        <>
+          <rect width="24" height="18" fill="#AA151B" />
+          <rect width="24" height="9" y="4.5" fill="#F1BF00" />
+        </>
+      )
+    }
+    {
+      code === 'gb' && (
+        <>
+          <rect width="24" height="18" fill="#012169" />
+          <path d="M0,0 L24,18 M24,0 L0,18" stroke="#fff" stroke-width="3.6" />
+          <path d="M0,0 L10.4,7.8 M24,0 L13.6,10.2" stroke="#C8102E" stroke-width="1.2" />
+          <path d="M0,18 L10.4,10.2 M24,18 L13.6,7.8" stroke="#C8102E" stroke-width="1.2" />
+          <path d="M12,0 V18 M0,9 H24" stroke="#fff" stroke-width="6" />
+          <path d="M12,0 V18 M0,9 H24" stroke="#C8102E" stroke-width="3.6" />
+        </>
+      )
+    }
+  </g>
+</svg>
+
+<style>
+  .flag {
+    display: block;
+    flex-shrink: 0;
+    border-radius: 2.5px;
+    outline: 1px solid rgba(16, 42, 67, 0.12);
+    outline-offset: -0.5px;
+  }
+</style>

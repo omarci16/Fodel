@@ -36,7 +36,11 @@ body {
   background: var(--cream);
   color: var(--ink);
   font-family: var(--sans);
-  font-weight: var(--fw-light);
+  /* Was --fw-light (300). Jost at 300 is a display weight; at reading size it
+     renders as grey texture rather than text, and the whole site inherits from
+     here. 400 is the readable floor for this typeface. Components that want
+     the light weight for a large display numeral still ask for it explicitly. */
+  font-weight: var(--fw-body);
   font-size: var(--fs-body);
   line-height: var(--lh-body);
   -webkit-font-smoothing: antialiased;

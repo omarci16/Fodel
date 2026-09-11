@@ -167,6 +167,10 @@ export type ListingIntake = {
   speaks?: string;
   ownerVisible?: string;
   locale?: string;
+  /** Not applied to the draft — properties has no billing columns. Carried
+   *  through on the invite for a future invoicing stage to read. */
+  billingName?: string;
+  billingAddress?: string;
 };
 
 /**

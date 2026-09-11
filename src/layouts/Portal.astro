@@ -86,17 +86,19 @@ const current = Astro.url.pathname;
   </body>
 </html>
 
-<style>
+<!-- is:global because Astro scopes every selector in a component <style> to
+     that component's cid, including html and body — and <body> here carries
+     no cid attribute, so the scoped versions of these rules matched nothing.
+     global.css already sets the family, colour and background on body; the
+     only thing actually needed here is min-height. -->
+<style is:global>
   html,
   body {
-    background: var(--cream);
     min-height: 100%;
   }
-  body {
-    font-family: var(--sans);
-    color: var(--ink);
-  }
+</style>
 
+<style>
   .topbar {
     display: flex;
     align-items: center;

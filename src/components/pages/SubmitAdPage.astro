@@ -1,22 +1,36 @@
 ---
 /**
- * Ad submission — the page that makes FODEL money, missing from the prototype.
+ * Ad submission — the page that makes FODEL money.
  *
- * The flow matches how the business already works (fodel.hu/szolgaltatas):
- * form → díjbekérő by email → bank transfer → photo upload rights →
- * translation → published in five languages. No card payment, because FODEL
- * do not take card payments.
+ * Rebuilt for FODEL 1.2: the package + price used to live on a separate
+ * /arlista/ page the visitor had to leave and come back from, and the
+ * package <select> posted ids (`normal-12m-129`/`normal-12m-179`) that don't
+ * exist in the catalogue (src/config/company.ts only has `cheap-6m` /
+ * `normal-12m`) — buildOrderLines() threw OrderError('unknown-package') on
+ * the admin's review screen every time. Packages are now selected inline as
+ * real PackageCard radio cards whose values come straight off
+ * LISTING_PACKAGES, so a mismatch is no longer possible by construction; the
+ * €179 tier is still decided server-side from the listing's own forint price
+ * (isAboveThreshold(), in src/lib/orders.ts) — never something the client
+ * asserts.
+ *
+ * The flow otherwise matches how the business already works
+ * (fodel.hu/szolgaltatas): form → díjbekérő by email → bank transfer → photo
+ * upload rights → translation → published in five languages.
  */
 import Base from '~/layouts/Base.astro';
 import PageHeader from '~/components/PageHeader.astro';
 import Eyebrow from '~/components/Eyebrow.astro';
 import Button from '~/components/Button.astro';
+import PackageCard from '~/components/PackageCard.astro';
 import FormShell from '~/components/forms/FormShell.astro';
 import Field from '~/components/forms/Field.astro';
-import { UI, CATEGORIES, path, type Locale, type CategoryKey } from '~/i18n/ui';
-import { COMPANY } from '~/config/company';
+import { UI, CATEGORIES, LOCALE_META, path, type Locale, type CategoryKey } from '~/i18n/ui';
+import { COMPANY, LISTING_PACKAGES, LISTING_EXTRAS, TRANSLATION_LANGUAGES } from '~/config/company';
 import { COUNTIES } from '~/data/features';
 import { alternatesFor } from '~/lib/page';
+import { formatCents } from '~/lib/orders';
+import { listingServiceSchema } from '~/lib/seo';
 
 interface Props {
   locale: Locale;
@@ -35,33 +49,57 @@ const t = hu
       title: 'Hirdesse ingatlanát',
       titleEm: 'Nyugat-Európában',
       body: 'Töltse ki az alábbi űrlapot. Azonnal kap egy e-mailt, amivel jelszót állíthat be, és saját felületén folytathatja a hirdetés összeállítását — a fényképekkel együtt. Munkatársunk átnézi, és csak a jóváhagyás után kell fizetnie.',
+      statCountries: `${COMPANY.reach.countries} országban`,
+      statLanguages: `${COMPANY.reach.languages} nyelven`,
+      statSince: `${COMPANY.founded} óta`,
       processHead: 'A folyamat',
       steps: [
-        { n: '01', t: 'Űrlap kitöltése', b: 'Megadja az ingatlan adatait és a kért csomagot.' },
+        { n: '01', t: 'Csomag kiválasztása', b: 'Kiválasztja a csomagot és a kért kiegészítőket, majd kitölti az ingatlan adatait.' },
         { n: '02', t: 'Fiók megnyitása', b: 'E-mailben küldünk egy linket, amivel jelszót állít be — az itt megadott adatok már be lesznek töltve.' },
         { n: '03', t: 'Hirdetés összeállítása', b: 'Saját felületén kiegészíti a leírást és feltölti a fényképeket. Nem sürgeti semmi.' },
         { n: '04', t: 'Ellenőrzés', b: 'Munkatársunk átnézi a hirdetést, és ha szükséges, javítást kér.' },
         { n: '05', t: 'Fizetés', b: 'A jóváhagyás után rendezi a díjat — bankkártyával vagy átutalással. Elutasított hirdetésért soha nem kell fizetni.' },
         { n: '06', t: 'Megjelenés', b: 'A fizetés beérkezése után a hirdetés azonnal élesedik, 5 nyelven, 8 országban.' },
       ],
+      packagesHead: 'Válasszon csomagot',
+      recommended: 'Ajánlott',
+      packages: [
+        {
+          name: 'Olcsó hirdetés',
+          price: '69 €',
+          duration: '6 hónap',
+          features: [
+            'Legfeljebb 20 kép',
+            'A képek az eredeti állapotban jelennek meg',
+            'A szöveg a beküldött formában jelenik meg',
+          ],
+        },
+        {
+          name: 'Normál hirdetés',
+          price: '129 €',
+          priceAlt: '179 €',
+          priceAltNote: '150 millió Ft feletti ingatlan esetén',
+          duration: '12 hónap',
+          featured: true,
+          features: [
+            'Korlátlan számú kép',
+            'A képeket szakszerűen feldolgozzuk',
+            'A szöveget szakszerűen megszerkesztjük',
+          ],
+        },
+      ],
+      extrasHead: 'Kiegészítők',
+      extraCategoryHighlight: 'Kiemelés a kategóriában',
+      extraHomepageHighlight: 'Kiemelés a főoldalon',
+      extraVideo: 'Videós bemutató',
+      perMonth: '/ hó',
+      minMonths: (n: number) => `min. ${n} hó`,
+      once: 'egyszeri',
+      totalLabel: 'Becsült összeg',
+      totalNote: 'tájékoztató jellegű — a végleges díjat munkatársunk erősíti meg jóváhagyáskor',
       formHead: 'Hirdetésfeladási űrlap',
       formNote:
         'A csillaggal jelölt mezők kitöltése kötelező. Ha bármiben elakad, hívjon minket — szívesen segítünk az űrlap kitöltésében is.',
-      packages: [
-        { value: 'cheap-6m', label: 'Olcsó hirdetés — 6 hónap, max. 20 kép — 69 €' },
-        { value: 'normal-12m-129', label: 'Normál hirdetés — 12 hónap, korlátlan kép — 129 €' },
-        { value: 'normal-12m-179', label: 'Normál hirdetés — 150 M Ft felett — 179 €' },
-      ],
-      translations: 'Kért fordítások',
-      translationsHint:
-        'Nyelvenként 25 €. Javasolt sorrend: holland, német, angol, francia. A magyar nyelvű megjelenés ingyenes.',
-      highlight: 'Kiemelés',
-      highlightOptions: [
-        { value: 'none', label: 'Nem kérek kiemelést' },
-        { value: 'category', label: 'Kategórián belüli kiemelés — 15 €/hó (min. 3 hó)' },
-        { value: 'homepage', label: 'Főoldali kiemelés — 25 €/hó (min. 3 hó)' },
-        { value: 'both', label: 'Mindkettő' },
-      ],
       ownerVisible: 'Megjelenjen az elérhetőségem a hirdetésben?',
       ownerVisibleHint:
         'Ha igen, a külföldi érdeklődő közvetlenül Önt is megkeresheti. Ilyen esetben — ha nincs szükség a segítségünkre — semmilyen jutalékot nem számítunk fel.',
@@ -82,33 +120,57 @@ const t = hu
       title: 'Plaats uw woning',
       titleEm: 'in West-Europa',
       body: 'Vul onderstaand formulier in. U ontvangt direct een e-mail waarmee u een wachtwoord instelt en zelf verdergaat met uw advertentie — inclusief de foto’s. Wij beoordelen hem, en pas daarna betaalt u.',
+      statCountries: `${COMPANY.reach.countries} landen`,
+      statLanguages: `${COMPANY.reach.languages} talen`,
+      statSince: `sinds ${COMPANY.founded}`,
       processHead: 'Het proces',
       steps: [
-        { n: '01', t: 'Formulier invullen', b: 'U geeft de gegevens van de woning en het gewenste pakket door.' },
+        { n: '01', t: 'Pakket kiezen', b: 'U kiest het pakket en de gewenste opties, en vult de gegevens van de woning in.' },
         { n: '02', t: 'Account openen', b: 'U krijgt een e-mail met een link om een wachtwoord in te stellen — uw gegevens staan er al in.' },
         { n: '03', t: 'Advertentie samenstellen', b: 'In uw eigen omgeving vult u de tekst aan en uploadt u de foto’s. Neem er rustig de tijd voor.' },
         { n: '04', t: 'Beoordeling', b: 'Onze medewerker beoordeelt de advertentie en vraagt zo nodig om een aanpassing.' },
         { n: '05', t: 'Betaling', b: 'Na goedkeuring betaalt u — met creditcard of per overschrijving. Voor een afgewezen advertentie betaalt u nooit.' },
         { n: '06', t: 'Publicatie', b: 'Zodra de betaling binnen is staat de advertentie direct online, in 5 talen en 8 landen.' },
       ],
+      packagesHead: 'Kies een pakket',
+      recommended: 'Aanbevolen',
+      packages: [
+        {
+          name: 'Voordelige advertentie',
+          price: '€ 69',
+          duration: '6 maanden',
+          features: [
+            'Maximaal 20 foto’s',
+            'Foto’s worden ongewijzigd geplaatst',
+            'Tekst wordt geplaatst zoals aangeleverd',
+          ],
+        },
+        {
+          name: 'Normale advertentie',
+          price: '€ 129',
+          priceAlt: '€ 179',
+          priceAltNote: 'bij een vraagprijs boven 150 miljoen HUF',
+          duration: '12 maanden',
+          featured: true,
+          features: [
+            'Onbeperkt aantal foto’s',
+            'Foto’s worden professioneel bewerkt',
+            'Tekst wordt professioneel geredigeerd',
+          ],
+        },
+      ],
+      extrasHead: 'Aanvullende opties',
+      extraCategoryHighlight: 'Uitlichten in de categorie',
+      extraHomepageHighlight: 'Uitlichten op de homepage',
+      extraVideo: 'Video plaatsen',
+      perMonth: '/ mnd',
+      minMonths: (n: number) => `min. ${n} mnd`,
+      once: 'eenmalig',
+      totalLabel: 'Geschat bedrag',
+      totalNote: 'indicatief — het definitieve bedrag bevestigen wij bij goedkeuring',
       formHead: 'Aanmeldformulier',
       formNote:
         'Velden met een sterretje zijn verplicht. Loopt u ergens op vast? Bel ons gerust — wij vullen het formulier desgewenst samen met u in.',
-      packages: [
-        { value: 'cheap-6m', label: 'Voordelige advertentie — 6 maanden, max. 20 foto’s — € 69' },
-        { value: 'normal-12m-129', label: 'Normale advertentie — 12 maanden, onbeperkt — € 129' },
-        { value: 'normal-12m-179', label: 'Normale advertentie — boven 150 mln HUF — € 179' },
-      ],
-      translations: 'Gewenste vertalingen',
-      translationsHint:
-        '€ 25 per taal. Aanbevolen volgorde: Nederlands, Duits, Engels, Frans. Publicatie in het Hongaars is gratis.',
-      highlight: 'Uitlichten',
-      highlightOptions: [
-        { value: 'none', label: 'Geen uitlichting' },
-        { value: 'category', label: 'Binnen de categorie — € 15/maand (min. 3 mnd)' },
-        { value: 'homepage', label: 'Op de homepage — € 25/maand (min. 3 mnd)' },
-        { value: 'both', label: 'Beide' },
-      ],
       ownerVisible: 'Mogen wij uw contactgegevens bij de advertentie tonen?',
       ownerVisibleHint:
         'Zo ja, dan kan een buitenlandse geïnteresseerde u rechtstreeks benaderen. Regelt u de koop dan zelf, dan brengen wij geen courtage in rekening.',
@@ -126,6 +188,31 @@ const categoryOptions = (Object.keys(CATEGORIES) as CategoryKey[]).map((key) => 
   value: key,
   label: CATEGORIES[key][locale].label,
 }));
+
+/**
+ * Package cards, ids straight off the catalogue — this zip is what makes the
+ * old id bug impossible: the value posted by the radio input can only ever
+ * be a real LISTING_PACKAGES id, never a hand-typed string.
+ */
+const packageCards = LISTING_PACKAGES.map((cfg, i) => ({
+  id: cfg.id,
+  priceCents: cfg.priceEur * 100,
+  ...t.packages[i],
+}));
+
+const categoryHighlight = LISTING_EXTRAS.find((e) => e.id === 'category-highlight')!;
+const homepageHighlight = LISTING_EXTRAS.find((e) => e.id === 'homepage-highlight')!;
+const videoExtra = LISTING_EXTRAS.find((e) => e.id === 'video')!;
+const translationExtra = LISTING_EXTRAS.find((e) => e.id === 'translation')!;
+
+const defaultPackage = packageCards.find((p) => p.featured) ?? packageCards[0];
+
+const packageSchema = listingServiceSchema(locale, {
+  name: t.packagesHead,
+  description: t.metaDescription,
+  url: path(locale, 'submitAd'),
+  packages: packageCards.map((p) => ({ name: p.name, priceEur: p.priceCents / 100 })),
+});
 ---
 
 <Base
@@ -133,6 +220,7 @@ const categoryOptions = (Object.keys(CATEGORIES) as CategoryKey[]).map((key) => 
   title={t.metaTitle}
   description={t.metaDescription}
   alternates={alternatesFor('submitAd')}
+  schema={[packageSchema]}
 >
   <PageHeader
     eyebrow={t.eyebrow}
@@ -143,166 +231,221 @@ const categoryOptions = (Object.keys(CATEGORIES) as CategoryKey[]).map((key) => 
     secondary={{ label: ui.cta.priceList, href: path(locale, 'priceList') }}
   />
 
-  {/* ── Process ── */}
-  <section class="process">
-    <Eyebrow space="20px">{t.processHead}</Eyebrow>
-    <ol>
-      {
-        t.steps.map((s: any) => (
-          <li>
-            <span class="n">{s.n}</span>
-            <h2>{s.t}</h2>
-            <p>{s.b}</p>
-          </li>
-        ))
-      }
-    </ol>
-  </section>
+  <div class="stats">
+    <div class="stat"><strong>{COMPANY.reach.countries}</strong><span>{t.statCountries}</span></div>
+    <div class="stat"><strong>{COMPANY.reach.languages}</strong><span>{t.statLanguages}</span></div>
+    <div class="stat"><strong>{COMPANY.founded}</strong><span>{t.statSince}</span></div>
+  </div>
 
-  {/* ── Form ── */}
-  <section class="form-section">
-    <div class="form-head">
-      <Eyebrow space="20px">{t.formHead}</Eyebrow>
-      <p class="form-note">{t.formNote}</p>
-      <p class="form-note">
-        {locale === 'hu' ? 'Már hirdet nálunk? ' : 'Adverteert u al bij ons? '}
-        <a href="/portal/login" rel="nofollow">
-          {locale === 'hu' ? 'Lépjen be a hirdetői felületre' : 'Log in op het adverteerdersportaal'}
-        </a>{locale === 'hu' ? ' — onnan új hirdetést is indíthat.' : ' — daar start u ook een nieuwe advertentie.'}
-      </p>
+  <div class="layout">
+    <div class="marketing">
+      {/* ── Process ── */}
+      <section class="process">
+        <Eyebrow space="20px">{t.processHead}</Eyebrow>
+        <ol>
+          {
+            t.steps.map((s) => (
+              <li>
+                <span class="n">{s.n}</span>
+                <h2>{s.t}</h2>
+                <p>{s.b}</p>
+              </li>
+            ))
+          }
+        </ol>
+      </section>
+
+      {/* ── Packages ── */}
+      <section class="packages">
+        <Eyebrow space="20px">{t.packagesHead}</Eyebrow>
+        <div class="package-grid">
+          {
+            packageCards.map((card) => (
+              <PackageCard
+                pkg={card}
+                mode="select"
+                radioName="package"
+                formId="listing-order"
+                checked={card.id === defaultPackage.id}
+                priceCents={card.priceCents}
+                recommendedLabel={t.recommended}
+              />
+            ))
+          }
+        </div>
+      </section>
+
+      {/* ── Extras ── */}
+      <section class="extras">
+        <Eyebrow space="20px">{t.extrasHead}</Eyebrow>
+        <div class="chips">
+          {
+            TRANSLATION_LANGUAGES.map((lang) => (
+              <label class="chip">
+                <input
+                  type="checkbox"
+                  data-extra="translation"
+                  data-price-cents={translationExtra.priceEur * 100}
+                  data-months="1"
+                  data-label={LOCALE_META[lang].label}
+                />
+                <span class="chip-name">{LOCALE_META[lang].label}</span>
+                <span class="chip-price">{formatCents(translationExtra.priceEur * 100)}</span>
+              </label>
+            ))
+          }
+          <label class="chip">
+            <input
+              type="checkbox"
+              data-extra="category-highlight"
+              data-price-cents={categoryHighlight.priceEur * 100}
+              data-months={categoryHighlight.minMonths}
+            />
+            <span class="chip-name">{t.extraCategoryHighlight}</span>
+            <span class="chip-price">
+              {formatCents(categoryHighlight.priceEur * 100)} {t.perMonth} · {t.minMonths(categoryHighlight.minMonths!)}
+            </span>
+          </label>
+          <label class="chip">
+            <input
+              type="checkbox"
+              data-extra="homepage-highlight"
+              data-price-cents={homepageHighlight.priceEur * 100}
+              data-months={homepageHighlight.minMonths}
+            />
+            <span class="chip-name">{t.extraHomepageHighlight}</span>
+            <span class="chip-price">
+              {formatCents(homepageHighlight.priceEur * 100)} {t.perMonth} · {t.minMonths(homepageHighlight.minMonths!)}
+            </span>
+          </label>
+          <label class="chip">
+            <input type="checkbox" data-extra="video" data-price-cents={videoExtra.priceEur * 100} data-months="1" />
+            <span class="chip-name">{t.extraVideo}</span>
+            <span class="chip-price">{formatCents(videoExtra.priceEur * 100)} {t.once}</span>
+          </label>
+        </div>
+        <p class="total">
+          {t.totalLabel}: <strong id="order-total-amount">{formatCents(defaultPackage.priceCents)}</strong>
+          <span class="total-note">({t.totalNote})</span>
+        </p>
+      </section>
     </div>
 
-    <div class="form-body">
-      <FormShell
-        locale={locale}
-        endpoint="/api/listing-order"
-        formId="listing-order"
-        submitLabel={t.submit}
-        successTitle={t.successTitle}
-        successBody={t.successBody}
-      >
-        <Field locale={locale} name="name" label={ui.form.name} required autocomplete="name" span="half" />
-        <Field locale={locale} name="email" label={ui.form.email} type="email" required autocomplete="email" span="half" />
-        <Field locale={locale} name="phone" label={ui.form.phone} type="tel" required autocomplete="tel" span="half" />
-        <Field
-          locale={locale}
-          name="package"
-          label={hu ? 'Választott csomag' : 'Gekozen pakket'}
-          type="select"
-          required
-          options={t.packages}
-          span="half"
-        />
+    <div class="form-col">
+      <div class="form-card">
+        <Eyebrow space="20px">{t.formHead}</Eyebrow>
+        <p class="form-note">{t.formNote}</p>
+        <p class="form-note">
+          {locale === 'hu' ? 'Már hirdet nálunk? ' : 'Adverteert u al bij ons? '}
+          <a href="/portal/login" rel="nofollow">
+            {locale === 'hu' ? 'Lépjen be a hirdetői felületre' : 'Log in op het adverteerdersportaal'}
+          </a>{locale === 'hu' ? ' — onnan új hirdetést is indíthat.' : ' — daar start u ook een nieuwe advertentie.'}
+        </p>
 
-        <Field
+        <FormShell
           locale={locale}
-          name="propertyType"
-          label={hu ? 'Ingatlan típusa' : 'Type woning'}
-          type="select"
-          required
-          options={categoryOptions}
-          span="half"
-        />
-        <Field
-          locale={locale}
-          name="county"
-          label={hu ? 'Megye' : 'Comitaat'}
-          type="select"
-          required
-          options={COUNTIES.map((c) => ({ value: c, label: c }))}
-          span="half"
-        />
-        <Field
-          locale={locale}
-          name="settlement"
-          label={hu ? 'Település' : 'Plaats'}
-          required
-          span="half"
-        />
-        <Field
-          locale={locale}
-          name="priceHuf"
-          label={hu ? 'Irányár (Ft)' : 'Vraagprijs (HUF)'}
-          type="number"
-          required
-          min={0}
-          span="half"
-        />
-        <Field
-          locale={locale}
-          name="floorM2"
-          label={hu ? 'Alapterület (m²)' : 'Woonoppervlak (m²)'}
-          type="number"
-          min={0}
-          span="half"
-        />
-        <Field
-          locale={locale}
-          name="plotM2"
-          label={hu ? 'Telekterület (m²)' : 'Perceeloppervlak (m²)'}
-          type="number"
-          min={0}
-          span="half"
-        />
+          endpoint="/api/listing-order"
+          formId="listing-order"
+          submitLabel={t.submit}
+          successTitle={t.successTitle}
+          successBody={t.successBody}
+        >
+          <input type="hidden" name="highlight" id="f-highlight-hidden" value="none" />
+          <input type="hidden" name="translations" id="f-translations-hidden" value="" />
+          <input type="hidden" name="video" id="f-video-hidden" value="" />
 
-        <Field
-          locale={locale}
-          name="translations"
-          label={t.translations}
-          hint={t.translationsHint}
-          placeholder={hu ? 'pl. holland, német' : 'bijv. Duits, Engels'}
-          span="full"
-        />
-        <Field
-          locale={locale}
-          name="highlight"
-          label={t.highlight}
-          type="select"
-          options={t.highlightOptions}
-          span="full"
-        />
-        <Field
-          locale={locale}
-          name="ownerVisible"
-          label={t.ownerVisible}
-          hint={t.ownerVisibleHint}
-          type="select"
-          required
-          options={[
-            { value: 'yes', label: t.yes },
-            { value: 'no', label: t.no },
-          ]}
-          span="full"
-        />
-        <Field
-          locale={locale}
-          name="speaks"
-          label={hu ? 'Milyen nyelven tud kommunikálni?' : 'Welke talen spreekt u?'}
-          hint={
-            hu
-              ? 'Ezt feltüntetjük a hirdetésben, hogy a külföldi érdeklődő előre tudja.'
-              : 'Wij vermelden dit bij de advertentie, zodat geïnteresseerden dit vooraf weten.'
-          }
-          placeholder={hu ? 'pl. magyar, német' : 'bijv. Hongaars, Duits'}
-          span="full"
-        />
-        <Field
-          locale={locale}
-          name="description"
-          label={hu ? 'Az ingatlan leírása' : 'Omschrijving van de woning'}
-          type="textarea"
-          rows={7}
-          hint={
-            hu
-              ? 'Írja le a bővítési lehetőségeket és a közeli infrastruktúrát: víz, város, bevásárlás, orvos, autópálya, repülőtér távolsága.'
-              : 'Beschrijf de uitbreidingsmogelijkheden en de omgeving: water, stad, winkels, huisarts, snelweg en luchthaven.'
-          }
-          span="full"
-        />
+          <Field locale={locale} name="name" label={ui.form.name} required autocomplete="name" span="full" />
+          <Field locale={locale} name="email" label={ui.form.email} type="email" required autocomplete="email" span="full" />
+          <Field locale={locale} name="phone" label={ui.form.phone} type="tel" required autocomplete="tel" span="full" />
 
-        <Field locale={locale} name="billingName" label={hu ? 'Számlázási név' : 'Factuurnaam'} span="half" />
-        <Field locale={locale} name="billingAddress" label={hu ? 'Számlázási cím' : 'Factuuradres'} span="half" />
-      </FormShell>
+          <Field
+            locale={locale}
+            name="propertyType"
+            label={hu ? 'Ingatlan típusa' : 'Type woning'}
+            type="select"
+            required
+            options={categoryOptions}
+            span="full"
+          />
+          <Field
+            locale={locale}
+            name="county"
+            label={hu ? 'Megye' : 'Comitaat'}
+            type="select"
+            required
+            options={COUNTIES.map((c) => ({ value: c, label: c }))}
+            span="full"
+          />
+          <Field locale={locale} name="settlement" label={hu ? 'Település' : 'Plaats'} required span="full" />
+          <Field
+            locale={locale}
+            name="priceHuf"
+            label={hu ? 'Irányár (Ft)' : 'Vraagprijs (HUF)'}
+            type="number"
+            required
+            min={0}
+            span="full"
+          />
+          <Field
+            locale={locale}
+            name="floorM2"
+            label={hu ? 'Alapterület (m²)' : 'Woonoppervlak (m²)'}
+            type="number"
+            min={0}
+            span="full"
+          />
+          <Field
+            locale={locale}
+            name="plotM2"
+            label={hu ? 'Telekterület (m²)' : 'Perceeloppervlak (m²)'}
+            type="number"
+            min={0}
+            span="full"
+          />
+
+          <Field
+            locale={locale}
+            name="ownerVisible"
+            label={t.ownerVisible}
+            hint={t.ownerVisibleHint}
+            type="select"
+            required
+            options={[
+              { value: 'yes', label: t.yes },
+              { value: 'no', label: t.no },
+            ]}
+            span="full"
+          />
+          <Field
+            locale={locale}
+            name="speaks"
+            label={hu ? 'Milyen nyelven tud kommunikálni?' : 'Welke talen spreekt u?'}
+            hint={
+              hu
+                ? 'Ezt feltüntetjük a hirdetésben, hogy a külföldi érdeklődő előre tudja.'
+                : 'Wij vermelden dit bij de advertentie, zodat geïnteresseerden dit vooraf weten.'
+            }
+            placeholder={hu ? 'pl. magyar, német' : 'bijv. Hongaars, Duits'}
+            span="full"
+          />
+          <Field
+            locale={locale}
+            name="description"
+            label={hu ? 'Az ingatlan leírása' : 'Omschrijving van de woning'}
+            type="textarea"
+            rows={6}
+            hint={
+              hu
+                ? 'Írja le a bővítési lehetőségeket és a közeli infrastruktúrát: víz, város, bevásárlás, orvos, autópálya, repülőtér távolsága.'
+                : 'Beschrijf de uitbreidingsmogelijkheden en de omgeving: water, stad, winkels, huisarts, snelweg en luchthaven.'
+            }
+            span="full"
+          />
+
+          <Field locale={locale} name="billingName" label={hu ? 'Számlázási név' : 'Factuurnaam'} span="full" />
+          <Field locale={locale} name="billingAddress" label={hu ? 'Számlázási cím' : 'Factuuradres'} span="full" />
+        </FormShell>
+      </div>
 
       <aside class="bank">
         <Eyebrow space="20px">{t.bankHead}</Eyebrow>
@@ -328,19 +471,111 @@ const categoryOptions = (Object.keys(CATEGORIES) as CategoryKey[]).map((key) => 
         </div>
       </aside>
     </div>
-  </section>
+  </div>
 </Base>
 
+<script>
+  const NBSP = ' ';
+  function formatCents(cents: number): string {
+    return `€${NBSP}${(cents / 100).toLocaleString('de-DE', {
+      minimumFractionDigits: cents % 100 === 0 ? 0 : 2,
+      maximumFractionDigits: 2,
+    })}`;
+  }
+
+  const totalEl = document.getElementById('order-total-amount');
+  const highlightHidden = document.getElementById('f-highlight-hidden') as HTMLInputElement | null;
+  const translationsHidden = document.getElementById('f-translations-hidden') as HTMLInputElement | null;
+  const videoHidden = document.getElementById('f-video-hidden') as HTMLInputElement | null;
+  const packageInputs = document.querySelectorAll<HTMLInputElement>('input[name="package"]');
+  const extraInputs = document.querySelectorAll<HTMLInputElement>('[data-extra]');
+
+  function recalc() {
+    let totalCents = 0;
+
+    const checkedPackage = document.querySelector<HTMLInputElement>('input[name="package"]:checked');
+    if (checkedPackage) totalCents += Number(checkedPackage.dataset.priceCents ?? 0);
+
+    const languages: string[] = [];
+    let highlightCategory = false;
+    let highlightHomepage = false;
+    let videoChecked = false;
+
+    extraInputs.forEach((input) => {
+      if (!input.checked) return;
+      const priceCents = Number(input.dataset.priceCents ?? 0);
+      const months = Number(input.dataset.months ?? 1);
+      totalCents += priceCents * months;
+
+      if (input.dataset.extra === 'translation') languages.push(input.dataset.label ?? '');
+      if (input.dataset.extra === 'category-highlight') highlightCategory = true;
+      if (input.dataset.extra === 'homepage-highlight') highlightHomepage = true;
+      if (input.dataset.extra === 'video') videoChecked = true;
+    });
+
+    if (totalEl) totalEl.textContent = formatCents(totalCents);
+    if (translationsHidden) translationsHidden.value = languages.join(', ');
+    if (highlightHidden) {
+      highlightHidden.value =
+        highlightCategory && highlightHomepage
+          ? 'both'
+          : highlightCategory
+            ? 'category'
+            : highlightHomepage
+              ? 'homepage'
+              : 'none';
+    }
+    if (videoHidden) videoHidden.value = videoChecked ? 'yes' : '';
+  }
+
+  packageInputs.forEach((input) => input.addEventListener('change', recalc));
+  extraInputs.forEach((input) => input.addEventListener('change', recalc));
+  recalc();
+</script>
+
 <style>
+  .stats {
+    display: flex;
+    gap: 40px;
+    flex-wrap: wrap;
+    padding: 0 var(--pad-x) 44px;
+  }
+  .stat {
+    border-top: 2px solid var(--accent);
+    padding-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .stat strong {
+    font-family: var(--serif);
+    font-weight: var(--fw-display);
+    font-size: 28px;
+    color: var(--ink);
+  }
+  .stat span {
+    font-size: var(--fs-micro);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--taupe);
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 420px;
+    gap: 64px;
+    align-items: start;
+    padding: 0 var(--pad-x) var(--section-y);
+  }
 
   .process {
-    padding: 24px var(--pad-x) 64px;
+    padding-bottom: 56px;
     border-bottom: 1px solid var(--border);
   }
   .process ol {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 32px 40px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 28px 32px;
     list-style: none;
     counter-reset: step;
   }
@@ -352,68 +587,141 @@ const categoryOptions = (Object.keys(CATEGORIES) as CategoryKey[]).map((key) => 
     display: block;
     font-family: var(--serif);
     font-weight: var(--fw-light);
-    font-size: 34px;
+    font-size: 30px;
     line-height: 1;
     color: var(--accent);
-    opacity: 0.62; /* was .45 — 2.64:1, below the 3:1 large-text floor */
-    margin-bottom: 14px;
+    opacity: 0.62;
+    margin-bottom: 12px;
   }
   .process h2 {
     font-family: var(--serif);
     font-weight: var(--fw-display);
-    font-size: 19px;
+    font-size: 18px;
     color: var(--ink);
-    margin-bottom: 8px;
+    margin-bottom: 6px;
   }
   .process p {
     font-size: var(--fs-small);
-    line-height: 1.8;
+    line-height: var(--lh-body);
     color: var(--taupe);
   }
 
-  .form-section {
-    padding: 64px var(--pad-x) var(--section-y);
+  .packages {
+    padding: 56px 0;
+    border-bottom: 1px solid var(--border);
   }
-  .form-head {
-    max-width: 62ch;
-    margin-bottom: 44px;
+  .package-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+
+  .extras {
+    padding-top: 56px;
+  }
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .chip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid var(--border);
+    padding: 12px 18px;
+    cursor: pointer;
+    transition:
+      border-color 0.25s,
+      background 0.25s;
+  }
+  .chip:has(input:checked) {
+    border-color: var(--ink);
+    background: var(--linen);
+  }
+  .chip:has(input:focus-visible) {
+    outline: var(--focus-ring);
+    outline-offset: 2px;
+  }
+  .chip:hover {
+    border-color: var(--taupe);
+  }
+  .chip input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--ink);
+    flex-shrink: 0;
+  }
+  .chip-name {
+    font-size: var(--fs-small);
+    color: var(--ink);
+  }
+  .chip-price {
+    font-size: var(--fs-micro);
+    color: var(--taupe);
+    white-space: nowrap;
+  }
+
+  .total {
+    font-size: var(--fs-body);
+    color: var(--ink);
+  }
+  .total strong {
+    font-family: var(--serif);
+    font-size: var(--fs-lead);
+  }
+  .total-note {
+    display: block;
+    font-size: var(--fs-micro);
+    color: var(--taupe);
+    margin-top: 4px;
+  }
+
+  .form-col {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    position: sticky;
+    top: calc(var(--nav-h) + 24px);
+  }
+  .form-card {
+    background: var(--linen);
+    border-top: 3px solid var(--accent);
+    box-shadow: 0 20px 50px rgba(16, 42, 67, 0.08);
+    padding: 40px;
   }
   .form-note {
-    font-size: var(--fs-body);
+    font-size: var(--fs-small);
     line-height: var(--lh-body);
     color: var(--taupe);
   }
   .form-note + .form-note {
-    margin-top: 14px;
+    margin-top: 10px;
   }
   .form-note a {
     color: var(--ink);
     text-decoration: underline;
     text-underline-offset: 3px;
   }
-  .form-body {
-    display: grid;
-    grid-template-columns: 1fr 340px;
-    gap: 64px;
-    align-items: start;
+  .form-card :global(.fields) {
+    margin-top: 24px;
   }
 
   .bank {
-    position: sticky;
-    top: calc(var(--nav-h) + 20px);
-    background: var(--linen);
-    border-left: 2px solid var(--accent);
-    padding: 32px;
+    background: var(--cream);
+    border: 1px solid var(--border);
+    padding: 28px;
   }
   .bank-note {
     font-size: var(--fs-small);
-    line-height: 1.75;
+    line-height: var(--lh-body);
     color: var(--taupe);
-    margin-bottom: 24px;
+    margin-bottom: 20px;
   }
   .bank dl > div {
-    padding-bottom: 16px;
-    margin-bottom: 16px;
+    padding-bottom: 14px;
+    margin-bottom: 14px;
     border-bottom: 1px solid var(--border);
   }
   .bank dt {
@@ -457,27 +765,30 @@ const categoryOptions = (Object.keys(CATEGORIES) as CategoryKey[]).map((key) => 
   }
 
   @media (max-width: 1000px) {
-    .form-body {
+    .layout {
       grid-template-columns: 1fr;
       gap: 40px;
     }
-    .bank {
+    .form-col {
       position: static;
-    }
-    .process ol {
-      grid-template-columns: 1fr 1fr;
     }
   }
   @media (max-width: 700px) {
-    .process {
-      padding: 16px var(--pad-x-mob) 44px;
+    .stats {
+      padding: 0 var(--pad-x-mob) 32px;
+      gap: 28px;
+    }
+    .layout {
+      padding: 0 var(--pad-x-mob) var(--section-y-mob);
     }
     .process ol {
       grid-template-columns: 1fr;
-      gap: 24px;
     }
-    .form-section {
-      padding: 44px var(--pad-x-mob) var(--section-y-mob);
+    .package-grid {
+      grid-template-columns: 1fr;
+    }
+    .form-card {
+      padding: 28px 24px;
     }
   }
 </style>

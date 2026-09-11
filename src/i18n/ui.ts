@@ -15,12 +15,43 @@ export const PLANNED_LOCALES = ['hu', 'nl', 'de', 'en', 'fr'] as const;
 export type PlannedLocale = (typeof PLANNED_LOCALES)[number];
 
 export const LOCALE_META = {
-  hu: { htmlLang: 'hu', ogLocale: 'hu_HU', hreflang: 'hu', label: 'Magyar', short: 'HU' },
-  nl: { htmlLang: 'nl', ogLocale: 'nl_NL', hreflang: 'nl', label: 'Nederlands', short: 'NL' },
-  de: { htmlLang: 'de', ogLocale: 'de_DE', hreflang: 'de', label: 'Deutsch', short: 'DE' },
-  en: { htmlLang: 'en', ogLocale: 'en_GB', hreflang: 'en', label: 'English', short: 'EN' },
-  fr: { htmlLang: 'fr', ogLocale: 'fr_FR', hreflang: 'fr', label: 'Français', short: 'FR' },
+  hu: { htmlLang: 'hu', ogLocale: 'hu_HU', hreflang: 'hu', label: 'Magyar', short: 'HU', flag: 'hu' },
+  nl: { htmlLang: 'nl', ogLocale: 'nl_NL', hreflang: 'nl', label: 'Nederlands', short: 'NL', flag: 'nl' },
+  de: { htmlLang: 'de', ogLocale: 'de_DE', hreflang: 'de', label: 'Deutsch', short: 'DE', flag: 'de' },
+  en: { htmlLang: 'en', ogLocale: 'en_GB', hreflang: 'en', label: 'English', short: 'EN', flag: 'gb' },
+  fr: { htmlLang: 'fr', ogLocale: 'fr_FR', hreflang: 'fr', label: 'Français', short: 'FR', flag: 'fr' },
+  it: { htmlLang: 'it', ogLocale: 'it_IT', hreflang: 'it', label: 'Italiano', short: 'IT', flag: 'it' },
+  es: { htmlLang: 'es', ogLocale: 'es_ES', hreflang: 'es', label: 'Español', short: 'ES', flag: 'es' },
 } as const;
+
+export type SwitcherLocale = keyof typeof LOCALE_META;
+
+/**
+ * What the nav's language menu offers, and how far each market actually goes.
+ *
+ *   full   — the whole site exists in this language (LOCALES)
+ *   bridge — one self-contained page pointing into the Dutch site
+ *            (src/pages/{de,en,fr}/index.astro — see LocaleBridgePage)
+ *   soon   — announced, not built. Rendered disabled, with no href.
+ *
+ * This drives presentation only. It deliberately does NOT widen LOCALES:
+ * ROUTES and UI are typed for hu/nl, and scripts/verify-ssg.mjs enforces
+ * hreflang reciprocity — emitting an alternate for a language with no page
+ * behind it fails the build, and rightly so. Base.astro's `alternates` prop is
+ * still the only thing that produces an hreflang tag.
+ */
+export const SWITCHER_LOCALES = [
+  { code: 'hu', status: 'full' },
+  { code: 'nl', status: 'full' },
+  { code: 'en', status: 'bridge' },
+  { code: 'de', status: 'bridge' },
+  { code: 'fr', status: 'bridge' },
+  { code: 'it', status: 'soon' },
+  { code: 'es', status: 'soon' },
+] as const satisfies ReadonlyArray<{
+  code: SwitcherLocale;
+  status: 'full' | 'bridge' | 'soon';
+}>;
 
 /** Verbatim per market. These are the lines FODEL leads with today. */
 export const BRAND = {
@@ -200,6 +231,7 @@ export const UI = {
     menu: 'Menü',
     close: 'Bezárás',
     language: 'Nyelv',
+    comingSoon: 'Hamarosan',
 
     nav: {
       home: 'Kezdőlap',
@@ -213,6 +245,7 @@ export const UI = {
 
     cta: {
       contact: 'Kapcsolat',
+      login: 'Bejelentkezés',
       callback: 'Ingyenes visszahívás',
       allProperties: 'Összes ingatlan',
       viewProperty: 'Megtekintés',
@@ -337,6 +370,7 @@ export const UI = {
     menu: 'Menu',
     close: 'Sluiten',
     language: 'Taal',
+    comingSoon: 'Binnenkort',
 
     nav: {
       home: 'Home',
@@ -350,6 +384,7 @@ export const UI = {
 
     cta: {
       contact: 'Contact',
+      login: 'Inloggen',
       callback: 'Gratis teruggebeld worden',
       allProperties: 'Alle woningen',
       viewProperty: 'Bekijken',

@@ -215,6 +215,43 @@ export function serviceSchema(locale: Locale, name: string, description: string)
   };
 }
 
+/**
+ * The listing packages as an OfferCatalog under one Service node — used on
+ * the price list and the submit-ad page, which both show these figures.
+ * `priceEur` is each package's base list price, matching what the page
+ * actually renders as the headline number (the €179 tier is a conditional
+ * surcharge decided server-side, not a separate advertised price).
+ */
+export function listingServiceSchema(
+  locale: Locale,
+  opts: {
+    name: string;
+    description: string;
+    url: string;
+    packages: { name: string; priceEur: number }[];
+  }
+) {
+  return {
+    '@type': 'Service',
+    name: opts.name,
+    description: opts.description,
+    provider: { '@id': `${SITE}/#organization` },
+    areaServed: { '@type': 'Country', name: 'Hungary' },
+    url: abs(opts.url),
+    hasOfferCatalog: {
+      '@type': 'OfferCatalog',
+      name: opts.name,
+      itemListElement: opts.packages.map((pkg) => ({
+        '@type': 'Offer',
+        itemOffered: { '@type': 'Service', name: pkg.name },
+        price: pkg.priceEur,
+        priceCurrency: 'EUR',
+      })),
+    },
+    inLanguage: LOCALE_META[locale].htmlLang,
+  };
+}
+
 /** FODEL sells video placement at €36 — everything asserted here must also render on the page (see VideoEmbed.astro). */
 export function videoObjectSchema(opts: {
   name: string;

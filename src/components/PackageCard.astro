@@ -1,0 +1,239 @@
+---
+/**
+ * One listing package, in two modes — extracted from PriceListPage so the
+ * submit-ad page can offer the same cards as a real, keyboard-navigable
+ * radio group instead of sending people to /arlista/ and back.
+ *
+ * mode="link"   — today's price-list behaviour: a card ending in a button
+ *                 that goes to the submit page. SEO/copy unchanged.
+ * mode="select" — the whole card is a <label> wrapping a visually-hidden
+ *                 radio input; :has(:checked) carries the selected look.
+ *                 `pkg.id` must be a real catalogue id (src/lib/orders.ts) —
+ *                 this is what gets posted, never a price.
+ */
+import GoldRule from './GoldRule.astro';
+import Button from './Button.astro';
+
+interface PackageCardData {
+  id?: string;
+  name: string;
+  price: string;
+  priceAlt?: string;
+  priceAltNote?: string;
+  duration: string;
+  featured?: boolean;
+  features: string[];
+}
+
+interface Props {
+  pkg: PackageCardData;
+  mode: 'link' | 'select';
+  ctaLabel?: string;
+  ctaHref?: string;
+  radioName?: string;
+  checked?: boolean;
+  recommendedLabel?: string;
+  /** mode="select" only: the id of the <form> this radio posts to — it lives
+   *  outside the form element, in the marketing column. */
+  formId?: string;
+  /** mode="select" only: cents, read by the page's running-total script. */
+  priceCents?: number;
+}
+
+const {
+  pkg,
+  mode,
+  ctaLabel,
+  ctaHref,
+  radioName = 'package',
+  checked = false,
+  recommendedLabel,
+  formId,
+  priceCents,
+} = Astro.props;
+
+const inputId = `pkg-${radioName}-${pkg.id ?? pkg.name}`;
+---
+
+{
+  mode === 'link' ? (
+    <article class:list={['package', { featured: pkg.featured }]}>
+      <header>
+        <h2>{pkg.name}</h2>
+        <p class="duration">{pkg.duration}</p>
+      </header>
+      <p class="price">{pkg.price}</p>
+      {pkg.priceAlt && (
+        <p class="price-alt">
+          <strong>{pkg.priceAlt}</strong> — {pkg.priceAltNote}
+        </p>
+      )}
+      <GoldRule class="pkg-rule" />
+      <ul>
+        {pkg.features.map((f) => (
+          <li>
+            <span class="dash" aria-hidden="true" />
+            <span>{f}</span>
+          </li>
+        ))}
+      </ul>
+      <Button variant={pkg.featured ? 'dark' : 'outline'} href={ctaHref} block>
+        {ctaLabel}
+      </Button>
+    </article>
+  ) : (
+    <label class="package package-select" for={inputId}>
+      <input
+        type="radio"
+        name={radioName}
+        id={inputId}
+        value={pkg.id}
+        checked={checked}
+        required
+        form={formId}
+        data-price-cents={priceCents}
+      />
+      {pkg.featured && recommendedLabel && <span class="badge">{recommendedLabel}</span>}
+      <header>
+        <h2>{pkg.name}</h2>
+        <p class="duration">{pkg.duration}</p>
+      </header>
+      <p class="price">{pkg.price}</p>
+      {pkg.priceAlt && (
+        <p class="price-alt">
+          <strong>{pkg.priceAlt}</strong> — {pkg.priceAltNote}
+        </p>
+      )}
+      <GoldRule class="pkg-rule" />
+      <ul>
+        {pkg.features.map((f) => (
+          <li>
+            <span class="dash" aria-hidden="true" />
+            <span>{f}</span>
+          </li>
+        ))}
+      </ul>
+    </label>
+  )
+}
+
+<style>
+  .package {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border);
+    padding: 40px;
+  }
+  .package.featured {
+    background: var(--linen);
+    border-color: var(--ink);
+  }
+  .package h2 {
+    font-family: var(--serif);
+    font-weight: var(--fw-display);
+    font-size: 26px;
+    color: var(--ink);
+  }
+  .duration {
+    font-size: var(--fs-eyebrow);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--taupe);
+    margin-top: 6px;
+  }
+  .price {
+    font-family: var(--serif);
+    font-weight: var(--fw-light);
+    font-size: clamp(44px, 5vw, 68px);
+    line-height: 1;
+    color: var(--ink);
+    margin: 24px 0 8px;
+  }
+  .price-alt {
+    font-size: var(--fs-small);
+    line-height: 1.7;
+    color: var(--taupe);
+    /* Reserved on both cards so the rules and feature lists line up, whether
+       or not the package has a second price tier. */
+    min-height: 2.6em;
+  }
+  .package:not(:has(.price-alt)) :global(.pkg-rule) {
+    margin-top: calc(24px + 2.6em);
+  }
+  .package :global(.pkg-rule) {
+    margin: 24px 0;
+  }
+  .package ul {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    list-style: none;
+    flex: 1;
+    margin-bottom: 32px;
+  }
+  .package li {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    color: var(--taupe);
+  }
+  .dash {
+    width: 16px;
+    height: 1px;
+    background: var(--accent);
+    margin-top: 13px;
+    flex-shrink: 0;
+  }
+
+  /* mode="select" */
+  .package-select {
+    position: relative;
+    cursor: pointer;
+    transition:
+      border-color 0.3s,
+      background 0.3s;
+  }
+  .package-select input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .package-select:has(input:checked) {
+    border-color: var(--ink);
+    background: var(--linen);
+  }
+  .package-select:has(input:focus-visible) {
+    outline: var(--focus-ring);
+    outline-offset: 2px;
+  }
+  .package-select:hover {
+    border-color: var(--taupe);
+  }
+  .badge {
+    position: absolute;
+    top: 40px;
+    right: 40px;
+    font-size: var(--fs-micro);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--taupe);
+  }
+
+  @media (max-width: 900px) {
+    .package {
+      padding: 28px 24px;
+    }
+    .badge {
+      top: 24px;
+      right: 24px;
+    }
+  }
+</style>

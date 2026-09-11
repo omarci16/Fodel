@@ -147,7 +147,12 @@ const jsonLd = graph([organisationSchema(locale), ...schema]);
   main:focus {
     outline: none;
   }
-  @media (max-width: 768px) {
+  /* 1080px, not 768px. Nav.astro switches to the compact bar + burger at
+     1080px, and .drawer positions itself at var(--nav-h-mob). Reserving the
+     full 112px desktop height down to 768px left 46px of dead space above
+     every page between 769 and 1080px, and put the drawer's top edge in the
+     wrong place across that whole band. One breakpoint, defined once. */
+  @media (max-width: 1080px) {
     .site-body {
       padding-top: var(--nav-h-mob);
     }

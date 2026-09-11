@@ -10,7 +10,8 @@
  */
 import Logo from './Logo.astro';
 import Button from './Button.astro';
-import { UI, LOCALE_META, LOCALES, path, type Locale } from '~/i18n/ui';
+import LanguageSwitcher from './LanguageSwitcher.astro';
+import { UI, path, type Locale } from '~/i18n/ui';
 
 interface Props {
   locale: Locale;
@@ -57,30 +58,12 @@ const isCurrent = (href: string) =>
     </ul>
 
     <div class="nav-end">
-      <ul class="lang" aria-label={ui.a11y.langSwitch}>
-        {
-          LOCALES.map((loc) => {
-            const href = alternates[loc] ?? `/${loc}/`;
-            const active = loc === locale;
-            return (
-              <li>
-                <a
-                  href={href}
-                  hreflang={LOCALE_META[loc].hreflang}
-                  lang={LOCALE_META[loc].htmlLang}
-                  class:list={['lang-link', { active }]}
-                  aria-current={active ? 'true' : undefined}
-                >
-                  <span aria-hidden="true">{LOCALE_META[loc].short}</span>
-                  <span class="sr-only">{LOCALE_META[loc].label}</span>
-                </a>
-              </li>
-            );
-          })
-        }
-      </ul>
+      <LanguageSwitcher locale={locale} alternates={alternates} align="right" />
 
-      <Button variant="outline" href={path(locale, 'contact')} class="nav-cta">
+      <Button variant="outline" href="/portal/login" rel="nofollow" class="nav-cta">
+        {ui.cta.login}
+      </Button>
+      <Button variant="dark" href={path(locale, 'contact')} class="nav-cta">
         {ui.cta.contact}
       </Button>
     </div>
@@ -120,22 +103,8 @@ const isCurrent = (href: string) =>
   </ul>
 
   <div class="drawer-foot">
-    <ul class="lang lang-drawer" aria-label={ui.a11y.langSwitch}>
-      {
-        LOCALES.map((loc) => (
-          <li>
-            <a
-              href={alternates[loc] ?? `/${loc}/`}
-              hreflang={LOCALE_META[loc].hreflang}
-              lang={LOCALE_META[loc].htmlLang}
-              class:list={['lang-link', { active: loc === locale }]}
-            >
-              {LOCALE_META[loc].label}
-            </a>
-          </li>
-        ))
-      }
-    </ul>
+    <LanguageSwitcher locale={locale} alternates={alternates} align="left" />
+    <Button variant="outline" href="/portal/login" rel="nofollow" block>{ui.cta.login}</Button>
     <Button variant="dark" href={path(locale, 'contact')} block>{ui.cta.callback}</Button>
   </div>
 </div>
@@ -239,43 +208,6 @@ const isCurrent = (href: string) =>
     gap: 24px;
   }
 
-  .lang {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    list-style: none;
-    font-family: var(--sans);
-    font-size: var(--fs-micro);
-    letter-spacing: 0.16em;
-  }
-  .lang li + li {
-    border-left: 1px solid var(--border);
-    padding-left: 10px;
-  }
-  .lang-link {
-    color: var(--taupe);
-    font-weight: 300;
-  }
-  .lang-link.active {
-    color: var(--ink);
-    font-weight: var(--fw-medium);
-  }
-  .lang-link:hover {
-    color: var(--ink);
-  }
-
-  .sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-    border: 0;
-  }
-
   .burger {
     display: none;
     flex-direction: column;
@@ -341,13 +273,6 @@ const isCurrent = (href: string) =>
     display: flex;
     flex-direction: column;
     gap: 18px;
-  }
-  .lang-drawer {
-    gap: 14px;
-    font-size: var(--fs-small);
-  }
-  .lang-drawer li + li {
-    padding-left: 14px;
   }
 
   @media (max-width: 1080px) {
