@@ -165,6 +165,33 @@ async function main() {
   if (resetAttempt && resetAttempt.length > 0) fail('a signed-in user could read password_resets');
   else pass('password_resets is unreadable to signed-in users');
 
+  // 11. FODEL 1.2 — one seller must not read another's referrals. A referrer
+  // reads their own rows (so they can see who they've sent FODEL's way); an
+  // unrelated seller must see none of it.
+  const { data: referralA } = await admin
+    .from('referrals')
+    .insert({
+      referrer_id: ownerA.id,
+      referrer_name: 'RLS test referrer',
+      referrer_email: 'owner-a@fodel-test.local',
+      referred_name: 'RLS test referred',
+      referred_email: 'referred@fodel-test.local',
+      status: 'pending',
+    })
+    .select('id')
+    .single();
+
+  const { data: referralsAttempt } = await clientB.from('referrals').select('id');
+  if (referralsAttempt && referralsAttempt.length > 0) fail("owner B could read owner A's referrals");
+  else pass("owner B cannot read owner A's referrals");
+
+  const clientA = await signInAs('owner-a@fodel-test.local', PASSWORD);
+  const { data: ownReferral } = await clientA.from('referrals').select('id').eq('id', referralA.id);
+  if (!ownReferral || ownReferral.length === 0) fail('owner A could not read their own referral');
+  else pass('owner A can read their own referral');
+
+  await admin.from('referrals').delete().eq('id', referralA.id);
+
   // 10. Once published, the SAME property must become publicly readable —
   // proves the policy is a real status-based gate, not just "always deny".
   await admin.from('properties').update({ status: 'published', published_at: new Date().toISOString() }).eq('id', propertyId);

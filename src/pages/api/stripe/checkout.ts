@@ -61,7 +61,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
   const admin = createSupabaseAdminClient();
   const { data: order } = await admin
     .from('payments')
-    .select('id, amount_cents, line_items, status, stripe_session_id')
+    .select('id, amount_cents, discount_cents, line_items, status, stripe_session_id')
     .eq('property_id', propertyId)
     .eq('status', 'pending')
     .order('created_at', { ascending: false })
@@ -81,6 +81,18 @@ export const POST: APIRoute = async ({ request, locals }) => {
   const stripe = getStripe();
   const origin = new URL(request.url).origin;
 
+  // A referral discount lives on its own column, never as a negative
+  // OrderLine — Stripe rejects a negative unit_amount outright. A one-off
+  // coupon reproduces the same breakdown on the seller's statement instead.
+  let discounts: { coupon: string }[] | undefined;
+  if (order.discount_cents && order.discount_cents > 0) {
+    const coupon = await stripe.coupons.create(
+      { amount_off: order.discount_cents, currency: 'eur', duration: 'once', name: 'Ajánlói kedvezmény' },
+      { idempotencyKey: `order-${order.id}-coupon` }
+    );
+    discounts = [{ coupon: coupon.id }];
+  }
+
   const session = await stripe.checkout.sessions.create(
     {
       mode: 'payment',
@@ -94,6 +106,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
         },
         quantity: line.quantity,
       })),
+      ...(discounts ? { discounts } : {}),
       success_url: `${origin}/portal/properties/${propertyId}?payment=success`,
       cancel_url: `${origin}/portal/properties/${propertyId}?payment=cancelled`,
       client_reference_id: order.id,

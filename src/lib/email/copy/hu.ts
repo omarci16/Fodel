@@ -101,6 +101,7 @@ export const HU = {
     body: (title: string, ref: string) =>
       `Jó hír: a(z) „${title}” (#${ref}) hirdetését átnéztük és jóváhagytuk. Már csak a hirdetési díj rendezése van hátra — a fizetés beérkezése után a hirdetés azonnal megjelenik.`,
     orderTitle: 'A hirdetés díja',
+    discountLabel: 'Ajánlói kedvezmény (10%)',
     totalLabel: 'Fizetendő',
     ctaCard: 'Fizetés bankkártyával',
     cardNote: 'A fizetés a Stripe biztonságos felületén történik. A kártyaadatokat a FODEL nem látja és nem tárolja.',
@@ -117,6 +118,7 @@ export const HU = {
     body: (title: string, ref: string) =>
       `A(z) „${title}” (#${ref}) hirdetés díját megkaptuk. A hirdetés élesítve, és mostantól látható a fodel.nl oldalon.`,
     orderTitle: 'Tételek',
+    discountLabel: 'Ajánlói kedvezmény (10%)',
     totalLabel: 'Fizetett összeg',
     vatNote: 'Az összeg a 21% holland áfát tartalmazza. A számlát külön e-mailben küldjük.',
     paidAtLabel: 'Fizetés dátuma',
@@ -151,6 +153,28 @@ export const HU = {
     cta: 'Új jelszó beállítása',
     expiry: 'A link egy óráig érvényes, és csak egyszer használható fel.',
     ignore: 'Ha nem Ön kérte a visszaállítást, hagyja figyelmen kívül ezt a levelet — a jelszava változatlan marad, és nem történik semmi.',
+  },
+
+  referralRegistered: {
+    subject: 'Ajánlását megkaptuk — FODEL',
+    preheader: 'Munkatársunk hamarosan felveszi a kapcsolatot az Ön által ajánlott személlyel.',
+    heading: 'Köszönjük az ajánlást',
+    body: (referredName: string) =>
+      `Megkaptuk ${referredName} adatait. Munkatársunk felveszi vele a kapcsolatot, és ha a hirdetésfeladás létrejön, az Ön következő hirdetésének díjából 10% kedvezményt írunk jóvá.`,
+    note: 'A jóváírás a hirdető fizetése után, kézzel történik — munkatársunk értesíti Önt, amint elérhető.',
+  },
+
+  referralAdminNotice: {
+    subject: (referrerName: string) => `Új ajánlás — ${referrerName}`,
+    preheader: 'Új ajánlói lead érkezett a honlapról.',
+    heading: 'Új ajánlás érkezett',
+    labels: {
+      referrerName: 'Ajánló neve',
+      referrerEmail: 'Ajánló e-mail',
+      referredName: 'Ajánlott neve',
+      referredEmail: 'Ajánlott e-mail',
+    },
+    advice: 'Vegye fel a kapcsolatot az ajánlott személlyel, és — ha hirdetést ad fel — jegyezze fel az ajánlót a jóváíráshoz.',
   },
 };
 // Deliberately not `as const`: this object's *shape* is the contract that

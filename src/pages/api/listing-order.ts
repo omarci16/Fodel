@@ -53,6 +53,7 @@ export const POST: APIRoute = (context) =>
       { name: 'description', label: 'Leírás', maxLength: 6000 },
       { name: 'billingName', label: 'Számlázási név', maxLength: 160 },
       { name: 'billingAddress', label: 'Számlázási cím', maxLength: 300 },
+      { name: 'referralCode', label: 'Ajánló kód', maxLength: 20 },
     ],
     onSuccess: async (values, extras) => {
       const email = values.email.toLowerCase();
@@ -85,6 +86,34 @@ export const POST: APIRoute = (context) =>
       const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
       const expiresAt = new Date(Date.now() + INVITE_DAYS * 24 * 60 * 60 * 1000);
 
+      // A code from ?ref= on the submit page, carried here as a hidden field.
+      // Resolved against a real seller's code — never trusted as-is — so a
+      // typo'd or made-up code simply mints no referral, silently.
+      let referralId: string | null = null;
+      const referralCode = values.referralCode?.trim().toUpperCase();
+      if (referralCode) {
+        const { data: referrer } = await admin
+          .from('profiles')
+          .select('id, full_name, email')
+          .eq('referral_code', referralCode)
+          .maybeSingle();
+        if (referrer) {
+          const { data: referral } = await admin
+            .from('referrals')
+            .insert({
+              referrer_id: referrer.id,
+              referrer_name: referrer.full_name,
+              referrer_email: referrer.email,
+              referred_name: values.name,
+              referred_email: email,
+              status: 'pending',
+            })
+            .select('id')
+            .single();
+          referralId = referral?.id ?? null;
+        }
+      }
+
       // The form answers ride along on the invite and become a pre-filled
       // draft when it is accepted — see api/portal/invite/accept.ts. Asking
       // someone to retype what they just submitted is how you lose them
@@ -109,6 +138,7 @@ export const POST: APIRoute = (context) =>
           ownerVisible: values.ownerVisible,
           billingName: values.billingName,
           billingAddress: values.billingAddress,
+          referralId,
         },
       });
       if (error) throw new Error(error.message);

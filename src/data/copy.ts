@@ -73,6 +73,25 @@ export const COPY: Record<Locale, any> = {
         titleEm: 'bizalommal!',
         body: 'Munkanapokon 09:00–18:00 · A visszahívás ingyenes.',
       },
+      referral: {
+        eyebrow: 'Ajánlói program',
+        title: 'Ajánljon egy hirdetőt,',
+        titleEm: 'kapjon 10%-ot',
+        body: 'Ha valaki az Ön ajánlására ad fel hirdetést a FODEL-nél, 10% kedvezményt kap a csomagjából — és Önnek 10% jóváírást írunk a következő hirdetésére. Ha már hirdetett nálunk, saját ajánlói kódját a portál Beállítások menüjében találja.',
+        steps: [
+          'Ajánlja ismerősét — a lenti űrlappal, vagy adja meg a saját linkjét a portálon',
+          'Munkatársunk felveszi vele a kapcsolatot',
+          'Ha hirdet, ő 10%-ot spórol, Ön 10%-ot jóváírunk',
+        ],
+        formTitle: 'Ajánljon egy ismerőst',
+        fields: {
+          referrerName: 'Az Ön neve',
+          referrerEmail: 'Az Ön e-mail címe',
+          referredName: 'Ajánlott neve',
+          referredEmail: 'Ajánlott e-mail címe',
+        },
+        submit: 'Ajánlás elküldése',
+      },
     },
 
     steps: [
@@ -313,6 +332,25 @@ export const COPY: Record<Locale, any> = {
         title: 'Wij bellen u',
         titleEm: 'graag terug',
         body: 'Op werkdagen 09:00–18:00 · Terugbellen kost u niets.',
+      },
+      referral: {
+        eyebrow: 'Aanbevelingsprogramma',
+        title: 'Beveel een adverteerder aan,',
+        titleEm: 'ontvang 10%',
+        body: 'Plaatst iemand op uw aanbeveling een advertentie bij FODEL, dan krijgt hij 10% korting op zijn pakket — en wij schrijven 10% bij op uw volgende advertentie. Adverteert u al bij ons? Uw eigen aanbevelingscode vindt u onder Instellingen in het portaal.',
+        steps: [
+          'Beveel een kennis aan — met het formulier hieronder, of deel uw eigen link uit het portaal',
+          'Onze medewerker neemt contact op',
+          'Plaatst hij een advertentie, dan bespaart hij 10% en schrijven wij u 10% bij',
+        ],
+        formTitle: 'Beveel een kennis aan',
+        fields: {
+          referrerName: 'Uw naam',
+          referrerEmail: 'Uw e-mailadres',
+          referredName: 'Naam van de aanbevolen persoon',
+          referredEmail: 'E-mailadres van de aanbevolen persoon',
+        },
+        submit: 'Aanbeveling versturen',
       },
     },
 

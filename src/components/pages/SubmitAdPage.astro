@@ -201,6 +201,13 @@ const translationExtra = LISTING_EXTRAS.find((e) => e.id === 'translation')!;
 
 const defaultPackage = packageCards.find((p) => p.featured) ?? packageCards[0];
 
+// A referrer's personal link — fodel.hu/hirdetes-feladasa?ref=ABC12345 — read
+// server-side because the page is SSR'd per request (prerender = false).
+// Resolved server-side against a real seller's referral_code in
+// src/pages/api/listing-order.ts; never trusted here as anything but a
+// string to carry through on the form.
+const referralCode = Astro.url.searchParams.get('ref')?.slice(0, 20) ?? '';
+
 const packageSchema = listingServiceSchema(locale, {
   name: t.packagesHead,
   description: t.metaDescription,
@@ -344,6 +351,7 @@ const packageSchema = listingServiceSchema(locale, {
           <input type="hidden" name="highlight" id="f-highlight-hidden" value="none" />
           <input type="hidden" name="translations" id="f-translations-hidden" value="" />
           <input type="hidden" name="video" id="f-video-hidden" value="" />
+          <input type="hidden" name="referralCode" value={referralCode} />
 
           <Field locale={locale} name="name" label={ui.form.name} required autocomplete="name" span="full" onDark />
           <Field locale={locale} name="email" label={ui.form.email} type="email" required autocomplete="email" span="full" onDark />

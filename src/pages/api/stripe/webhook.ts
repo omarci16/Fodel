@@ -62,7 +62,7 @@ export const POST: APIRoute = async ({ request }) => {
 
     const { data: order } = await admin
       .from('payments')
-      .select('id, property_id, owner_id, amount_cents, line_items, status')
+      .select('id, property_id, owner_id, amount_cents, discount_cents, line_items, status')
       .eq('stripe_session_id', session.id)
       .maybeSingle();
 
@@ -112,7 +112,13 @@ export const POST: APIRoute = async ({ request }) => {
 
 async function sendReceipt(
   admin: any,
-  order: { property_id: string; owner_id: string | null; amount_cents: number; line_items: OrderLine[] },
+  order: {
+    property_id: string;
+    owner_id: string | null;
+    amount_cents: number;
+    discount_cents?: number;
+    line_items: OrderLine[];
+  },
   paidAt: Date
 ): Promise<void> {
   if (!order.owner_id) return;
@@ -140,6 +146,7 @@ async function sendReceipt(
       ref: property.ref,
       title,
       items: linesForEmail(order.line_items ?? []),
+      discount: order.discount_cents ? `−${formatCents(order.discount_cents)}` : undefined,
       total: formatCents(order.amount_cents),
       paidAt: paidAt.toLocaleDateString(locale === 'nl' ? 'nl-NL' : 'hu-HU', {
         year: 'numeric',

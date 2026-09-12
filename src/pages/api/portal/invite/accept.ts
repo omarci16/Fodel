@@ -95,6 +95,12 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     try {
       const draftId = await createDraft(admin, created.user.id);
       await applyIntake(admin, draftId, payload as ListingIntake);
+
+      const referralId = (payload as { referralId?: string | null }).referralId;
+      if (referralId) {
+        await admin.from('referrals').update({ referred_property_id: draftId }).eq('id', referralId);
+      }
+
       return redirect(`/portal/properties/${draftId}`);
     } catch (error) {
       // A failed pre-fill must never cost someone their account — they are

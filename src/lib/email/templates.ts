@@ -322,6 +322,8 @@ export function approvedAwaitingPayment(
     ref: string;
     title: string;
     items: OrderLine[];
+    /** Referral discount, pre-formatted with its own minus sign — see src/lib/orders.ts. */
+    discount?: string;
     total: string;
     payUrl: string | null;
   }
@@ -342,6 +344,8 @@ export function approvedAwaitingPayment(
     ]) +
     small(c.bankNote(`#${opts.ref}`));
 
+  const discountLine = opts.discount ? [[c.discountLabel, opts.discount]] as [string, string][] : [];
+
   return {
     subject: c.subject(opts.ref),
     html: shell({
@@ -352,6 +356,7 @@ export function approvedAwaitingPayment(
         lead(c.body(opts.title, opts.ref)) +
         h2(c.orderTitle) +
         itemisedTotal(opts.items, c.totalLabel, opts.total) +
+        (discountLine.length ? facts(discountLine) : '') +
         small(c.vatNote) +
         cardBlock +
         bankBlock +
@@ -365,7 +370,7 @@ ${c.body(opts.title, opts.ref)}
 
 ${c.orderTitle}
 ${opts.items.map((i) => `  ${i.label} — ${i.amount}`).join('\n')}
-  ${c.totalLabel}: ${opts.total}
+${opts.discount ? `  ${c.discountLabel}: ${opts.discount}\n` : ''}  ${c.totalLabel}: ${opts.total}
 ${c.vatNote}
 ${opts.payUrl ? `\n${textCta(c.ctaCard, opts.payUrl)}\n${c.cardNote}\n` : ''}
 ${c.bankTitle}
@@ -382,10 +387,18 @@ ${common.signOff}`,
 
 export function paymentReceipt(
   locale: EmailLocale,
-  opts: { ref: string; title: string; items: OrderLine[]; total: string; paidAt: string }
+  opts: {
+    ref: string;
+    title: string;
+    items: OrderLine[];
+    discount?: string;
+    total: string;
+    paidAt: string;
+  }
 ): BuiltEmail {
   const c = copyFor(locale).paymentReceipt;
   const common = copyFor(locale).common;
+  const discountLine = opts.discount ? [[c.discountLabel, opts.discount]] as [string, string][] : [];
 
   return {
     subject: c.subject(opts.ref),
@@ -397,6 +410,7 @@ export function paymentReceipt(
         lead(c.body(opts.title, opts.ref)) +
         h2(c.orderTitle) +
         itemisedTotal(opts.items, c.totalLabel, opts.total) +
+        (discountLine.length ? facts(discountLine) : '') +
         facts([[c.paidAtLabel, opts.paidAt]]) +
         small(c.vatNote) +
         signOff(locale),
@@ -409,12 +423,79 @@ ${c.body(opts.title, opts.ref)}
 
 ${c.orderTitle}
 ${opts.items.map((i) => `  ${i.label} — ${i.amount}`).join('\n')}
-  ${c.totalLabel}: ${opts.total}
+${opts.discount ? `  ${c.discountLabel}: ${opts.discount}\n` : ''}  ${c.totalLabel}: ${opts.total}
   ${c.paidAtLabel}: ${opts.paidAt}
 
 ${c.vatNote}
 
 ${common.signOff}`,
+    }),
+  };
+}
+
+/* ── 12. Referral registered (to the referrer) ───────────────────────────── */
+
+export function referralRegistered(
+  locale: EmailLocale,
+  opts: { referredName: string }
+): BuiltEmail {
+  const c = copyFor(locale).referralRegistered;
+  const common = copyFor(locale).common;
+
+  return {
+    subject: c.subject,
+    html: shell({
+      locale,
+      preheader: c.preheader,
+      body: h1(c.heading) + lead(c.body(opts.referredName)) + small(c.note) + signOff(locale),
+    }),
+    text: textShell({
+      locale,
+      body: `${c.heading}
+
+${c.body(opts.referredName)}
+
+${c.note}
+
+${common.signOff}`,
+    }),
+  };
+}
+
+/* ── 13. Referral admin notice (to FODEL) ─────────────────────────────────── */
+
+export function referralAdminNotice(
+  locale: EmailLocale,
+  opts: { referrerName: string; referrerEmail: string; referredName: string; referredEmail: string }
+): BuiltEmail {
+  const c = copyFor(locale).referralAdminNotice;
+  const L = c.labels;
+
+  return {
+    subject: c.subject(opts.referrerName),
+    html: shell({
+      locale,
+      preheader: `${opts.referrerName} → ${opts.referredName}`,
+      body:
+        h1(c.heading) +
+        facts([
+          [L.referrerName, opts.referrerName],
+          [L.referrerEmail, opts.referrerEmail],
+          [L.referredName, opts.referredName],
+          [L.referredEmail, opts.referredEmail],
+        ]) +
+        p(c.advice),
+    }),
+    text: textShell({
+      locale,
+      body: `${c.heading}
+
+${L.referrerName}: ${opts.referrerName}
+${L.referrerEmail}: ${opts.referrerEmail}
+${L.referredName}: ${opts.referredName}
+${L.referredEmail}: ${opts.referredEmail}
+
+${c.advice}`,
     }),
   };
 }
@@ -565,4 +646,6 @@ export const templates = {
   published,
   newEnquiry,
   passwordReset,
+  referralRegistered,
+  referralAdminNotice,
 };

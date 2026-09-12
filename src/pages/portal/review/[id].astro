@@ -19,7 +19,7 @@ export const prerender = false;
 import Portal from '~/layouts/Portal.astro';
 import { getProperty, CATEGORY_LABEL, STATUS_LABEL } from '~/lib/portal/properties';
 import { resolveImage } from '~/lib/property-images';
-import { catalogue, suggestSelection, isAboveThreshold } from '~/lib/orders';
+import { catalogue, suggestSelection, isAboveThreshold, REFERRAL_DISCOUNT_PERCENT } from '~/lib/orders';
 import { eur, huf } from '~/lib/format';
 
 function mediaSrc(storagePath: string): string {
@@ -73,6 +73,31 @@ const { data: openOrder } = await supabase
 const missingCaptions = property.media.filter(
   (m) => !(m.alt as Record<string, string>)?.hu?.trim()
 ).length;
+
+/* ── Referral programme ──────────────────────────────────────────────────
+   Two independent, mutually-exclusive-in-practice tick-boxes on the same
+   order: this listing may itself be the *referred* one (a pending referral
+   points at it), and/or its owner may be a *referrer* sitting on an earned,
+   not-yet-credited 10% from someone else's paid listing. Both resolve to the
+   same payments.discount_cents column — see the approve branch of
+   src/pages/api/portal/properties/[id]/status.ts. */
+const { data: pendingReferral } = await supabase
+  .from('referrals')
+  .select('id, referrer_name')
+  .eq('referred_property_id', property.id)
+  .eq('status', 'pending')
+  .maybeSingle();
+
+const { data: creditableReferral } = property.owner_id
+  ? await supabase
+      .from('referrals')
+      .select('id, referred_name')
+      .eq('referrer_id', property.owner_id)
+      .eq('status', 'applied')
+      .order('updated_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+  : { data: null };
 ---
 
 <Portal title={`Elbírálás — #${property.ref}`}>
@@ -179,7 +204,33 @@ const missingCaptions = property.media.filter(
         ))}
       </fieldset>
 
-      <p class="total">Összesen: <strong id="order-total">—</strong> <span class="vat">(21% áfával)</span></p>
+      {(pendingReferral || creditableReferral) && (
+        <fieldset class="referral">
+          <legend>Ajánlói program</legend>
+          {pendingReferral && (
+            <label class="checkbox">
+              <input type="checkbox" id="referral-discount" checked data-referral-id={pendingReferral.id} />
+              <span>
+                10% ajánlói kedvezmény a csomagból — ajánló: {pendingReferral.referrer_name ?? '—'}
+              </span>
+            </label>
+          )}
+          {creditableReferral && (
+            <label class="checkbox">
+              <input type="checkbox" id="referral-credit" data-referral-id={creditableReferral.id} />
+              <span>
+                A hirdető 10% jóváírásra jogosult (ajánlotta: {creditableReferral.referred_name}) —
+                beszámítás ebbe a rendelésbe
+              </span>
+            </label>
+          )}
+        </fieldset>
+      )}
+
+      <p class="total">
+        Összesen: <strong id="order-total">—</strong> <span class="vat">(21% áfával)</span>
+        <span class="discount-note" id="discount-note" hidden> · 10% ajánlói kedvezmény érvényesítve</span>
+      </p>
     </section>
   )}
 
@@ -203,9 +254,12 @@ const missingCaptions = property.media.filter(
   )}
 </Portal>
 
-<script define:vars={{ propertyId: property.id, aboveThreshold }}>
+<script define:vars={{ propertyId: property.id, aboveThreshold, referralDiscountPercent: REFERRAL_DISCOUNT_PERCENT }}>
   const statusEl = document.getElementById('action-status');
   const totalEl = document.getElementById('order-total');
+  const discountNoteEl = document.getElementById('discount-note');
+  const discountBox = document.getElementById('referral-discount');
+  const creditBox = document.getElementById('referral-credit');
 
   /** Reads the order panel. Ids and counts only — the server prices it. */
   function readOrder() {
@@ -215,19 +269,33 @@ const missingCaptions = property.media.filter(
       const qtyInput = document.querySelector(`[data-qty-for="${box.value}"]`);
       return { id: box.value, quantity: qtyInput ? Number(qtyInput.value) || 1 : 1 };
     });
-    return { packageId: pkg.value, aboveThreshold, extras };
+    return {
+      packageId: pkg.value,
+      aboveThreshold,
+      extras,
+      referralDiscountId: discountBox?.checked ? discountBox.dataset.referralId : null,
+      referralCreditId: creditBox?.checked ? creditBox.dataset.referralId : null,
+    };
   }
 
   /** Display only. The authoritative total is computed server-side from the catalogue. */
   function renderTotal() {
     if (!totalEl) return;
     const pkg = document.querySelector('input[name="package"]:checked');
-    let sum = pkg ? Number(pkg.dataset.price) : 0;
+    const pkgPrice = pkg ? Number(pkg.dataset.price) : 0;
+    let sum = pkgPrice;
     document.querySelectorAll('input[name="extra"]:checked').forEach((box) => {
       const qtyInput = document.querySelector(`[data-qty-for="${box.value}"]`);
       const qty = qtyInput ? Number(qtyInput.value) || 1 : 1;
       sum += Number(box.dataset.price) * qty;
     });
+
+    const discountApplied = Boolean(discountBox?.checked) || Boolean(creditBox?.checked);
+    if (discountApplied) {
+      sum -= Math.round((pkgPrice * referralDiscountPercent) / 100);
+    }
+    if (discountNoteEl) discountNoteEl.hidden = !discountApplied;
+
     totalEl.textContent = `€ ${sum.toLocaleString('de-DE')}`;
   }
 
@@ -315,9 +383,14 @@ const missingCaptions = property.media.filter(
   .extra-row .checkbox { flex: 1; margin-bottom: 0; }
   .qty { width: 68px; border: 1px solid var(--border); background: #fff; padding: 7px 9px; font-size: var(--fs-small); color: var(--ink); }
 
+  .referral { padding: 14px 16px; background: rgba(16, 42, 67, 0.05); border-left: 2px solid var(--ink); margin-bottom: 20px; }
+  .referral .checkbox { margin-bottom: 8px; }
+  .referral .checkbox:last-child { margin-bottom: 0; }
+
   .total { font-size: var(--fs-body); color: var(--taupe); padding-top: 16px; border-top: 1px solid var(--border); }
   .total strong { font-family: var(--serif); font-size: 22px; color: var(--ink); }
   .vat { font-size: var(--fs-micro); }
+  .discount-note { font-size: var(--fs-micro); color: var(--ink); }
 
   .actions { padding: 28px 0; border-top: 1px solid var(--border); }
   .btn { padding: 13px 32px; background: var(--ink); color: var(--cream); font-size: var(--fs-micro); letter-spacing: var(--ls-button); text-transform: uppercase; }

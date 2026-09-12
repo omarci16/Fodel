@@ -15,6 +15,8 @@ import Button from '~/components/Button.astro';
 import PropertyCard from '~/components/PropertyCard.astro';
 import HomeSearch from '~/components/HomeSearch.astro';
 import ParallaxCta from '~/components/ParallaxCta.astro';
+import FormShell from '~/components/forms/FormShell.astro';
+import Field from '~/components/forms/Field.astro';
 import { UI, path, type Locale } from '~/i18n/ui';
 import { copy } from '~/data/copy';
 import { homeAlternates } from '~/lib/page';
@@ -34,6 +36,7 @@ const steps = copy(locale).steps;
 const all = await activeProperties();
 const featured = await homepageFeatured(3);
 const hero = featured[0];
+const referral = c.referral;
 
 const HERO_WIDTHS = [600, 900, 1200];
 const HERO_SIZES = '(max-width: 900px) 100vw, 46vw';
@@ -182,6 +185,43 @@ const schema = [websiteSchema(locale, path(locale, 'properties'))];
 
     <div class="how-cta reveal">
       <Button variant="dark" href={path(locale, 'sellers')}>{ui.cta.learnMore}</Button>
+    </div>
+  </section>
+
+  {/* ── REFERRAL ── */}
+  <section class="referral" data-bg="dark">
+    <div class="referral-copy reveal">
+      <Eyebrow space="16px">{referral.eyebrow}</Eyebrow>
+      <h2>
+        {referral.title}
+        <br />
+        <em>{referral.titleEm}</em>
+      </h2>
+      <GoldRule space="24px" />
+      <p>{referral.body}</p>
+      <ol class="referral-steps">
+        {referral.steps.map((step: string, i: number) => (
+          <li>
+            <span class="n">{String(i + 1).padStart(2, '0')}</span>
+            {step}
+          </li>
+        ))}
+      </ol>
+    </div>
+
+    <div class="referral-form reveal">
+      <FormShell
+        locale={locale}
+        endpoint="/api/referral"
+        formId="referral"
+        submitLabel={referral.submit}
+        onDark
+      >
+        <Field locale={locale} name="referrerName" label={referral.fields.referrerName} required span="full" onDark />
+        <Field locale={locale} name="referrerEmail" label={referral.fields.referrerEmail} type="email" required span="full" onDark />
+        <Field locale={locale} name="referredName" label={referral.fields.referredName} required span="full" onDark />
+        <Field locale={locale} name="referredEmail" label={referral.fields.referredEmail} type="email" required span="full" onDark />
+      </FormShell>
     </div>
   </section>
 
@@ -452,6 +492,62 @@ const schema = [websiteSchema(locale, path(locale, 'properties'))];
     margin-top: 68px;
   }
 
+  /* ── Referral ── */
+  .referral {
+    display: grid;
+    grid-template-columns: 1fr 460px;
+    gap: 64px;
+    background: var(--ink);
+    border-top: 1px solid var(--on-dark-rule);
+    padding: 100px var(--pad-x);
+  }
+  .referral-copy h2 {
+    font-family: var(--serif);
+    font-weight: var(--fw-display);
+    font-size: clamp(30px, 3.2vw, 48px);
+    line-height: 1.12;
+    color: var(--cream);
+  }
+  .referral-copy h2 em {
+    font-style: italic;
+    color: var(--accent);
+  }
+  .referral-copy p {
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    color: var(--on-dark-body);
+    max-width: 52ch;
+    margin-bottom: 32px;
+  }
+  .referral-steps {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .referral-steps li {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    font-size: var(--fs-small);
+    color: var(--on-dark-body);
+    border-top: 2px solid var(--accent);
+    padding-top: 12px;
+  }
+  .referral-steps .n {
+    font-family: var(--serif);
+    font-size: 20px;
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+  .referral-form {
+    background: var(--ink);
+    border-top: 3px solid var(--accent);
+    box-shadow: 0 24px 60px rgba(16, 42, 67, 0.22);
+    padding: 36px;
+    align-self: start;
+  }
+
   /* ── Responsive ── */
   @media (max-width: 900px) {
     .hero {
@@ -542,6 +638,15 @@ const schema = [websiteSchema(locale, path(locale, 'properties'))];
     }
     .how-cta {
       margin-top: 36px;
+    }
+
+    .referral {
+      grid-template-columns: 1fr;
+      gap: 40px;
+      padding: 56px var(--pad-x-mob);
+    }
+    .referral-form {
+      padding: 28px;
     }
   }
 </style>

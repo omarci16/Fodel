@@ -98,6 +98,7 @@ export const NL = {
     body: (title: string, ref: string) =>
       `Goed nieuws: wij hebben uw advertentie „${title}” (#${ref}) beoordeeld en goedgekeurd. Alleen de betaling is nog nodig — zodra die binnen is, staat de advertentie direct online.`,
     orderTitle: 'Kosten van de advertentie',
+    discountLabel: 'Aanbrengkorting (10%)',
     totalLabel: 'Te betalen',
     ctaCard: 'Betalen met creditcard',
     cardNote: 'De betaling verloopt via de beveiligde omgeving van Stripe. FODEL ziet en bewaart uw kaartgegevens niet.',
@@ -114,6 +115,7 @@ export const NL = {
     body: (title: string, ref: string) =>
       `Wij hebben de betaling voor advertentie „${title}” (#${ref}) ontvangen. De advertentie staat online en is zichtbaar op fodel.nl.`,
     orderTitle: 'Specificatie',
+    discountLabel: 'Aanbrengkorting (10%)',
     totalLabel: 'Betaald bedrag',
     vatNote: 'Het bedrag is inclusief 21% Nederlandse btw. De factuur ontvangt u in een aparte e-mail.',
     paidAtLabel: 'Betaaldatum',
@@ -148,5 +150,27 @@ export const NL = {
     cta: 'Nieuw wachtwoord instellen',
     expiry: 'De link is één uur geldig en kan maar één keer worden gebruikt.',
     ignore: 'Heeft u dit niet zelf aangevraagd? Negeer deze e-mail — uw wachtwoord blijft ongewijzigd en er gebeurt niets.',
+  },
+
+  referralRegistered: {
+    subject: 'Uw aanbeveling is ontvangen — FODEL',
+    preheader: 'Onze medewerker neemt binnenkort contact op met de door u aanbevolen persoon.',
+    heading: 'Dank u voor de aanbeveling',
+    body: (referredName: string) =>
+      `Wij hebben de gegevens van ${referredName} ontvangen. Onze medewerker neemt contact op, en zodra de advertentie tot stand komt, schrijven wij 10% korting bij op de kosten van uw volgende advertentie.`,
+    note: 'De bijschrijving gebeurt handmatig, na betaling door de adverteerder — onze medewerker laat het u weten zodra dat kan.',
+  },
+
+  referralAdminNotice: {
+    subject: (referrerName: string) => `Nieuwe aanbeveling — ${referrerName}`,
+    preheader: 'Er is een nieuwe aanbevelings-lead binnengekomen via de website.',
+    heading: 'Nieuwe aanbeveling ontvangen',
+    labels: {
+      referrerName: 'Naam aanbeveler',
+      referrerEmail: 'E-mail aanbeveler',
+      referredName: 'Naam aanbevolen persoon',
+      referredEmail: 'E-mail aanbevolen persoon',
+    },
+    advice: 'Neem contact op met de aanbevolen persoon en noteer, bij een geplaatste advertentie, de aanbeveler voor de bijschrijving.',
   },
 } satisfies typeof HU;

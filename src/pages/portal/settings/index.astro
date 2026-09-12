@@ -2,10 +2,17 @@
 export const prerender = false;
 
 import Portal from '~/layouts/Portal.astro';
+import { path } from '~/i18n/ui';
+import { SITE_URL } from '~/config/site.mjs';
 
 const { profile } = Astro.locals;
 const saved = Astro.url.searchParams.get('saved');
 const err = Astro.url.searchParams.get('error');
+
+const referralLocale = profile?.locale === 'nl' ? 'nl' : 'hu';
+const referralLink = profile?.referral_code
+  ? `${SITE_URL}${path(referralLocale, 'submitAd')}?ref=${profile.referral_code}`
+  : null;
 ---
 
 <Portal title="Beállítások">
@@ -47,7 +54,38 @@ const err = Astro.url.searchParams.get('error');
     </div>
     <button type="submit" class="btn">Jelszó módosítása</button>
   </form>
+
+  {referralLink && (
+    <div class="panel">
+      <h2>Ajánlói link</h2>
+      <p class="hint">
+        Ha valaki ezen a linken keresztül ad fel hirdetést, 10% kedvezményt kap — és a következő
+        hirdetésének díjából mi 10%-ot jóváírunk Önnek.
+      </p>
+      <div class="referral-row">
+        <input id="referral-link" class="readonly-input" value={referralLink} readonly />
+        <button type="button" class="btn ghost" id="copy-referral">Másolás</button>
+      </div>
+      <p class="copy-status" id="copy-status" role="status"></p>
+    </div>
+  )}
 </Portal>
+
+<script>
+  const button = document.getElementById('copy-referral');
+  const input = document.getElementById('referral-link') as HTMLInputElement | null;
+  const status = document.getElementById('copy-status');
+  button?.addEventListener('click', async () => {
+    if (!input) return;
+    try {
+      await navigator.clipboard.writeText(input.value);
+      if (status) status.textContent = 'Link vágólapra másolva.';
+    } catch {
+      input.select();
+      if (status) status.textContent = 'Jelölje ki és másolja a linket.';
+    }
+  });
+</script>
 
 <style>
   .head { margin-bottom: 24px; }
@@ -67,4 +105,10 @@ const err = Astro.url.searchParams.get('error');
   input:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 
   .btn { padding: 12px 24px; background: var(--ink); color: var(--cream); font-size: var(--fs-micro); letter-spacing: var(--ls-button); text-transform: uppercase; }
+  .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--ink); padding: 11px 18px; }
+
+  .hint { font-size: var(--fs-small); line-height: 1.7; color: var(--taupe); max-width: 480px; margin-bottom: 16px; }
+  .referral-row { display: flex; gap: 10px; max-width: 480px; }
+  .readonly-input { flex: 1; border: 1px solid var(--border); background: var(--linen); padding: 11px 12px; font-size: var(--fs-small); color: var(--ink); }
+  .copy-status { font-size: var(--fs-micro); color: var(--taupe); margin-top: 8px; min-height: 1.5em; }
 </style>

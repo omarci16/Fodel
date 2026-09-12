@@ -188,6 +188,22 @@ export function orderTotalCents(lines: OrderLine[]): number {
   return lines.reduce((sum, line) => sum + line.unitCents * line.quantity, 0);
 }
 
+/**
+ * The referral programme's discount — 10% of the package line only, never
+ * the extras. Deliberately NOT an `OrderLine`: Stripe rejects a negative
+ * `unit_amount` with a 400 at the moment a seller clicks pay, so this is its
+ * own `payments.discount_cents` column, applied at Checkout as a one-off
+ * coupon (see src/pages/api/stripe/checkout.ts) and rendered as its own line
+ * in the email and any future invoice.
+ */
+export const REFERRAL_DISCOUNT_PERCENT = 10;
+
+export function referralDiscountCents(lines: OrderLine[]): number {
+  const pkg = lines.find((line) => line.kind === 'package');
+  if (!pkg) return 0;
+  return Math.round((pkg.unitCents * pkg.quantity * REFERRAL_DISCOUNT_PERCENT) / 100);
+}
+
 /** Order lines shaped for the email templates' itemised table. */
 export function linesForEmail(lines: OrderLine[]): { label: string; amount: string }[] {
   return lines.map((line) => ({

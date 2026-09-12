@@ -26,6 +26,7 @@ type PortalProfile = {
   phone: string | null;
   email: string;
   locale: string;
+  referral_code: string | null;
 };
 
 declare namespace App {

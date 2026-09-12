@@ -29,6 +29,7 @@ import {
   linesForEmail,
   formatCents,
   suggestSelection,
+  referralDiscountCents,
   OrderError,
   type OrderSelection,
 } from '~/lib/orders';
@@ -148,27 +149,86 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
       if (e instanceof OrderError) return json(422, { ok: false, error: e.code });
       throw e;
     }
-    const totalCents = orderTotalCents(lines);
+
+    // Referral discount — never a negative OrderLine (Stripe 400s a Checkout
+    // session on a negative unit_amount). Its own column instead, resolved
+    // from a real referrals row the admin ticked, never trusted as an amount
+    // from the request body.
+    const admin = createSupabaseAdminClient();
+    const referralDiscountId: string | null =
+      typeof body.order?.referralDiscountId === 'string' ? body.order.referralDiscountId : null;
+    const referralCreditId: string | null =
+      typeof body.order?.referralCreditId === 'string' ? body.order.referralCreditId : null;
+
+    let discountCents = 0;
+    let appliedReferral: { id: string; kind: 'discount' | 'credit' } | null = null;
+    let creditedReferral: { id: string } | null = null;
+
+    if (referralDiscountId) {
+      const { data: referral } = await admin
+        .from('referrals')
+        .select('id')
+        .eq('id', referralDiscountId)
+        .eq('referred_property_id', id)
+        .eq('status', 'pending')
+        .maybeSingle();
+      if (referral) {
+        discountCents += referralDiscountCents(lines);
+        appliedReferral = { id: referral.id, kind: 'discount' };
+      }
+    }
+    if (referralCreditId) {
+      const { data: referral } = await admin
+        .from('referrals')
+        .select('id')
+        .eq('id', referralCreditId)
+        .eq('referrer_id', property.owner_id)
+        .eq('status', 'applied')
+        .maybeSingle();
+      if (referral) {
+        discountCents += referralDiscountCents(lines);
+        creditedReferral = { id: referral.id };
+      }
+    }
+
+    const totalCents = Math.max(0, orderTotalCents(lines) - discountCents);
 
     // Supersede any earlier unpaid order for this listing — an admin who
     // approves, changes their mind about the extras, and approves again must
     // not leave two live payment links pointing at different amounts.
-    const admin = createSupabaseAdminClient();
     await admin
       .from('payments')
       .update({ status: 'cancelled' })
       .eq('property_id', id)
       .eq('status', 'pending');
 
-    const { error: orderError } = await admin.from('payments').insert({
-      property_id: id,
-      owner_id: property.owner_id,
-      amount_cents: totalCents,
-      currency: 'eur',
-      status: 'pending',
-      line_items: lines,
-    });
+    const { data: insertedOrder, error: orderError } = await admin
+      .from('payments')
+      .insert({
+        property_id: id,
+        owner_id: property.owner_id,
+        amount_cents: totalCents,
+        discount_cents: discountCents,
+        currency: 'eur',
+        status: 'pending',
+        line_items: lines,
+      })
+      .select('id')
+      .single();
     if (orderError) return json(500, { ok: false, error: orderError.message });
+
+    if (appliedReferral) {
+      await admin
+        .from('referrals')
+        .update({ status: 'applied', discount_applied_to: insertedOrder.id })
+        .eq('id', appliedReferral.id);
+    }
+    if (creditedReferral) {
+      await admin
+        .from('referrals')
+        .update({ status: 'credited', credited_to: insertedOrder.id })
+        .eq('id', creditedReferral.id);
+    }
 
     const { error } = await supabase
       .from('properties')
@@ -188,6 +248,7 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
           ref: property.ref,
           title,
           items: linesForEmail(lines),
+          discount: discountCents > 0 ? `−${formatCents(discountCents)}` : undefined,
           total: formatCents(totalCents),
           // The email links to the listing's own page, which is where the pay
           // button lives. A Stripe session is created at the moment they click
