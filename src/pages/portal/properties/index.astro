@@ -57,11 +57,12 @@ const ownerById = new Map((owners ?? []).map((o: any) => [o.id, o.full_name || o
           <th>Település</th>
           <th>Ár</th>
           <th>Állapot</th>
+          {isAdmin && <th class="actions-col">Műveletek</th>}
         </tr>
       </thead>
       <tbody>
         {properties.map((p) => (
-          <tr>
+          <tr id={`row-${p.id}`}>
             <td><a href={`/portal/properties/${p.id}`}>#{p.ref}</a></td>
             <td><a href={`/portal/properties/${p.id}`}>{title(p)}</a></td>
             {isAdmin && <td class="owner">{(p.owner_id && ownerById.get(p.owner_id)) || '—'}</td>}
@@ -69,12 +70,57 @@ const ownerById = new Map((owners ?? []).map((o: any) => [o.id, o.full_name || o
             <td>{p.settlement}</td>
             <td>€{p.price_eur.toLocaleString('de-DE')}</td>
             <td><span class:list={['pill', `pill-${p.status}`]}>{STATUS_LABEL[p.status] ?? p.status}</span></td>
+            {isAdmin && (
+              <td class="actions-col">
+                <button type="button" class="delete-btn" data-delete={p.id} data-ref={p.ref}>
+                  Törlés
+                </button>
+              </td>
+            )}
           </tr>
         ))}
       </tbody>
     </table>
   )}
 </Portal>
+
+{isAdmin && (
+  <script>
+    document.addEventListener('click', async (e) => {
+      const btn = e.target;
+      if (!(btn instanceof HTMLButtonElement)) return;
+      const id = btn.dataset.delete;
+      if (!id) return;
+
+      if (
+        !confirm(
+          `Véglegesen törli a(z) #${btn.dataset.ref} hirdetést? Ez nem vonható vissza — a fényképek, leírások és a hirdetéshez tartozó rendelés is törlődik.`
+        )
+      ) {
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Törlés…';
+
+      const res = await fetch(`/api/portal/properties/${id}/status`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'delete' }),
+      });
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok || !json.ok) {
+        btn.disabled = false;
+        btn.textContent = 'Törlés';
+        alert('Nem sikerült törölni a hirdetést.');
+        return;
+      }
+
+      document.getElementById(`row-${id}`)?.remove();
+    });
+  </script>
+)}
 
 <style>
   .head { display: flex; align-items: baseline; gap: 24px; margin-bottom: 20px; flex-wrap: wrap; }
@@ -99,6 +145,19 @@ const ownerById = new Map((owners ?? []).map((o: any) => [o.id, o.full_name || o
   .pill-changes_requested { background: rgba(179, 38, 30, 0.08); border-color: #b3261e; color: #b3261e; }
   .pill-awaiting_payment { background: rgba(200, 150, 0, 0.1); border-color: #96700b; color: #6b4f08; }
   .owner { font-size: var(--fs-micro); color: var(--taupe); }
+
+  .actions-col { width: 1%; white-space: nowrap; }
+  .delete-btn {
+    font-size: var(--fs-micro);
+    letter-spacing: 0.04em;
+    padding: 6px 12px;
+    border: 1px solid #b3261e;
+    background: transparent;
+    color: #b3261e;
+    cursor: pointer;
+  }
+  .delete-btn:hover:not(:disabled) { background: #b3261e; color: #fff; }
+  .delete-btn:disabled { opacity: 0.5; cursor: default; }
 
   @media (max-width: 720px) {
     .list { display: block; overflow-x: auto; }

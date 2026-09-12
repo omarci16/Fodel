@@ -23,6 +23,7 @@ import type { APIRoute } from 'astro';
 import { deliver, localeOf, templates, adminRecipients } from '~/lib/email/send';
 import { createSupabaseAdminClient } from '~/lib/supabase-server';
 import { publishProperty, listingTitle } from '~/lib/portal/publish';
+import { deleteImage } from '~/lib/media';
 import { logEvent } from '~/lib/activity';
 import {
   buildOrderLines,
@@ -445,6 +446,49 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
       propertyId: id,
       source: 'portal',
     }).catch(() => {});
+    return json(200, { ok: true });
+  }
+
+  /* ── delete ─────────────────────────────────────────────────────────── */
+  // Admin-only, any status. RLS backs this up (properties_admin_all has no
+  // status restriction; the owner's own delete policy is narrower — draft
+  // only — and isn't exercised from this admin action). Every FK from
+  // properties is either ON DELETE CASCADE (property_translations,
+  // property_media, review_notes — inherently scoped to this listing) or
+  // ON DELETE SET NULL (enquiries, payments, activity_events, valuations,
+  // invites.referred_property_id — historical records outlive the listing
+  // they were about), so this is a genuine, schema-sanctioned hard delete,
+  // not a workaround.
+
+  if (action === 'delete') {
+    if (!isAdmin) return json(403, { ok: false });
+
+    // The DB row cascades on its own; the actual files in storage do not —
+    // deleting the row without this would leave every photo orphaned in
+    // the bucket forever.
+    const { data: media } = await supabase.from('property_media').select('storage_path').eq('property_id', id);
+    for (const m of media ?? []) {
+      await deleteImage(supabase, m.storage_path).catch(() => {});
+    }
+
+    // Logged before the delete: activity_events.property_id is SET NULL,
+    // not CASCADE, so every earlier event about this listing survives —
+    // but only this event's own payload still carries the ref once the
+    // property itself is gone.
+    await logEvent({
+      kind: 'listing.delete',
+      actorId: user!.id,
+      actorEmail: profile?.email ?? null,
+      subjectType: 'property',
+      subjectId: id,
+      propertyId: id,
+      source: 'portal',
+      payload: { ref: property.ref, category: property.category },
+    }).catch(() => {});
+
+    const { error } = await supabase.from('properties').delete().eq('id', id);
+    if (error) return json(500, { ok: false, error: error.message });
+
     return json(200, { ok: true });
   }
 

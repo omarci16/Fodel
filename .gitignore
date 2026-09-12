@@ -16,3 +16,4 @@ node_modules/
 # macOS / OneDrive
 .DS_Store
 Icon?
+.vercel
