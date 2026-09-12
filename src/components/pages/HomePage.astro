@@ -95,7 +95,7 @@ const schema = [websiteSchema(locale, path(locale, 'properties'))];
           />
           <div class="hero-scrim" aria-hidden="true"></div>
 
-          <a class="hero-card" href={url(hero, locale)}>
+          <a class="hero-card" href={url(hero, locale)} data-bg="dark">
             <Eyebrow space="2px" class="hero-card-eyebrow">{c.hero.featuredLabel}</Eyebrow>
             <span class="hero-card-title">{text(hero.data.title, locale)}</span>
             <span class="hero-card-meta">
@@ -319,9 +319,6 @@ const schema = [websiteSchema(locale, path(locale, 'properties'))];
     backdrop-filter: blur(12px);
     padding: 22px 30px;
     max-width: 320px;
-  }
-  :global(.hero-card-eyebrow) {
-    color: var(--cream);
   }
   .hero-card-title {
     font-family: var(--serif);
