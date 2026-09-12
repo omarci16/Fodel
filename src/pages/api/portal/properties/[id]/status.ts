@@ -23,6 +23,7 @@ import type { APIRoute } from 'astro';
 import { deliver, localeOf, templates, adminRecipients } from '~/lib/email/send';
 import { createSupabaseAdminClient } from '~/lib/supabase-server';
 import { publishProperty, listingTitle } from '~/lib/portal/publish';
+import { logEvent } from '~/lib/activity';
 import {
   buildOrderLines,
   orderTotalCents,
@@ -102,6 +103,16 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
     // FODEL was told anything at all, so a submission was only ever noticed by
     // an admin who happened to open the dashboard.
     await notifyAdmins(supabase, property, owner, mediaCount ?? 0);
+
+    await logEvent({
+      kind: 'listing.submit',
+      actorId: user!.id,
+      actorEmail: profile?.email ?? null,
+      subjectType: 'property',
+      subjectId: id,
+      propertyId: id,
+      source: 'portal',
+    }).catch(() => {});
 
     return json(200, { ok: true });
   }
@@ -259,6 +270,17 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
       );
     }
 
+    await logEvent({
+      kind: 'listing.approve',
+      actorId: user!.id,
+      actorEmail: profile?.email ?? null,
+      subjectType: 'property',
+      subjectId: id,
+      propertyId: id,
+      source: 'portal',
+      payload: { totalCents, discountCents },
+    }).catch(() => {});
+
     return json(200, { ok: true, totalCents });
   }
 
@@ -288,8 +310,20 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
         .from('payments')
         .update({ status: 'manual', paid_at: new Date().toISOString() })
         .eq('id', order.id);
+      await logEvent({
+        kind: 'payment.manual',
+        actorId: user!.id,
+        actorEmail: profile?.email ?? null,
+        subjectType: 'payment',
+        subjectId: order.id,
+        propertyId: id,
+        source: 'portal',
+      }).catch(() => {});
     }
 
+    // listing.published is logged exclusively inside publishProperty() —
+    // never here too. It is the one function both this action and the
+    // Stripe webhook call, and logging in both would double-count the event.
     const result = await publishProperty(supabase, id!);
     if (!result.ok) return json(500, { ok: false, error: result.error });
     return json(200, { ok: true });
@@ -337,6 +371,18 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
         })
       );
     }
+
+    await logEvent({
+      kind: 'listing.request_changes',
+      actorId: user!.id,
+      actorEmail: profile?.email ?? null,
+      subjectType: 'property',
+      subjectId: id,
+      propertyId: id,
+      source: 'portal',
+      payload: { note },
+    }).catch(() => {});
+
     return json(200, { ok: true });
   }
 
@@ -347,6 +393,15 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
     if (property.status !== 'published') return json(409, { ok: false, error: 'not-published' });
     const { error } = await supabase.from('properties').update({ status: 'sold' }).eq('id', id);
     if (error) return json(500, { ok: false, error: error.message });
+    await logEvent({
+      kind: 'listing.mark_sold',
+      actorId: user!.id,
+      actorEmail: profile?.email ?? null,
+      subjectType: 'property',
+      subjectId: id,
+      propertyId: id,
+      source: 'portal',
+    }).catch(() => {});
     return json(200, { ok: true });
   }
 
@@ -354,6 +409,15 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
     if (!isAdmin) return json(403, { ok: false });
     const { error } = await supabase.from('properties').update({ status: 'archived' }).eq('id', id);
     if (error) return json(500, { ok: false, error: error.message });
+    await logEvent({
+      kind: 'listing.archive',
+      actorId: user!.id,
+      actorEmail: profile?.email ?? null,
+      subjectType: 'property',
+      subjectId: id,
+      propertyId: id,
+      source: 'portal',
+    }).catch(() => {});
     return json(200, { ok: true });
   }
 

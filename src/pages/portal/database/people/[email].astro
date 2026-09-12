@@ -1,0 +1,162 @@
+---
+/**
+ * One address, everything it has done. The point of the activity log: answer
+ * "who has asked about farmhouses in Zala this year, and what else should we
+ * send them" without a query-time UNION of five tables.
+ *
+ * "Hasonló ingatlanok" reuses similarTo() unchanged — it already filters
+ * `status === 'active'`, which is exactly right for a buyer-facing suggestion
+ * — rather than forking it for a scorer that reads a different shape. The
+ * portal's own Property row shape (status = 'published', not 'active') stays
+ * out of this: activeProperties() already returns the public, content-
+ * collection-shaped Property[] that similarTo() expects, seeded from
+ * whichever of this person's enquiries is still a live listing.
+ */
+export const prerender = false;
+
+import Portal from '~/layouts/Portal.astro';
+import { activeProperties, similarTo, text, url as propertyUrl } from '~/lib/properties';
+import { SITE_URL } from '~/config/site.mjs';
+
+const { supabase, profile } = Astro.locals;
+if (profile?.role !== 'admin') return Astro.redirect('/portal/dashboard');
+
+const email = decodeURIComponent(Astro.params.email ?? '');
+
+const { data: events } = await supabase
+  .from('activity_events')
+  .select('id, occurred_at, kind, subject_type, subject_id, property_id, locale, source, payload')
+  .ilike('actor_email', email)
+  .order('occurred_at', { ascending: false })
+  .limit(200);
+
+const { data: enquiries } = await supabase
+  .from('enquiries')
+  .select('id, property_id, message, created_at, handled, handled_at')
+  .ilike('email', email)
+  .order('created_at', { ascending: false });
+
+const enquiredPropertyIds = [...new Set((enquiries ?? []).map((e) => e.property_id).filter(Boolean))];
+const { data: enquiredProperties } = enquiredPropertyIds.length
+  ? await supabase.from('properties').select('id, ref, settlement').in('id', enquiredPropertyIds)
+  : { data: [] };
+const enquiredRefById = new Map((enquiredProperties ?? []).map((p: any) => [p.id, p]));
+
+// Seeded from the most recent enquiry that is still a live listing — an
+// enquiry about a since-sold or archived property has nothing to compare
+// against on the public site any more.
+const active = await activeProperties();
+const activeById = new Map(active.map((p) => [p.id, p]));
+const seed = enquiredPropertyIds.map((id) => activeById.get(id)).find((p) => p != null);
+const suggestions = seed ? similarTo(seed, active, 6) : [];
+
+const dateFmt = new Intl.DateTimeFormat('hu-HU', {
+  year: 'numeric',
+  month: 'short',
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+const mailtoBody = suggestions.length
+  ? `Kedves ${email},\n\nAz alábbi ingatlanok is érdekelhetik:\n\n${suggestions
+      .map((p) => `- ${text(p.data.title, 'hu')} — ${SITE_URL}${propertyUrl(p, 'hu')}`)
+      .join('\n')}\n\nÜdvözlettel,\nFODEL Ingatlan`
+  : '';
+const mailtoHref = `mailto:${email}${mailtoBody ? `?subject=${encodeURIComponent('Hasonló ingatlanok — FODEL')}&body=${encodeURIComponent(mailtoBody)}` : ''}`;
+---
+
+<Portal title={email}>
+  <header class="head">
+    <p class="eyebrow"><a href="/portal/database">← Adatbázis</a></p>
+    <h1>{email}</h1>
+  </header>
+
+  {enquiries && enquiries.length > 0 && (
+    <section class="block">
+      <h2>Érdeklődések ({enquiries.length})</h2>
+      <table class="list">
+        <thead><tr><th>Dátum</th><th>Hirdetés</th><th>Üzenet</th><th>Kezelve</th></tr></thead>
+        <tbody>
+          {enquiries.map((e) => {
+            const p = e.property_id ? enquiredRefById.get(e.property_id) : null;
+            return (
+              <tr>
+                <td class="nowrap">{dateFmt.format(new Date(e.created_at))}</td>
+                <td>{p ? <a href={`/portal/properties/${e.property_id}`}>#{p.ref} — {p.settlement}</a> : '—'}</td>
+                <td class="msg">{e.message ?? '—'}</td>
+                <td>{e.handled ? '✓' : '—'}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </section>
+  )}
+
+  {suggestions.length > 0 && (
+    <section class="block">
+      <h2>Hasonló ingatlanok</h2>
+      <ul class="suggestions">
+        {suggestions.map((p) => (
+          <li>
+            <a href={`${SITE_URL}${propertyUrl(p, 'hu')}`} target="_blank" rel="noopener">
+              #{p.data.ref} — {text(p.data.title, 'hu')} · {p.data.location.settlement}
+            </a>
+          </li>
+        ))}
+      </ul>
+      <a class="btn" href={mailtoHref}>Levél összeállítása ezekkel</a>
+    </section>
+  )}
+
+  <section class="block">
+    <h2>Minden esemény ({events?.length ?? 0})</h2>
+    {events && events.length > 0 ? (
+      <table class="list">
+        <thead><tr><th>Időpont</th><th>Esemény</th><th>Forrás</th></tr></thead>
+        <tbody>
+          {events.map((e) => (
+            <tr>
+              <td class="nowrap">{dateFmt.format(new Date(e.occurred_at))}</td>
+              <td><span class="pill">{e.kind}</span></td>
+              <td class="sub">{e.source ?? '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    ) : (
+      <p class="empty">Nincs rögzített esemény ehhez a címhez.</p>
+    )}
+  </section>
+</Portal>
+
+<style>
+  .head { margin-bottom: 24px; }
+  .eyebrow { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--taupe); margin-bottom: 8px; }
+  .eyebrow a { text-decoration: underline; text-underline-offset: 2px; }
+  h1 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 26px; color: var(--ink); word-break: break-all; }
+  h2 { font-family: var(--serif); font-size: 18px; color: var(--ink); margin-bottom: 14px; }
+
+  .block { padding: 24px 0; border-top: 1px solid var(--border); }
+
+  .list { width: 100%; border-collapse: collapse; font-size: var(--fs-small); }
+  .list th { text-align: left; font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; color: var(--taupe); padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .list td { padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--ink); vertical-align: top; }
+  .list a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+  .nowrap { white-space: nowrap; }
+  .msg { max-width: 40ch; }
+  .sub { font-size: var(--fs-micro); color: var(--taupe); }
+  .pill { display: inline-block; font-size: var(--fs-micro); padding: 3px 10px; border: 1px solid var(--border); white-space: nowrap; background: rgba(16, 42, 67, 0.05); }
+
+  .suggestions { list-style: none; margin-bottom: 16px; }
+  .suggestions li { padding: 8px 0; border-bottom: 1px solid var(--border); font-size: var(--fs-small); }
+  .suggestions a { color: var(--ink); }
+
+  .btn { display: inline-block; padding: 10px 20px; background: var(--ink); color: var(--cream); font-size: var(--fs-micro); letter-spacing: var(--ls-button); text-transform: uppercase; }
+  .empty { color: var(--taupe); font-size: var(--fs-small); }
+
+  @media (max-width: 860px) {
+    .list { display: block; overflow-x: auto; }
+  }
+</style>

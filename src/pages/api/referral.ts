@@ -17,6 +17,7 @@ export const prerender = false;
 export const POST: APIRoute = (context) =>
   handleForm(context, {
     id: 'referral',
+    activityKind: 'referral.created',
     subject: 'ÚJ AJÁNLÁS / Nieuwe aanbeveling',
     fields: [
       { name: 'referrerName', label: 'Ajánló neve', required: true, maxLength: 120 },

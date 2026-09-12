@@ -20,7 +20,16 @@ const PUBLIC_PORTAL_PATHS = [
   '/portal/reset/', // /portal/reset/[token] — likewise
 ];
 
-const ADMIN_ONLY_PREFIXES = ['/portal/users', '/portal/review', '/portal/payments'];
+const ADMIN_ONLY_PREFIXES = [
+  '/portal/users',
+  '/portal/review',
+  '/portal/payments',
+  '/portal/database',
+  // The CSV export lives under /api/portal/database, a distinct prefix from
+  // /portal/database — easy to forget on a "read-only" route, so it is listed
+  // explicitly rather than assumed covered.
+  '/api/portal/database',
+];
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const { pathname } = context.url;

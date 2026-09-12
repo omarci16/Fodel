@@ -93,6 +93,7 @@ export const LEGAL: Record<Locale, Record<string, ContentPageData>> = {
             'A megkeresés tárgya és üzenete',
             'Hirdetésfeladás esetén az ingatlan adatai és a számlázási adatok',
             'Kerestetés esetén a keresési feltételei',
+            'Belső nyilvántartás céljából: mikor és milyen űrlapot töltött ki, mikor jelentkezett be a portálra — nyers IP-cím rögzítése nélkül',
           ],
         },
         {
@@ -102,6 +103,7 @@ export const LEGAL: Record<Locale, Record<string, ContentPageData>> = {
             ['Kapcsolatfelvétel, visszahívás', 'Hozzájárulás (GDPR 6. cikk (1) a) — 12 hónapig'],
             ['Hirdetésfeladás', 'Szerződés teljesítése (6. cikk (1) b) — a számviteli előírások szerint 8 évig'],
             ['Kerestetés', 'Hozzájárulás — a keresés lezárásáig, legfeljebb 24 hónapig'],
+            ['Belső aktivitási napló', 'Jogos érdek (6. cikk (1) f) — a nyilvántartás rendezettsége és a visszaélések felderítése — legfeljebb 24 hónapig'],
           ],
         },
         {
@@ -377,6 +379,7 @@ export const LEGAL: Record<Locale, Record<string, ContentPageData>> = {
             'Het onderwerp en de inhoud van uw bericht',
             'Bij een advertentie: de gegevens van de woning en uw factuurgegevens',
             'Bij een zoekopdracht: uw zoekcriteria',
+            'Voor interne administratie: wanneer en welk formulier u invulde, wanneer u inlogde op het portaal — zonder een IP-adres op te slaan',
           ],
         },
         {
@@ -386,6 +389,7 @@ export const LEGAL: Record<Locale, Record<string, ContentPageData>> = {
             ['Contact en terugbelverzoek', 'Toestemming (art. 6 lid 1 a AVG) — 12 maanden'],
             ['Advertentieopdracht', 'Uitvoering overeenkomst (art. 6 lid 1 b) — 7 jaar, fiscale bewaarplicht'],
             ['Zoekopdracht', 'Toestemming — tot afronding, maximaal 24 maanden'],
+            ['Interne activiteitenlog', 'Gerechtvaardigd belang (art. 6 lid 1 f) — ordelijke administratie en misbruikdetectie — maximaal 24 maanden'],
           ],
         },
         {

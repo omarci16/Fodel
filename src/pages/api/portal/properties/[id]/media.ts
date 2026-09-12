@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { processAndUploadImage, MediaUploadError } from '~/lib/media';
+import { logEvent } from '~/lib/activity';
 
 export const prerender = false;
 
@@ -45,6 +46,16 @@ export const POST: APIRoute = async ({ request, params, locals }) => {
       .select('id')
       .single();
     if (error) return json(500, { ok: false, error: error.message });
+
+    await logEvent({
+      kind: 'media.uploaded',
+      actorId: user?.id ?? null,
+      actorEmail: profile?.email ?? null,
+      subjectType: 'property_media',
+      subjectId: data.id,
+      propertyId: id ?? null,
+      source: 'portal',
+    }).catch(() => {});
 
     return json(200, { ok: true, id: data.id });
   } catch (e) {

@@ -16,6 +16,7 @@ import { SITE_URL } from '~/config/site.mjs';
 import { CATEGORIES, ROUTES } from '~/i18n/ui';
 import { LISTING_PACKAGES } from '~/config/company';
 import { deliver, localeOf, templates } from '~/lib/email/send';
+import { logEvent } from '~/lib/activity';
 
 /** The public URL of a listing, in the owner's own language. */
 export function publicUrl(
@@ -39,8 +40,18 @@ export type PublishResult =
  * @param client Must be able to update the property. The webhook has no user
  *   session, so it passes the service-role client; the admin action passes the
  *   signed-in admin's own session client and RLS authorises it.
+ * @param dedupeKey The Stripe event id, when this call is triggered by a
+ *   webhook delivery — see src/lib/activity.ts. Stripe can legitimately
+ *   deliver the same event twice even on success; this is what stops a retry
+ *   from writing "listing.published" a second time. Manual publication
+ *   (an admin confirming a bank transfer) passes none, because that call
+ *   cannot be retried the way a webhook can.
  */
-export async function publishProperty(client: any, propertyId: string): Promise<PublishResult> {
+export async function publishProperty(
+  client: any,
+  propertyId: string,
+  dedupeKey?: string | null
+): Promise<PublishResult> {
   const { data: property, error } = await client
     .from('properties')
     .select('id, ref, category, status, owner_id, package')
@@ -69,6 +80,18 @@ export async function publishProperty(client: any, propertyId: string): Promise<
   if (updateError) return { ok: false, error: updateError.message };
 
   await notifyOwnerPublished(client, property);
+
+  // The only place a listing goes live, so the only place this is logged —
+  // never also in the Stripe webhook or the manual-publish action, which
+  // would double-count every card payment.
+  await logEvent({
+    kind: 'listing.published',
+    subjectType: 'property',
+    subjectId: propertyId,
+    propertyId,
+    source: dedupeKey ? 'stripe-webhook' : 'portal',
+    dedupeKey: dedupeKey ?? null,
+  }).catch(() => {});
 
   return { ok: true, alreadyPublished: false };
 }

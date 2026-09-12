@@ -31,6 +31,7 @@ const INVITE_DAYS = 7;
 export const POST: APIRoute = (context) =>
   handleForm(context, {
     id: 'listing-order',
+    activityKind: 'listing.intake',
     subject: 'ÚJ HIRDETÉSFELADÁS / Nieuwe advertentie-aanvraag',
     // The registration email below is the acknowledgement, and a better one.
     skipAck: true,

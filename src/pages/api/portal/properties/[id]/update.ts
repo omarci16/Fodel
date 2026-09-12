@@ -11,6 +11,7 @@
 import type { APIRoute } from 'astro';
 import { LOCALE_OPTIONS } from '~/lib/portal/properties';
 import { extractYouTubeId } from '~/lib/video';
+import { logEvent } from '~/lib/activity';
 
 export const prerender = false;
 
@@ -131,6 +132,16 @@ export const POST: APIRoute = async ({ request, params, locals, redirect }) => {
       .upsert(row, { onConflict: 'property_id,locale' });
     if (trError) return back('error=' + encodeURIComponent(trError.message));
   }
+
+  await logEvent({
+    kind: 'listing.edited',
+    actorId: user?.id ?? null,
+    actorEmail: profile?.email ?? null,
+    subjectType: 'property',
+    subjectId: id,
+    propertyId: id ?? null,
+    source: 'portal',
+  }).catch(() => {});
 
   return back('saved=1');
 };

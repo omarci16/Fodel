@@ -13,6 +13,7 @@
 import type { APIContext } from 'astro';
 import { Resend } from 'resend';
 import { COMPANY } from '~/config/company';
+import { logEvent } from '~/lib/activity';
 
 export type FieldRule = {
   name: string;
@@ -45,6 +46,12 @@ export interface FormDefinition {
    * that doesn't know what it already sent.
    */
   skipAck?: boolean;
+  /**
+   * Recorded to activity_events once the submission is accepted — see
+   * src/lib/activity.ts. One call site for all four public forms rather than
+   * one per route file; the referral form re-uses this too.
+   */
+  activityKind: string;
 }
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/;
@@ -237,6 +244,19 @@ export async function handleForm(
     const value = form.get(key);
     if (typeof value === 'string' && value) extras[key] = value;
   }
+
+  // Logged once a valid, non-spam submission is accepted — regardless of
+  // whether email delivery below succeeds. The submission itself is the
+  // state change; a Resend outage must not also cost the activity record.
+  await logEvent({
+    kind: def.activityKind,
+    actorEmail: result.values.email || null,
+    subjectType: 'form',
+    subjectId: def.id,
+    locale,
+    source: returnTo,
+    payload: { ...result.values, ...extras },
+  }).catch(() => {});
 
   const html = buildEmail(def, result.values, extras);
   const apiKey = import.meta.env.RESEND_API_KEY;

@@ -1,4 +1,5 @@
 import type { APIRoute } from 'astro';
+import { logEvent } from '~/lib/activity';
 
 export const prerender = false;
 
@@ -31,10 +32,19 @@ export const POST: APIRoute = async ({ request, clientAddress, locals, redirect 
     return redirect('/portal/login?error=invalid');
   }
 
-  const { error } = await locals.supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await locals.supabase.auth.signInWithPassword({ email, password });
   if (error) {
     return redirect('/portal/login?error=invalid');
   }
+
+  await logEvent({
+    kind: 'auth.login',
+    actorId: data.user?.id ?? null,
+    actorEmail: email,
+    subjectType: 'profile',
+    subjectId: data.user?.id ?? null,
+    source: 'portal',
+  }).catch(() => {});
 
   return redirect(safeNext);
 };

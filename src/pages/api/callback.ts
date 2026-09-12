@@ -7,6 +7,7 @@ export const prerender = false;
 export const POST: APIRoute = (context) =>
   handleForm(context, {
     id: 'callback',
+    activityKind: 'callback.requested',
     subject: 'Kapcsolatfelvétel / Contactverzoek',
     fields: [
       { name: 'name', label: 'Név / Naam', required: true, maxLength: 120 },

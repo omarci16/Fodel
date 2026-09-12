@@ -19,6 +19,7 @@ import { createSupabaseAdminClient } from '~/lib/supabase-server';
 import { deliver, templates } from '~/lib/email/send';
 import { createDraft, applyIntake, type ListingIntake } from '~/lib/portal/properties';
 import { SITE_URL } from '~/config/site.mjs';
+import { logEvent } from '~/lib/activity';
 
 export const prerender = false;
 
@@ -72,6 +73,16 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   }
 
   await admin.from('invites').update({ accepted_at: new Date().toISOString() }).eq('id', invite.id);
+
+  await logEvent({
+    kind: 'auth.registered',
+    actorId: created.user.id,
+    actorEmail: invite.email,
+    subjectType: 'profile',
+    subjectId: created.user.id,
+    locale,
+    source: 'invite',
+  }).catch(() => {});
 
   // Establish a real session (sets cookies via the request/response pair), as
   // opposed to the admin client above, which never touches cookies.
