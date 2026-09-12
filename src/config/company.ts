@@ -125,6 +125,17 @@ export const COMPANY = {
    fodel.hu/arlista and fodel.hu/gyik. All prices include 21% Dutch VAT.
    ------------------------------------------------------------------------ */
 
+/**
+ * ⚠️ UNVERIFIED. Every published price, email and (from FODEL 1.2) invoice
+ * assumes Dutch VAT at this rate. B2C advertising / electronically-supplied
+ * services sold to Hungarian private individuals are generally taxable
+ * where the CUSTOMER is (Hungary, 27%, via the EU's One-Stop-Shop scheme),
+ * not at the seller's home rate — if that applies here, this number and
+ * every invoice built from it are wrong. One email to FODEL's accountant
+ * resolves this; nothing in the invoicing code can.
+ */
+export const LISTING_VAT_PERCENT = 21;
+
 export const LISTING_PACKAGES = [
   {
     id: 'cheap-6m',

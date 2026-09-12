@@ -204,6 +204,27 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
 
     const totalCents = Math.max(0, orderTotalCents(lines) - discountCents);
 
+    // Billing details, if the owner typed them on the original ad-submission
+    // form — carried on their invite's payload since Stage C, read here for
+    // the first time so Stage E's invoicing has something to print. Missing
+    // entirely for anyone who registered another way; an admin fills them in
+    // on the payment detail screen before issuing an invoice either way.
+    let billingName: string | null = null;
+    let billingAddress: string | null = null;
+    if (owner?.email) {
+      const { data: invite } = await admin
+        .from('invites')
+        .select('payload')
+        .eq('email', owner.email)
+        .not('payload->>billingName', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const payload = invite?.payload as { billingName?: string; billingAddress?: string } | undefined;
+      billingName = payload?.billingName ?? null;
+      billingAddress = payload?.billingAddress ?? null;
+    }
+
     // Supersede any earlier unpaid order for this listing — an admin who
     // approves, changes their mind about the extras, and approves again must
     // not leave two live payment links pointing at different amounts.
@@ -213,6 +234,9 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
       .eq('property_id', id)
       .eq('status', 'pending');
 
+    const dueAt = new Date();
+    dueAt.setDate(dueAt.getDate() + 14);
+
     const { data: insertedOrder, error: orderError } = await admin
       .from('payments')
       .insert({
@@ -220,6 +244,9 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
         owner_id: property.owner_id,
         amount_cents: totalCents,
         discount_cents: discountCents,
+        billing_name: billingName,
+        billing_address: billingAddress,
+        due_at: dueAt.toISOString(),
         currency: 'eur',
         status: 'pending',
         line_items: lines,

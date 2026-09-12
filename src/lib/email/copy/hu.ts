@@ -164,6 +164,24 @@ export const HU = {
     note: 'A jóváírás a hirdető fizetése után, kézzel történik — munkatársunk értesíti Önt, amint elérhető.',
   },
 
+  invoiceIssued: {
+    subject: (number: string) => `Számla — ${number}`,
+    preheader: 'A számlát elkészítettük, megtekintheti vagy letöltheti a linken.',
+    heading: 'Elkészült a számlája',
+    body: (title: string, ref: string, number: string) =>
+      `A(z) „${title}” (#${ref}) hirdetéshez kapcsolódó ${number} számú számlát elkészítettük.`,
+    cta: 'Számla megtekintése',
+  },
+
+  creditNoteIssued: {
+    subject: (number: string) => `Jóváíró számla — ${number}`,
+    preheader: 'Jóváíró számlát állítottunk ki a korábbi számlájához.',
+    heading: 'Jóváíró számla készült',
+    body: (title: string, ref: string, number: string, correctsNumber: string) =>
+      `A(z) „${title}” (#${ref}) hirdetéshez kiállított ${correctsNumber} számú számlához ${number} számú jóváíró számlát készítettünk.`,
+    cta: 'Jóváíró számla megtekintése',
+  },
+
   referralAdminNotice: {
     subject: (referrerName: string) => `Új ajánlás — ${referrerName}`,
     preheader: 'Új ajánlói lead érkezett a honlapról.',

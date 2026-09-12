@@ -6,6 +6,10 @@
  * transfer is FODEL's published payment method and card is the addition. The
  * status column distinguishes how money arrived, not whether it did.
  *
+ * FODEL 1.2 adds a month/package/owner filter and a `?view=calendar` grid by
+ * due_at — server-rendered, so the "no client state" rule that already holds
+ * for this screen stays true of the calendar too.
+ *
  * Deliberately not linked for owners — they see their own outstanding amount
  * on the listing itself, which is where the pay button lives.
  */
@@ -17,19 +21,38 @@ import { formatCents, type OrderLine } from '~/lib/orders';
 const { supabase, profile } = Astro.locals;
 if (profile?.role !== 'admin') return Astro.redirect('/portal/dashboard');
 
-const filter = Astro.url.searchParams.get('status') ?? '';
+const params = Astro.url.searchParams;
+const filter = params.get('status') ?? '';
+const month = params.get('month') ?? '';
+const packageFilter = params.get('package') ?? '';
+const ownerFilter = params.get('owner') ?? '';
+const view = params.get('view') ?? 'list';
 
 let query = supabase
   .from('payments')
-  .select('id, property_id, owner_id, amount_cents, currency, status, line_items, created_at, paid_at')
+  .select('id, property_id, owner_id, amount_cents, discount_cents, currency, status, line_items, created_at, paid_at, due_at, billing_name')
   .order('created_at', { ascending: false })
-  .limit(300);
+  .limit(500);
 if (filter) query = query.eq('status', filter);
+if (month) {
+  const start = `${month}-01`;
+  const end = new Date(`${month}-01T00:00:00Z`);
+  end.setMonth(end.getMonth() + 1);
+  query = query.gte('created_at', start).lt('created_at', end.toISOString());
+}
 
-const { data: orders } = await query;
+const { data: allOrders } = await query;
 
-const propertyIds = [...new Set((orders ?? []).map((o) => o.property_id).filter(Boolean))];
-const ownerIds = [...new Set((orders ?? []).map((o) => o.owner_id).filter(Boolean))];
+const orders = (allOrders ?? []).filter((o) => {
+  if (packageFilter) {
+    const pkg = (o.line_items as OrderLine[]).find((l) => l.kind === 'package');
+    if (pkg?.id !== packageFilter) return false;
+  }
+  return true;
+});
+
+const propertyIds = [...new Set(orders.map((o) => o.property_id).filter(Boolean))];
+const ownerIds = [...new Set(orders.map((o) => o.owner_id).filter(Boolean))];
 
 const { data: properties } = propertyIds.length
   ? await supabase.from('properties').select('id, ref, settlement, status').in('id', propertyIds)
@@ -41,6 +64,13 @@ const { data: owners } = ownerIds.length
 const propertyById = new Map((properties ?? []).map((p: any) => [p.id, p]));
 const ownerById = new Map((owners ?? []).map((o: any) => [o.id, o]));
 
+const orderRows = orders.filter((o) => {
+  if (!ownerFilter) return true;
+  const owner = o.owner_id ? ownerById.get(o.owner_id) : null;
+  const haystack = `${owner?.full_name ?? ''} ${owner?.email ?? ''}`.toLowerCase();
+  return haystack.includes(ownerFilter.toLowerCase());
+});
+
 const STATUS_LABEL: Record<string, string> = {
   pending: 'Fizetésre vár',
   paid: 'Fizetve (kártya)',
@@ -49,9 +79,9 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 // Settled money only — a pending order is an invoice, not income.
-const settled = (orders ?? []).filter((o) => o.status === 'paid' || o.status === 'manual');
+const settled = orderRows.filter((o) => o.status === 'paid' || o.status === 'manual');
 const settledTotal = settled.reduce((sum, o) => sum + o.amount_cents, 0);
-const outstanding = (orders ?? [])
+const outstanding = orderRows
   .filter((o) => o.status === 'pending')
   .reduce((sum, o) => sum + o.amount_cents, 0);
 
@@ -59,12 +89,41 @@ const dateFmt = new Intl.DateTimeFormat('hu-HU', { year: 'numeric', month: 'shor
 
 const summarise = (lines: OrderLine[]) =>
   lines.map((l) => (l.quantity > 1 ? `${l.label} ×${l.quantity}` : l.label)).join(' · ');
+
+/* ── Calendar grid ─────────────────────────────────────────────────────── */
+const calendarMonth = /^\d{4}-\d{2}$/.test(month) ? month : new Date().toISOString().slice(0, 7);
+const [calYear, calMon] = calendarMonth.split('-').map(Number);
+const firstOfMonth = new Date(Date.UTC(calYear, calMon - 1, 1));
+const daysInMonth = new Date(Date.UTC(calYear, calMon, 0)).getUTCDate();
+// Monday-first grid, matching the rest of the site's hu/nl locales.
+const leadingBlanks = (firstOfMonth.getUTCDay() + 6) % 7;
+
+const now = new Date();
+const byDay = new Map<number, { order: (typeof orderRows)[number]; overdue: boolean }[]>();
+if (view === 'calendar') {
+  for (const o of orderRows) {
+    const anchor = o.status === 'pending' ? o.due_at : o.paid_at;
+    if (!anchor) continue;
+    const d = new Date(anchor);
+    if (d.getUTCFullYear() !== calYear || d.getUTCMonth() !== calMon - 1) continue;
+    const day = d.getUTCDate();
+    const overdue = o.status === 'pending' && d < now;
+    byDay.set(day, [...(byDay.get(day) ?? []), { order: o, overdue }]);
+  }
+}
+
+const prevMonth = new Date(Date.UTC(calYear, calMon - 2, 1)).toISOString().slice(0, 7);
+const nextMonth = new Date(Date.UTC(calYear, calMon, 1)).toISOString().slice(0, 7);
 ---
 
 <Portal title="Fizetések">
   <header class="head">
     <p class="eyebrow">Fizetések</p>
-    <h1>{orders?.length ?? 0} tétel</h1>
+    <h1>{orderRows.length} tétel</h1>
+    <div class="view-toggle">
+      <a href={`/portal/payments?${new URLSearchParams({ ...(filter && { status: filter }) })}`} aria-current={view === 'list' ? 'page' : undefined}>Lista</a>
+      <a href={`/portal/payments?view=calendar&month=${calendarMonth}`} aria-current={view === 'calendar' ? 'page' : undefined}>Naptár</a>
+    </div>
   </header>
 
   <section class="totals">
@@ -78,61 +137,121 @@ const summarise = (lines: OrderLine[]) =>
     </div>
   </section>
 
-  <div class="filters">
-    <a href="/portal/payments" aria-current={!filter ? 'page' : undefined}>Mind</a>
-    {Object.entries(STATUS_LABEL).map(([value, label]) => (
-      <a href={`/portal/payments?status=${value}`} aria-current={filter === value ? 'page' : undefined}>{label}</a>
-    ))}
-  </div>
-
-  {orders && orders.length > 0 ? (
-    <table class="list">
-      <thead>
-        <tr><th>Dátum</th><th>Hirdetés</th><th>Hirdető</th><th>Tételek</th><th class="right">Összeg</th><th>Állapot</th></tr>
-      </thead>
-      <tbody>
-        {orders.map((o) => {
-          const property = o.property_id ? propertyById.get(o.property_id) : null;
-          const owner = o.owner_id ? ownerById.get(o.owner_id) : null;
+  {view === 'calendar' ? (
+    <section class="calendar">
+      <div class="cal-head">
+        <a href={`/portal/payments?view=calendar&month=${prevMonth}`}>← Előző</a>
+        <strong>{calendarMonth}</strong>
+        <a href={`/portal/payments?view=calendar&month=${nextMonth}`}>Következő →</a>
+      </div>
+      <div class="cal-grid">
+        {['H', 'K', 'Sze', 'Cs', 'P', 'Szo', 'V'].map((d) => <div class="cal-dow">{d}</div>)}
+        {Array.from({ length: leadingBlanks }).map(() => <div class="cal-cell blank"></div>)}
+        {Array.from({ length: daysInMonth }).map((_, i) => {
+          const day = i + 1;
+          const entries = byDay.get(day) ?? [];
           return (
-            <tr class:list={{ muted: o.status === 'cancelled' }}>
-              <td>
-                {dateFmt.format(new Date(o.created_at))}
-                {o.paid_at && <><br /><span class="sub">Fizetve: {dateFmt.format(new Date(o.paid_at))}</span></>}
-              </td>
-              <td>
-                {property ? (
-                  <a href={`/portal/properties/${o.property_id}`}>#{property.ref}</a>
-                ) : '—'}
-                {property && <><br /><span class="sub">{property.settlement}</span></>}
-              </td>
-              <td>{owner?.full_name ?? owner?.email ?? '—'}</td>
-              <td class="items">{summarise((o.line_items ?? []) as OrderLine[])}</td>
-              <td class="right amount">{formatCents(o.amount_cents)}</td>
-              <td><span class:list={['pill', `pill-${o.status}`]}>{STATUS_LABEL[o.status] ?? o.status}</span></td>
-            </tr>
+            <div class="cal-cell">
+              <span class="cal-day">{day}</span>
+              {entries.map(({ order, overdue }) => {
+                const owner = order.owner_id ? ownerById.get(order.owner_id) : null;
+                return (
+                  <a href={`/portal/payments/${order.id}`} class:list={['cal-entry', { overdue }]}>
+                    {formatCents(order.amount_cents)} · {owner?.full_name ?? owner?.email ?? '—'}
+                  </a>
+                );
+              })}
+            </div>
           );
         })}
-      </tbody>
-    </table>
+      </div>
+    </section>
   ) : (
-    <p class="empty">Ehhez a szűréshez nincs tétel.</p>
+    <>
+      <form method="GET" class="filters">
+        <div class="chips">
+          <a href="/portal/payments" aria-current={!filter ? 'page' : undefined}>Mind</a>
+          {Object.entries(STATUS_LABEL).map(([value, label]) => (
+            <a href={`/portal/payments?status=${value}`} aria-current={filter === value ? 'page' : undefined}>{label}</a>
+          ))}
+        </div>
+        <div class="row">
+          <input type="hidden" name="status" value={filter} />
+          <label>Hónap <input type="month" name="month" value={month} /></label>
+          <label>
+            Csomag
+            <select name="package">
+              <option value="" selected={!packageFilter}>Mind</option>
+              <option value="cheap-6m" selected={packageFilter === 'cheap-6m'}>Olcsó — 6 hónap</option>
+              <option value="normal-12m" selected={packageFilter === 'normal-12m'}>Normál — 12 hónap</option>
+            </select>
+          </label>
+          <label>Hirdető <input name="owner" value={ownerFilter} placeholder="név vagy e-mail" /></label>
+          <button type="submit" class="btn">Szűrés</button>
+        </div>
+      </form>
+
+      {orderRows.length > 0 ? (
+        <table class="list">
+          <thead>
+            <tr><th>Dátum</th><th>Hirdetés</th><th>Hirdető</th><th>Tételek</th><th class="right">Összeg</th><th>Állapot</th></tr>
+          </thead>
+          <tbody>
+            {orderRows.map((o) => {
+              const property = o.property_id ? propertyById.get(o.property_id) : null;
+              const owner = o.owner_id ? ownerById.get(o.owner_id) : null;
+              return (
+                <tr class:list={{ muted: o.status === 'cancelled' }}>
+                  <td>
+                    {dateFmt.format(new Date(o.created_at))}
+                    {o.paid_at && <><br /><span class="sub">Fizetve: {dateFmt.format(new Date(o.paid_at))}</span></>}
+                  </td>
+                  <td>
+                    {property ? (
+                      <a href={`/portal/properties/${o.property_id}`}>#{property.ref}</a>
+                    ) : '—'}
+                    {property && <><br /><span class="sub">{property.settlement}</span></>}
+                  </td>
+                  <td>{owner?.full_name ?? owner?.email ?? '—'}</td>
+                  <td class="items">{summarise((o.line_items ?? []) as OrderLine[])}</td>
+                  <td class="right amount">{formatCents(o.amount_cents)}</td>
+                  <td>
+                    <span class:list={['pill', `pill-${o.status}`]}>{STATUS_LABEL[o.status] ?? o.status}</span>
+                    <br /><a href={`/portal/payments/${o.id}`} class="detail-link">Részletek →</a>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      ) : (
+        <p class="empty">Ehhez a szűréshez nincs tétel.</p>
+      )}
+    </>
   )}
 </Portal>
 
 <style>
-  .head { margin-bottom: 20px; }
-  .eyebrow { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--taupe); margin-bottom: 8px; }
+  .head { margin-bottom: 20px; display: flex; align-items: baseline; gap: 20px; flex-wrap: wrap; }
+  .eyebrow { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--taupe); margin-bottom: 8px; flex-basis: 100%; }
   h1 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 26px; color: var(--ink); }
+  .view-toggle { display: flex; gap: 4px; }
+  .view-toggle a { padding: 6px 14px; font-size: var(--fs-micro); letter-spacing: 0.04em; color: var(--taupe); border: 1px solid var(--border); }
+  .view-toggle a[aria-current='page'] { background: var(--ink); color: var(--cream); border-color: var(--ink); }
 
   .totals { display: flex; gap: 1px; background: var(--border); border: 1px solid var(--border); margin-bottom: 24px; max-width: 460px; }
   .total { flex: 1; background: var(--cream); padding: 18px 20px; }
   .total .n { display: block; font-family: var(--serif); font-weight: var(--fw-medium); font-size: 22px; color: var(--ink); }
   .total .label { display: block; margin-top: 4px; font-size: var(--fs-micro); color: var(--taupe); }
 
-  .filters { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 22px; }
-  .filters a { padding: 7px 14px; font-size: var(--fs-micro); letter-spacing: 0.04em; color: var(--taupe); border: 1px solid var(--border); }
-  .filters a[aria-current='page'] { background: var(--ink); color: var(--cream); border-color: var(--ink); }
+  .filters { margin-bottom: 22px; }
+  .chips { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 14px; }
+  .chips a { padding: 7px 14px; font-size: var(--fs-micro); letter-spacing: 0.04em; color: var(--taupe); border: 1px solid var(--border); }
+  .chips a[aria-current='page'] { background: var(--ink); color: var(--cream); border-color: var(--ink); }
+  .row { display: flex; gap: 16px; flex-wrap: wrap; align-items: end; }
+  .row label { display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; color: var(--taupe); }
+  .row input, .row select { border: 1px solid var(--border); background: #fff; padding: 8px 10px; font-size: var(--fs-small); color: var(--ink); min-width: 120px; }
+  .btn { padding: 9px 20px; background: var(--ink); color: var(--cream); font-size: var(--fs-micro); letter-spacing: var(--ls-button); text-transform: uppercase; height: 37px; }
 
   .empty { color: var(--taupe); font-size: var(--fs-small); padding: 32px 0; }
 
@@ -141,6 +260,7 @@ const summarise = (lines: OrderLine[]) =>
   .list td { padding: 12px; border-bottom: 1px solid var(--border); color: var(--ink); vertical-align: top; }
   .list tr.muted td { opacity: 0.5; }
   .list a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+  .detail-link { font-size: var(--fs-micro); }
   .sub { font-size: var(--fs-micro); color: var(--taupe); }
   .items { font-size: var(--fs-micro); color: var(--taupe); max-width: 30ch; }
   .right { text-align: right; }
@@ -150,7 +270,20 @@ const summarise = (lines: OrderLine[]) =>
   .pill-paid, .pill-manual { background: rgba(16, 42, 67, 0.08); border-color: var(--ink); }
   .pill-pending { background: rgba(200, 150, 0, 0.1); border-color: #96700b; color: #6b4f08; }
 
+  .calendar { margin-top: 8px; }
+  .cal-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16px; font-size: var(--fs-small); }
+  .cal-head a { text-decoration: underline; text-underline-offset: 2px; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); }
+  .cal-dow { background: var(--linen); padding: 6px; font-size: var(--fs-micro); text-align: center; color: var(--taupe); }
+  .cal-cell { background: var(--cream); min-height: 84px; padding: 6px; display: flex; flex-direction: column; gap: 3px; }
+  .cal-cell.blank { background: var(--linen); }
+  .cal-day { font-size: var(--fs-micro); color: var(--taupe); }
+  .cal-entry { display: block; font-size: 10px; line-height: 1.4; padding: 2px 4px; background: rgba(16, 42, 67, 0.08); color: var(--ink); }
+  .cal-entry.overdue { background: rgba(179, 38, 30, 0.12); color: #b3261e; }
+
   @media (max-width: 860px) {
     .list { display: block; overflow-x: auto; }
+    .cal-grid { font-size: 11px; }
+    .cal-cell { min-height: 60px; }
   }
 </style>

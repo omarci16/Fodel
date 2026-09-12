@@ -433,7 +433,53 @@ ${common.signOff}`,
   };
 }
 
-/* ── 12. Referral registered (to the referrer) ───────────────────────────── */
+/* ── 12. Invoice issued ───────────────────────────────────────────────────── */
+
+export function invoiceIssued(
+  locale: EmailLocale,
+  opts: { ref: string; title: string; number: string; viewUrl: string }
+): BuiltEmail {
+  const c = copyFor(locale).invoiceIssued;
+
+  return {
+    subject: c.subject(opts.number),
+    html: shell({
+      locale,
+      preheader: c.preheader,
+      body: h1(c.heading) + lead(c.body(opts.title, opts.ref, opts.number)) + button(c.cta, opts.viewUrl) + signOff(locale),
+    }),
+    text: textShell({
+      locale,
+      body: `${c.heading}\n\n${c.body(opts.title, opts.ref, opts.number)}\n\n${textCta(c.cta, opts.viewUrl)}`,
+    }),
+  };
+}
+
+export function creditNoteIssued(
+  locale: EmailLocale,
+  opts: { ref: string; title: string; number: string; correctsNumber: string; viewUrl: string }
+): BuiltEmail {
+  const c = copyFor(locale).creditNoteIssued;
+
+  return {
+    subject: c.subject(opts.number),
+    html: shell({
+      locale,
+      preheader: c.preheader,
+      body:
+        h1(c.heading) +
+        lead(c.body(opts.title, opts.ref, opts.number, opts.correctsNumber)) +
+        button(c.cta, opts.viewUrl) +
+        signOff(locale),
+    }),
+    text: textShell({
+      locale,
+      body: `${c.heading}\n\n${c.body(opts.title, opts.ref, opts.number, opts.correctsNumber)}\n\n${textCta(c.cta, opts.viewUrl)}`,
+    }),
+  };
+}
+
+/* ── 14. Referral registered (to the referrer) ───────────────────────────── */
 
 export function referralRegistered(
   locale: EmailLocale,
@@ -462,7 +508,7 @@ ${common.signOff}`,
   };
 }
 
-/* ── 13. Referral admin notice (to FODEL) ─────────────────────────────────── */
+/* ── 15. Referral admin notice (to FODEL) ─────────────────────────────────── */
 
 export function referralAdminNotice(
   locale: EmailLocale,
@@ -648,4 +694,6 @@ export const templates = {
   passwordReset,
   referralRegistered,
   referralAdminNotice,
+  invoiceIssued,
+  creditNoteIssued,
 };

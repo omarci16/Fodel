@@ -1,0 +1,150 @@
+---
+/**
+ * The print-styled invoice — the one document this whole stage exists to
+ * produce. Reachable two ways, deliberately: signed in as the admin or the
+ * invoice's own owner (normal portal navigation), or signed out via the
+ * one-time-mint, not-single-use `?t=<view_token>` mailed in
+ * templates.invoiceIssued/creditNoteIssued — the same posture as
+ * invites/password_resets, except this token stays valid on reopen because a
+ * customer reasonably revisits an invoice more than once.
+ *
+ * ⚠️ Not a legally final document — see the header of
+ * supabase/migrations/0008_invoicing.sql. KvK is a placeholder dash and the
+ * VAT rate is unverified. Rendered anyway, on request, so the mechanics are
+ * ready the moment both are confirmed.
+ */
+export const prerender = false;
+
+import Portal from '~/layouts/Portal.astro';
+import { invoiceLines, issuerDetails } from '~/lib/invoice';
+import { formatCents, type OrderLine } from '~/lib/orders';
+import { createSupabaseAdminClient } from '~/lib/supabase-server';
+
+const { supabase, profile, user } = Astro.locals;
+const { number } = Astro.params;
+const token = Astro.url.searchParams.get('t');
+
+const isAdmin = profile?.role === 'admin';
+const columns =
+  'id, number, kind, corrects_id, payment_id, property_id, owner_id, billing_name, billing_address, line_items, discount_cents, gross_cents, vat_rate, net_cents, vat_cents, currency, view_token, issued_at, supply_date';
+
+// A signed-in admin or the invoice's own owner reads through their own
+// session (RLS decides); anyone else — including a signed-in user who isn't
+// either — needs the exact view_token, checked with the service-role client
+// since a token holder carries no session proving who they are at all.
+let invoice = null;
+if (isAdmin || user) {
+  const { data } = await supabase.from('invoices').select(columns).eq('number', number).maybeSingle();
+  invoice = data;
+}
+if (!invoice && token) {
+  const { data } = await createSupabaseAdminClient().from('invoices').select(columns).eq('number', number).maybeSingle();
+  if (data && data.view_token === token) invoice = data;
+}
+
+if (!invoice) return new Response('Számla nem található.', { status: 404 });
+
+const { data: property } = invoice.property_id
+  ? await createSupabaseAdminClient().from('properties').select('ref').eq('id', invoice.property_id).maybeSingle()
+  : { data: null };
+
+const { data: correctedInvoice } = invoice.corrects_id
+  ? await createSupabaseAdminClient().from('invoices').select('number').eq('id', invoice.corrects_id).maybeSingle()
+  : { data: null };
+
+const issuer = issuerDetails();
+const lines = invoiceLines(invoice as any);
+const sign = invoice.kind === 'credit_note' ? -1 : 1;
+
+const dateFmt = new Intl.DateTimeFormat('hu-HU', { year: 'numeric', month: 'long', day: 'numeric' });
+---
+
+<Portal title={invoice.number}>
+  <div class="toolbar no-print">
+    <a href="/portal/payments">← Fizetések</a>
+    <button type="button" onclick="window.print()">Nyomtatás / PDF</button>
+  </div>
+
+  <article class="invoice">
+    <header class="inv-head">
+      <div>
+        <p class="doc-type">{invoice.kind === 'credit_note' ? 'Jóváíró számla' : 'Számla'}</p>
+        <h1>{invoice.number}</h1>
+        {correctedInvoice && <p class="corrects">Korrigálja: {correctedInvoice.number}</p>}
+      </div>
+      <dl class="meta">
+        <div><dt>Kiállítás dátuma</dt><dd>{dateFmt.format(new Date(invoice.issued_at))}</dd></div>
+        <div><dt>Teljesítés dátuma</dt><dd>{dateFmt.format(new Date(invoice.supply_date))}</dd></div>
+        {property && <div><dt>Hirdetés</dt><dd>#{property.ref}</dd></div>}
+      </dl>
+    </header>
+
+    <section class="parties">
+      <div>
+        <p class="party-label">Kiállító</p>
+        <p class="party-name">{issuer.name}</p>
+        <p>{issuer.address}</p>
+        <p>KvK: {issuer.kvk ?? '—'}</p>
+        <p>BTW-id: {issuer.vat}{!issuer.vatVerified && ' (megerősítésre vár)'}</p>
+      </div>
+      <div>
+        <p class="party-label">Vevő</p>
+        <p class="party-name">{invoice.billing_name}</p>
+        <p>{invoice.billing_address}</p>
+      </div>
+    </section>
+
+    <table class="lines">
+      <thead><tr><th>Tétel</th><th class="right">Összeg</th></tr></thead>
+      <tbody>
+        {lines.map((l) => (
+          <tr><td>{l.label}</td><td class="right">{l.amount}</td></tr>
+        ))}
+      </tbody>
+      <tfoot>
+        <tr><td>Nettó összeg</td><td class="right">{formatCents(invoice.net_cents * sign)}</td></tr>
+        <tr><td>ÁFA ({invoice.vat_rate}%)</td><td class="right">{formatCents(invoice.vat_cents * sign)}</td></tr>
+        <tr class="total"><td>Végösszeg</td><td class="right">{formatCents(invoice.gross_cents * sign)}</td></tr>
+      </tfoot>
+    </table>
+
+    <p class="disclaimer">
+      Ez a dokumentum tájékoztató jellegű, a végleges számlaformátumot a könyvelővel való egyeztetés
+      után véglegesítjük.
+    </p>
+  </article>
+</Portal>
+
+<style>
+  .toolbar { display: flex; justify-content: space-between; margin-bottom: 24px; font-size: var(--fs-small); }
+  .toolbar a { text-decoration: underline; text-underline-offset: 2px; }
+  .toolbar button { padding: 8px 18px; background: var(--ink); color: var(--cream); font-size: var(--fs-micro); letter-spacing: var(--ls-button); text-transform: uppercase; }
+
+  .invoice { max-width: 720px; margin: 0 auto; background: #fff; border: 1px solid var(--border); padding: 48px; }
+  .inv-head { display: flex; justify-content: space-between; align-items: start; margin-bottom: 40px; border-bottom: 2px solid var(--accent); padding-bottom: 24px; }
+  .doc-type { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--taupe); margin-bottom: 6px; }
+  h1 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 28px; color: var(--ink); }
+  .corrects { font-size: var(--fs-small); color: var(--taupe); margin-top: 4px; }
+  .meta { text-align: right; font-size: var(--fs-small); }
+  .meta div { margin-bottom: 4px; }
+  .meta dt { display: inline; color: var(--taupe); }
+  .meta dt::after { content: ': '; }
+  .meta dd { display: inline; color: var(--ink); }
+
+  .parties { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-bottom: 40px; font-size: var(--fs-small); line-height: 1.7; color: var(--ink); }
+  .party-label { font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; color: var(--taupe); margin-bottom: 6px; }
+  .party-name { font-weight: 600; }
+
+  .lines { width: 100%; border-collapse: collapse; font-size: var(--fs-small); margin-bottom: 8px; }
+  .lines th { text-align: left; font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: 0.06em; color: var(--taupe); padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .lines td { padding: 8px 0; border-bottom: 1px solid var(--border); color: var(--ink); }
+  .lines tfoot td { border-bottom: none; padding-top: 8px; }
+  .lines tfoot tr.total td { font-weight: 700; font-size: 17px; border-top: 1px solid var(--ink); padding-top: 12px; }
+  .right { text-align: right; font-variant-numeric: tabular-nums; }
+
+  .disclaimer { font-size: var(--fs-micro); color: var(--taupe); margin-top: 32px; }
+
+  @media print {
+    .invoice { border: none; padding: 0; }
+  }
+</style>

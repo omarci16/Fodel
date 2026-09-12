@@ -161,6 +161,24 @@ export const NL = {
     note: 'De bijschrijving gebeurt handmatig, na betaling door de adverteerder — onze medewerker laat het u weten zodra dat kan.',
   },
 
+  invoiceIssued: {
+    subject: (number: string) => `Factuur — ${number}`,
+    preheader: 'De factuur is gereed, u kunt hem bekijken of downloaden via de link.',
+    heading: 'Uw factuur is gereed',
+    body: (title: string, ref: string, number: string) =>
+      `De factuur ${number} bij uw advertentie „${title}” (#${ref}) is gereed.`,
+    cta: 'Factuur bekijken',
+  },
+
+  creditNoteIssued: {
+    subject: (number: string) => `Creditfactuur — ${number}`,
+    preheader: 'Wij hebben een creditfactuur opgesteld voor uw eerdere factuur.',
+    heading: 'Creditfactuur gereed',
+    body: (title: string, ref: string, number: string, correctsNumber: string) =>
+      `Bij factuur ${correctsNumber} van uw advertentie „${title}” (#${ref}) hebben wij creditfactuur ${number} opgesteld.`,
+    cta: 'Creditfactuur bekijken',
+  },
+
   referralAdminNotice: {
     subject: (referrerName: string) => `Nieuwe aanbeveling — ${referrerName}`,
     preheader: 'Er is een nieuwe aanbevelings-lead binnengekomen via de website.',

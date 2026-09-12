@@ -18,6 +18,10 @@ const PUBLIC_PORTAL_PATHS = [
   '/portal/invite/', // /portal/invite/[token] — the token itself is the credential
   '/portal/forgot',
   '/portal/reset/', // /portal/reset/[token] — likewise
+  // /portal/invoices/[number] — reachable signed out via ?t=<view_token> for
+  // the emailed link; the page itself checks the token (or, signed in, that
+  // the caller is an admin or the invoice's own owner) before rendering.
+  '/portal/invoices/',
 ];
 
 const ADMIN_ONLY_PREFIXES = [
