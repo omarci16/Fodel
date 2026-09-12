@@ -19,6 +19,7 @@ import { FEATURES, COUNTIES } from '~/data/features';
 import { resolveImage } from '~/lib/property-images';
 import { formatCents, type OrderLine } from '~/lib/orders';
 import { isStripeEnabled } from '~/lib/stripe';
+import { isAiEnabled } from '~/lib/ai/client';
 import { COMPANY } from '~/config/company';
 
 /** A demo photo (bare filename) needs Astro's asset pipeline to become a real URL; a real upload already is one. */
@@ -48,6 +49,13 @@ const err = Astro.url.searchParams.get('error');
 const payment = Astro.url.searchParams.get('payment');
 
 const trByLocale = Object.fromEntries(property.translations.map((t) => [t.locale, t]));
+
+const { data: pendingSuggestions } = await supabase
+  .from('ai_suggestions')
+  .select('id, locale, suggested, issues')
+  .eq('property_id', id)
+  .eq('status', 'pending');
+const suggestionByLocale = Object.fromEntries((pendingSuggestions ?? []).map((s) => [s.locale, s]));
 const hero = property.media.find((m) => m.is_hero) ?? property.media[0];
 const gallery = property.media.filter((m) => m !== hero);
 
@@ -258,6 +266,7 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
         {LOCALE_OPTIONS.map((l, i) => {
           const t = trByLocale[l.value];
           const required = l.value === 'hu';
+          const suggestion = suggestionByLocale[l.value];
           return (
             <div class="locale-panel" data-locale-panel={l.value} hidden={i !== 0}>
               <Field locale="hu" name={`title_${l.value}`} label="Cím" required={required} value={t?.title ?? ''} />
@@ -270,6 +279,29 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
                 <Field locale="hu" name={`heating_${l.value}`} label="Fűtés" value={t?.heating ?? ''} />
                 <Field locale="hu" name={`tag_${l.value}`} label="Kiemelő címke (pl. Kiemelt, Vízpart)" value={t?.tag ?? ''} />
               </div>
+
+              {isAiEnabled() && t && (
+                <div class="ai-box" data-ai-locale={l.value}>
+                  {suggestion ? (
+                    <div class="ai-suggestion" data-suggestion-id={suggestion.id}>
+                      <p class="ai-label">AI szövegjavaslat</p>
+                      <div class="diff">
+                        <div><p class="diff-label">Jelenlegi</p><p class="diff-text">{t.description}</p></div>
+                        <div><p class="diff-label">Javasolt</p><p class="diff-text">{suggestion.suggested.description}</p></div>
+                      </div>
+                      {suggestion.issues?.length > 0 && (
+                        <ul class="ai-issues">{suggestion.issues.map((iss: string) => <li>{iss}</li>)}</ul>
+                      )}
+                      <button type="button" class="btn ghost small ai-accept">Elfogadom</button>
+                      <button type="button" class="btn ghost small ai-reject">Elvetem</button>
+                      <p class="hint">Az "Elfogadom" a teljes szöveget (cím, alcím, rövid és részletes leírás) lecseréli — mentés előtt még szerkesztheti a fenti mezőkben.</p>
+                    </div>
+                  ) : (
+                    <button type="button" class="btn ghost small ai-request">Szövegjavaslat kérése</button>
+                  )}
+                  <p class="ai-status" data-ai-status={l.value} role="status"></p>
+                </div>
+              )}
             </div>
           );
         })}
@@ -412,6 +444,63 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
       document.querySelectorAll('[data-locale-panel]').forEach((p) => {
         p.hidden = p.getAttribute('data-locale-panel') !== locale;
       });
+    });
+  });
+
+  // AI description-rewrite suggestion — request, accept (optionally after
+  // editing the fields above), or reject. Never auto-runs; always a click.
+  document.querySelectorAll('.ai-request').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const box = btn.closest('.ai-box');
+      const locale = box.dataset.aiLocale;
+      const statusEl = box.querySelector(`[data-ai-status="${locale}"]`);
+      btn.disabled = true;
+      statusEl.textContent = 'Javaslat készítése… (ez akár 30 másodpercig is tarthat)';
+      const res = await fetch(`/api/portal/properties/${propertyId}/ai-suggestion`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'request', locale }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json.ok) {
+        location.reload();
+      } else {
+        statusEl.textContent = 'Nem sikerült javaslatot készíteni.';
+        btn.disabled = false;
+      }
+    });
+  });
+
+  document.querySelectorAll('.ai-accept').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const wrap = btn.closest('.ai-suggestion');
+      const box = btn.closest('.ai-box');
+      const locale = box.dataset.aiLocale;
+      const statusEl = box.querySelector(`[data-ai-status="${locale}"]`);
+      statusEl.textContent = 'Elfogadás…';
+      const res = await fetch(`/api/portal/properties/${propertyId}/ai-suggestion`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'accept', suggestionId: wrap.dataset.suggestionId }),
+      });
+      statusEl.textContent = res.ok ? 'Elfogadva — az oldal frissül…' : 'Nem sikerült.';
+      if (res.ok) location.reload();
+    });
+  });
+
+  document.querySelectorAll('.ai-reject').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const wrap = btn.closest('.ai-suggestion');
+      const box = btn.closest('.ai-box');
+      const locale = box.dataset.aiLocale;
+      const statusEl = box.querySelector(`[data-ai-status="${locale}"]`);
+      const res = await fetch(`/api/portal/properties/${propertyId}/ai-suggestion`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'reject', suggestionId: wrap.dataset.suggestionId }),
+      });
+      statusEl.textContent = res.ok ? 'Elvetve.' : 'Nem sikerült.';
+      if (res.ok) location.reload();
     });
   });
 
@@ -571,6 +660,15 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
   .field { display: flex; flex-direction: column; margin-bottom: 22px; }
   .field label { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--taupe); margin-bottom: 9px; }
   .readonly { font-size: var(--fs-body); color: var(--ink); padding: 13px 0; }
+
+  .ai-box { margin-top: 8px; padding: 16px; background: var(--linen); }
+  .ai-label { font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; color: var(--taupe); margin-bottom: 10px; }
+  .diff { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 12px; }
+  .diff-label { font-size: var(--fs-micro); color: var(--taupe); margin-bottom: 4px; }
+  .diff-text { font-size: var(--fs-small); line-height: 1.6; color: var(--ink); background: #fff; padding: 10px; border: 1px solid var(--border); }
+  .ai-issues { font-size: var(--fs-micro); color: var(--taupe); margin: 0 0 12px 18px; }
+  .btn.small { padding: 7px 14px; font-size: 11px; margin-right: 8px; margin-bottom: 8px; }
+  .ai-status { font-size: var(--fs-micro); color: var(--taupe); margin-top: 6px; min-height: 1.4em; }
 
   .hint { font-size: var(--fs-small); color: var(--taupe); line-height: 1.7; margin-bottom: 14px; }
 

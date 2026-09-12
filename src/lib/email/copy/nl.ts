@@ -161,6 +161,25 @@ export const NL = {
     note: 'De bijschrijving gebeurt handmatig, na betaling door de adverteerder — onze medewerker laat het u weten zodra dat kan.',
   },
 
+  valuationReady: {
+    subject: 'Uw waardebepaling is gereed — FODEL',
+    preheader: 'Wij hebben een indicatieve schatting voor uw woning gemaakt.',
+    heading: 'Uw waardebepaling is gereed',
+    body: (range: string) =>
+      `Op basis van de opgegeven gegevens en vergelijkbare woningen is onze indicatieve schatting: ${range}.`,
+    disclaimerWithCount: (n: number) =>
+      `Deze schatting is indicatief, geen taxatierapport, en vervangt geen officiële taxatie. Gebaseerd op ${n} vergelijkbare woningen.`,
+    cta: 'Nu adverteren',
+    ctaUrl: 'submitAd',
+  },
+
+  valuationDeclined: {
+    subject: 'Uw aanvraag voor een waardebepaling — FODEL',
+    preheader: 'Onze medewerker neemt persoonlijk contact met u op.',
+    heading: 'Dank u voor uw aanvraag',
+    body: 'Op basis van de opgegeven gegevens hebben wij momenteel te weinig vergelijkbare woningen voor een betrouwbare schatting. Onze medewerker neemt persoonlijk contact met u op.',
+  },
+
   invoiceIssued: {
     subject: (number: string) => `Factuur — ${number}`,
     preheader: 'De factuur is gereed, u kunt hem bekijken of downloaden via de link.',

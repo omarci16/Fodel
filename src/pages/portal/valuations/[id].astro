@@ -1,0 +1,192 @@
+---
+/**
+ * One valuation: the facts it was run against, the comparables and
+ * statistics, the AI adjustment/rationale if AI_ENABLED, and the admin
+ * decision — edit the band, approve (emails the public lead, if any) or
+ * reject ("we'll call you"). "Számítás" runs the comps+stats(+AI) pass; it
+ * is the one place the AI call happens, never inside the public form.
+ */
+export const prerender = false;
+
+import Portal from '~/layouts/Portal.astro';
+import { eur } from '~/lib/format';
+import type { Comp } from '~/lib/ai/valuation';
+
+const { supabase, profile } = Astro.locals;
+if (profile?.role !== 'admin') return Astro.redirect('/portal/dashboard');
+
+const { id } = Astro.params;
+const { data: v } = await supabase.from('valuations').select('*').eq('id', id).maybeSingle();
+if (!v) return new Response('Nem található.', { status: 404 });
+
+const comps = (v.comps ?? []) as Comp[];
+
+const STATUS_LABEL: Record<string, string> = {
+  queued: 'Feldolgozásra vár',
+  insufficient_data: 'Kevés összehasonlító adat',
+  needs_review: 'Ellenőrzésre vár',
+  approved: 'Jóváhagyva',
+  rejected: 'Elvetve',
+};
+---
+
+<Portal title="Értékbecslés">
+  <header class="head">
+    <p class="eyebrow"><a href="/portal/valuations">← Értékbecslések</a></p>
+    <h1>{v.category} · {v.county}{v.settlement ? `, ${v.settlement}` : ''}</h1>
+    <span class="pill">{STATUS_LABEL[v.status] ?? v.status}</span>
+  </header>
+
+  <section class="grid">
+    <div class="col">
+      <h2>Adatok</h2>
+      <dl class="facts">
+        <div><dt>Forrás</dt><dd>{v.source === 'public_lead' ? 'Nyilvános űrlap' : 'Admin (hirdetés)'}</dd></div>
+        <div><dt>Alapterület</dt><dd>{v.floor_m2 ?? '—'} m²</dd></div>
+        <div><dt>Telek</dt><dd>{v.plot_m2 ?? '—'} m²</dd></div>
+        <div><dt>Épült</dt><dd>{v.year_built ?? '—'}</dd></div>
+        <div><dt>Állapot</dt><dd>{v.condition ?? '—'}</dd></div>
+        {v.contact_name && <div><dt>Kapcsolat</dt><dd>{v.contact_name} · {v.contact_email} · {v.contact_phone ?? '—'}</dd></div>}
+      </dl>
+
+      {v.status === 'queued' && (
+        <button type="button" class="btn" id="compute-btn">Számítás futtatása</button>
+      )}
+
+      {comps.length > 0 && (
+        <>
+          <h2>Összehasonlító ingatlanok ({comps.length})</h2>
+          <table class="comps">
+            <thead><tr><th>Ref</th><th class="right">Ár</th><th class="right">Alapterület</th><th class="right">€/m²</th></tr></thead>
+            <tbody>
+              {comps.map((c) => (
+                <tr>
+                  <td><a href={`/portal/properties?ref=${c.ref}`}>#{c.ref}</a></td>
+                  <td class="right">{eur(c.priceEur)}</td>
+                  <td class="right">{c.floorM2} m²</td>
+                  <td class="right">{eur(Math.round(c.pricePerM2))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+
+      {v.status === 'insufficient_data' && (
+        <p class="notice">Kevesebb, mint 8 összehasonlítható ingatlan — nincs elég adat egy megbízható sávhoz. Áras becslés kézzel, vagy várjon több hirdetésre.</p>
+      )}
+
+      {(v.ai_rationale_hu || v.ai_adjustment_percent != null) && (
+        <>
+          <h2>AI kiigazítás</h2>
+          <p class="ai-adjustment">Javasolt korrekció: {v.ai_adjustment_percent > 0 ? '+' : ''}{v.ai_adjustment_percent}% ({v.ai_confidence})</p>
+          <p class="ai-rationale">{v.ai_rationale_hu}</p>
+          {v.ai_factors && (v.ai_factors as string[]).length > 0 && (
+            <ul class="ai-factors">{(v.ai_factors as string[]).map((f) => <li>{f}</li>)}</ul>
+          )}
+        </>
+      )}
+    </div>
+
+    <div class="col">
+      {v.low_eur != null && (
+        <form id="band-form" class="panel">
+          <h2>Ár-sáv</h2>
+          <label>Alsó (€) <input type="number" name="lowEur" value={v.low_eur} /></label>
+          <label>Közép (€) <input type="number" name="midEur" value={v.mid_eur} /></label>
+          <label>Felső (€) <input type="number" name="highEur" value={v.high_eur} /></label>
+          <label>Megjegyzés <textarea name="note" rows="3">{v.admin_note ?? ''}</textarea></label>
+
+          {(v.status === 'needs_review' || v.status === 'approved' || v.status === 'rejected') && (
+            <div class="actions">
+              <button type="button" class="btn" id="approve-btn">Jóváhagyás és e-mail küldése</button>
+              <button type="button" class="btn ghost" id="reject-btn">Elvetés</button>
+            </div>
+          )}
+          <p class="action-status" id="action-status" role="status"></p>
+        </form>
+      )}
+    </div>
+  </section>
+</Portal>
+
+<script define:vars={{ valuationId: v.id }}>
+  const actionStatus = document.getElementById('action-status');
+  const form = document.getElementById('band-form');
+
+  async function post(action, extra = {}) {
+    const payload = { action, ...extra };
+    if (form) {
+      payload.lowEur = Number(form.lowEur?.value) || undefined;
+      payload.midEur = Number(form.midEur?.value) || undefined;
+      payload.highEur = Number(form.highEur?.value) || undefined;
+      payload.note = form.note?.value;
+    }
+    const res = await fetch(`/api/portal/valuations/${valuationId}/action`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return { ok: res.ok, json: await res.json().catch(() => ({})) };
+  }
+
+  document.getElementById('compute-btn')?.addEventListener('click', async (e) => {
+    e.target.disabled = true;
+    e.target.textContent = 'Számítás…';
+    const { ok } = await post('compute');
+    if (ok) location.reload();
+  });
+
+  document.getElementById('approve-btn')?.addEventListener('click', async () => {
+    actionStatus.textContent = 'Feldolgozás…';
+    const { ok } = await post('approve');
+    actionStatus.textContent = ok ? 'Jóváhagyva.' : 'Nem sikerült.';
+    if (ok) setTimeout(() => location.reload(), 600);
+  });
+
+  document.getElementById('reject-btn')?.addEventListener('click', async () => {
+    if (!confirm('Biztosan elveti ezt a becslést?')) return;
+    actionStatus.textContent = 'Feldolgozás…';
+    const { ok } = await post('reject');
+    actionStatus.textContent = ok ? 'Elvetve.' : 'Nem sikerült.';
+    if (ok) setTimeout(() => location.reload(), 600);
+  });
+</script>
+
+<style>
+  .head { margin-bottom: 24px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .eyebrow { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--taupe); flex-basis: 100%; margin-bottom: 4px; }
+  .eyebrow a { text-decoration: underline; text-underline-offset: 2px; }
+  h1 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 24px; color: var(--ink); }
+  h2 { font-family: var(--serif); font-size: 16px; color: var(--ink); margin: 20px 0 12px; }
+
+  .pill { display: inline-block; font-size: var(--fs-micro); padding: 3px 10px; border: 1px solid var(--border); }
+
+  .grid { display: grid; grid-template-columns: 1fr 320px; gap: 48px; }
+
+  .facts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  .facts dt { font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: 0.06em; color: var(--taupe); }
+  .facts dd { font-size: var(--fs-small); color: var(--ink); }
+
+  .comps { width: 100%; border-collapse: collapse; font-size: var(--fs-small); }
+  .comps th { text-align: left; font-size: var(--fs-micro); text-transform: uppercase; color: var(--taupe); padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .comps td { padding: 6px 0; border-bottom: 1px solid var(--border); color: var(--ink); }
+  .right { text-align: right; }
+
+  .notice { font-size: var(--fs-small); color: #6b4f08; background: rgba(200, 150, 0, 0.08); padding: 12px 16px; border-left: 2px solid #96700b; }
+  .ai-adjustment { font-size: var(--fs-small); font-weight: 600; color: var(--ink); }
+  .ai-rationale { font-size: var(--fs-small); color: var(--taupe); line-height: 1.7; margin-top: 6px; }
+  .ai-factors { font-size: var(--fs-micro); color: var(--taupe); margin-top: 8px; padding-left: 18px; }
+
+  .panel label { display: block; font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; color: var(--taupe); margin-bottom: 6px; margin-top: 14px; }
+  .panel input, .panel textarea { width: 100%; border: 1px solid var(--border); background: #fff; padding: 9px 10px; font-size: var(--fs-small); color: var(--ink); font-family: inherit; }
+
+  .btn { padding: 10px 18px; background: var(--ink); color: var(--cream); font-size: var(--fs-micro); letter-spacing: var(--ls-button); text-transform: uppercase; margin-top: 16px; margin-right: 10px; }
+  .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--ink); }
+  .actions { margin-top: 20px; }
+  .action-status { font-size: var(--fs-small); color: var(--taupe); margin-top: 10px; min-height: 1.5em; }
+
+  @media (max-width: 900px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+</style>

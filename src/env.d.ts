@@ -11,6 +11,8 @@ interface ImportMetaEnv {
   readonly STRIPE_WEBHOOK_SECRET: string;
   readonly STRIPE_ENABLED: string;
   readonly PMTILES_URL: string;
+  readonly OPENAI_API_KEY: string;
+  readonly AI_ENABLED: string;
 }
 
 interface ImportMeta {

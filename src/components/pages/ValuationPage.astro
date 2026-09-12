@@ -1,0 +1,160 @@
+---
+/**
+ * Értékbecslés / Waardebepaling — the AI valuation lead magnet.
+ *
+ * Deliberately never returns an instant number: the estimate is computed
+ * from comparables + statistics (src/lib/ai/valuation.ts), reviewed by an
+ * admin, and only then emailed — see /portal/valuations. This page's whole
+ * job is to collect the facts and set that expectation honestly.
+ */
+import Base from '~/layouts/Base.astro';
+import PageHeader from '~/components/PageHeader.astro';
+import FormShell from '~/components/forms/FormShell.astro';
+import Field from '~/components/forms/Field.astro';
+import { UI, CATEGORIES, type Locale, type CategoryKey } from '~/i18n/ui';
+import { COUNTIES } from '~/data/features';
+import { alternatesFor } from '~/lib/page';
+import { serviceSchema } from '~/lib/seo';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const ui = UI[locale];
+const hu = locale === 'hu';
+
+const t = hu
+  ? {
+      metaTitle: 'Ingyenes értékbecslés — Mennyit ér az ingatlana?',
+      metaDescription:
+        'Töltse ki az űrlapot, és egy munkanapon belül e-mailben elküldjük tájékoztató jellegű árbecslésünket, hasonló eladott és hirdetett ingatlanok alapján.',
+      eyebrow: 'Értékbecslés',
+      title: 'Mennyit ér',
+      titleEm: 'az ingatlana?',
+      body: 'Adja meg az ingatlan adatait. Munkatársunk hasonló ingatlanok alapján tájékoztató jellegű becslést készít, és egy munkanapon belül e-mailben elküldi.',
+      formHead: 'Ingyenes becslés kérése',
+      submit: 'Becslés kérése',
+      successTitle: 'Köszönjük!',
+      successBody: 'Megkaptuk az adatokat. Egy munkanapon belül e-mailben elküldjük a becslést.',
+      disclaimer:
+        'Tájékoztató jellegű becslés, nem értékbecslői szakvélemény. Nem helyettesíti a hivatalos ingatlanértékelést, és abból jog nem származik.',
+    }
+  : {
+      metaTitle: 'Gratis waardebepaling — Wat is uw woning waard?',
+      metaDescription:
+        'Vul het formulier in en ontvang binnen één werkdag een indicatieve schatting per e-mail, gebaseerd op vergelijkbare verkochte en aangeboden woningen.',
+      eyebrow: 'Waardebepaling',
+      title: 'Wat is uw woning',
+      titleEm: 'waard?',
+      body: 'Geef de gegevens van de woning door. Onze medewerker maakt op basis van vergelijkbare woningen een indicatieve schatting en stuurt die binnen één werkdag per e-mail.',
+      formHead: 'Gratis schatting aanvragen',
+      submit: 'Schatting aanvragen',
+      successTitle: 'Dank u wel!',
+      successBody: 'Wij hebben uw gegevens ontvangen. Binnen één werkdag ontvangt u de schatting per e-mail.',
+      disclaimer:
+        'Indicatieve schatting, geen taxatierapport. Vervangt geen officiële taxatie en hieraan kunnen geen rechten worden ontleend.',
+    };
+
+const categoryOptions = (Object.keys(CATEGORIES) as CategoryKey[]).map((key) => ({
+  value: key,
+  label: CATEGORIES[key][locale].label,
+}));
+---
+
+<Base
+  locale={locale}
+  title={t.metaTitle}
+  description={t.metaDescription}
+  alternates={alternatesFor('valuation')}
+  schema={[serviceSchema(locale, t.eyebrow, t.metaDescription)]}
+>
+  <PageHeader eyebrow={t.eyebrow} title={t.title} titleEm={t.titleEm} body={t.body} compact />
+
+  <section class="form-section">
+    <div class="form-inner">
+      <h2>{t.formHead}</h2>
+
+      <FormShell
+        locale={locale}
+        endpoint="/api/valuation"
+        formId="valuation"
+        submitLabel={t.submit}
+        successTitle={t.successTitle}
+        successBody={t.successBody}
+      >
+        <Field locale={locale} name="name" label={ui.form.name} required autocomplete="name" span="half" />
+        <Field locale={locale} name="email" label={ui.form.email} type="email" required autocomplete="email" span="half" />
+        <Field locale={locale} name="phone" label={ui.form.phone} type="tel" autocomplete="tel" span="half" />
+        <Field
+          locale={locale}
+          name="category"
+          label={hu ? 'Ingatlan típusa' : 'Type woning'}
+          type="select"
+          required
+          options={categoryOptions}
+          span="half"
+        />
+        <Field
+          locale={locale}
+          name="county"
+          label={hu ? 'Megye' : 'Comitaat'}
+          type="select"
+          required
+          options={COUNTIES.map((c) => ({ value: c, label: c }))}
+          span="half"
+        />
+        <Field locale={locale} name="settlement" label={hu ? 'Település' : 'Plaats'} span="half" />
+        <Field locale={locale} name="floorM2" label={hu ? 'Alapterület (m²)' : 'Woonoppervlak (m²)'} type="number" min={0} span="half" />
+        <Field locale={locale} name="plotM2" label={hu ? 'Telekterület (m²)' : 'Perceeloppervlak (m²)'} type="number" min={0} span="half" />
+        <Field locale={locale} name="yearBuilt" label={hu ? 'Építés éve' : 'Bouwjaar'} type="number" min={1500} max={2100} span="half" />
+        <Field
+          locale={locale}
+          name="condition"
+          label={hu ? 'Állapot' : 'Staat van onderhoud'}
+          placeholder={hu ? 'pl. jó, felújítandó' : 'bijv. goed, opknapper'}
+          span="full"
+        />
+      </FormShell>
+
+      <p class="disclaimer">{t.disclaimer}</p>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .form-section {
+    padding: 16px var(--pad-x) var(--section-y);
+  }
+  .form-inner {
+    max-width: 760px;
+    margin-inline: auto;
+    background: var(--linen);
+    border: 1px solid var(--border);
+    padding: 48px;
+  }
+  h2 {
+    font-family: var(--serif);
+    font-weight: var(--fw-display);
+    font-size: clamp(24px, 2.8vw, 34px);
+    color: var(--ink);
+    margin-bottom: 32px;
+  }
+  .disclaimer {
+    font-size: var(--fs-micro);
+    line-height: 1.6;
+    color: var(--taupe);
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+
+  @media (max-width: 700px) {
+    .form-section {
+      padding: 8px var(--pad-x-mob) var(--section-y-mob);
+    }
+    .form-inner {
+      padding: 28px 24px;
+    }
+  }
+</style>

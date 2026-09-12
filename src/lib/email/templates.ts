@@ -433,6 +433,42 @@ ${common.signOff}`,
   };
 }
 
+/* ── 16. Valuation ready ──────────────────────────────────────────────────── */
+
+export function valuationReady(
+  locale: EmailLocale,
+  opts: { range: string; compCount: number; submitAdUrl: string }
+): BuiltEmail {
+  const c = copyFor(locale).valuationReady;
+
+  return {
+    subject: c.subject,
+    html: shell({
+      locale,
+      preheader: c.preheader,
+      body:
+        h1(c.heading) +
+        lead(c.body(opts.range)) +
+        small(c.disclaimerWithCount(opts.compCount)) +
+        button(c.cta, opts.submitAdUrl) +
+        signOff(locale),
+    }),
+    text: textShell({
+      locale,
+      body: `${c.heading}\n\n${c.body(opts.range)}\n\n${c.disclaimerWithCount(opts.compCount)}\n\n${textCta(c.cta, opts.submitAdUrl)}`,
+    }),
+  };
+}
+
+export function valuationDeclined(locale: EmailLocale): BuiltEmail {
+  const c = copyFor(locale).valuationDeclined;
+  return {
+    subject: c.subject,
+    html: shell({ locale, preheader: c.preheader, body: h1(c.heading) + lead(c.body) + signOff(locale) }),
+    text: textShell({ locale, body: `${c.heading}\n\n${c.body}` }),
+  };
+}
+
 /* ── 12. Invoice issued ───────────────────────────────────────────────────── */
 
 export function invoiceIssued(
@@ -696,4 +732,6 @@ export const templates = {
   referralAdminNotice,
   invoiceIssued,
   creditNoteIssued,
+  valuationReady,
+  valuationDeclined,
 };

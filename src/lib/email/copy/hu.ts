@@ -164,6 +164,25 @@ export const HU = {
     note: 'A jóváírás a hirdető fizetése után, kézzel történik — munkatársunk értesíti Önt, amint elérhető.',
   },
 
+  valuationReady: {
+    subject: 'Elkészült az értékbecslése — FODEL',
+    preheader: 'Tájékoztató jellegű becslést készítettünk az Ön ingatlanára.',
+    heading: 'Elkészült az értékbecslése',
+    body: (range: string) =>
+      `A megadott adatok és a hasonló ingatlanok alapján tájékoztató jellegű becslésünk: ${range}.`,
+    disclaimerWithCount: (n: number) =>
+      `Ez a becslés tájékoztató jellegű, nem értékbecslői szakvélemény, és nem helyettesíti a hivatalos ingatlanértékelést. Az összeg ${n} hasonló ingatlan adatai alapján készült.`,
+    cta: 'Hirdesse meg most',
+    ctaUrl: 'submitAd',
+  },
+
+  valuationDeclined: {
+    subject: 'Az Ön értékbecslési igénye — FODEL',
+    preheader: 'Munkatársunk személyesen felveszi Önnel a kapcsolatot.',
+    heading: 'Köszönjük a megkeresést',
+    body: 'A megadott adatok alapján jelenleg nem áll elég összehasonlítható ingatlan a rendelkezésünkre egy megbízható becsléshez. Munkatársunk személyesen felveszi Önnel a kapcsolatot.',
+  },
+
   invoiceIssued: {
     subject: (number: string) => `Számla — ${number}`,
     preheader: 'A számlát elkészítettük, megtekintheti vagy letöltheti a linken.',
