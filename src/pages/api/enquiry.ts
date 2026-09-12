@@ -29,14 +29,19 @@ export const POST: APIRoute = (context) =>
       if (!ref) return; // enquiry sent without property context — nothing to persist against
 
       const admin = createSupabaseAdminClient();
-      const { data: property } = await admin
+      const { data: property, error: lookupError } = await admin
         .from('properties')
         .select('id, owner_id')
         .eq('ref', ref)
         .maybeSingle();
+      // Thrown (not swallowed): runHook's own catch logs it, same as every
+      // other onSuccess failure — a lookup error looked identical to
+      // "no such property" here, so a real failure (a network blip, an RLS
+      // change) went completely unlogged instead of just losing one enquiry.
+      if (lookupError) throw new Error(`property lookup failed: ${lookupError.message}`);
       if (!property) return;
 
-      await admin.from('enquiries').insert({
+      const { error: insertError } = await admin.from('enquiries').insert({
         property_id: property.id,
         name: values.name,
         email: values.email,
@@ -44,6 +49,7 @@ export const POST: APIRoute = (context) =>
         message: values.message || null,
         locale: extras.Locale === 'nl' ? 'nl' : 'hu',
       });
+      if (insertError) throw new Error(`enquiry insert failed: ${insertError.message}`);
 
       if (property.owner_id) {
         const { data: owner } = await admin
