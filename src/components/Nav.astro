@@ -68,44 +68,51 @@ const isCurrent = (href: string) =>
       </Button>
     </div>
 
-    <button
-      class="burger"
-      type="button"
-      id="nav-toggle"
-      aria-expanded="false"
-      aria-controls="nav-drawer"
-      aria-label={ui.menu}
-    >
-      <span aria-hidden="true"></span>
-      <span aria-hidden="true"></span>
-      <span aria-hidden="true"></span>
-    </button>
+    <div class="nav-mobile-only">
+      <LanguageSwitcher locale={locale} alternates={alternates} align="right" />
+
+      <button
+        class="burger"
+        type="button"
+        id="nav-toggle"
+        aria-expanded="false"
+        aria-controls="nav-drawer"
+        aria-label={ui.menu}
+      >
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+      </button>
+    </div>
   </div>
 </nav>
 
-<div class="drawer" id="nav-drawer" hidden>
-  <ul class="drawer-links">
-    {
-      links.map((l) => {
-        const href = path(locale, l.key);
-        return (
-          <li>
-            <a href={href} aria-current={isCurrent(href) ? 'page' : undefined}>
-              {l.label}
-            </a>
-          </li>
-        );
-      })
-    }
-    <li>
-      <a href={path(locale, 'contact')}>{ui.nav.contact}</a>
-    </li>
-  </ul>
+<div class="drawer" id="nav-drawer" inert>
+  <div class="drawer-clip">
+    <div class="drawer-panel">
+      <ul class="drawer-links">
+        {
+          links.map((l, i) => {
+            const href = path(locale, l.key);
+            return (
+              <li style={`--i:${i}`}>
+                <a href={href} aria-current={isCurrent(href) ? 'page' : undefined}>
+                  {l.label}
+                </a>
+              </li>
+            );
+          })
+        }
+        <li style={`--i:${links.length}`}>
+          <a href={path(locale, 'contact')}>{ui.nav.contact}</a>
+        </li>
+      </ul>
 
-  <div class="drawer-foot">
-    <LanguageSwitcher locale={locale} alternates={alternates} align="left" />
-    <Button variant="outline" href="/portal/login" rel="nofollow" block>{ui.cta.login}</Button>
-    <Button variant="dark" href={path(locale, 'contact')} block>{ui.cta.callback}</Button>
+      <div class="drawer-foot" style={`--i:${links.length + 1}`}>
+        <Button variant="outline" href="/portal/login" rel="nofollow" block>{ui.cta.login}</Button>
+        <Button variant="dark" href={path(locale, 'contact')} block>{ui.cta.callback}</Button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -124,7 +131,10 @@ const isCurrent = (href: string) =>
 
   const setOpen = (open: boolean) => {
     toggle.setAttribute('aria-expanded', String(open));
-    drawer.toggleAttribute('hidden', !open);
+    drawer.toggleAttribute('data-open', open);
+    // inert (not `hidden`) so the drawer can still animate while it's
+    // closing — `hidden` would rip it out of layout mid-transition.
+    drawer.inert = !open;
     document.body.style.overflow = open ? 'hidden' : '';
     if (open) focusable()[0]?.focus();
   };
@@ -134,7 +144,7 @@ const isCurrent = (href: string) =>
   });
 
   document.addEventListener('keydown', (e) => {
-    if (drawer.hasAttribute('hidden')) return;
+    if (!drawer.hasAttribute('data-open')) return;
 
     if (e.key === 'Escape') {
       setOpen(false);
@@ -208,8 +218,13 @@ const isCurrent = (href: string) =>
     gap: 24px;
   }
 
-  .burger {
+  .nav-mobile-only {
     display: none;
+    align-items: center;
+    gap: 8px;
+  }
+  .burger {
+    display: flex;
     flex-direction: column;
     align-items: flex-end;
     gap: 5px;
@@ -220,7 +235,7 @@ const isCurrent = (href: string) =>
     width: 22px;
     height: 1.5px;
     background: var(--ink);
-    transition: all 0.3s;
+    transition: all 0.35s var(--ease);
   }
   .burger span:nth-child(2) {
     width: 16px;
@@ -240,6 +255,25 @@ const isCurrent = (href: string) =>
     position: fixed;
     inset: var(--nav-h-mob) 0 auto;
     z-index: 998;
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.45s var(--ease);
+  }
+  .drawer[data-open] {
+    grid-template-rows: 1fr;
+  }
+  /* Clips the panel while the grid track animates — and does NOTHING else.
+     Padding and borders do not shrink with the track: with border-box
+     sizing a used height of 0 still resolves to max(0, padding + border),
+     so any decoration put here survives the collapse as a permanent strip
+     welded under the navbar. Keep this element free of padding, border,
+     background and min-height, or the stray bar comes back. */
+  .drawer-clip {
+    overflow: hidden;
+    min-height: 0;
+  }
+  /* Everything painted lives here, safely inside the clipper. */
+  .drawer-panel {
     background: rgba(244, 244, 242, 0.99);
     backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border);
@@ -247,11 +281,22 @@ const isCurrent = (href: string) =>
     max-height: calc(100dvh - var(--nav-h-mob));
     overflow-y: auto;
   }
-  .drawer[hidden] {
-    display: none;
-  }
   .drawer-links {
     list-style: none;
+  }
+  .drawer-links li,
+  .drawer-foot {
+    opacity: 0;
+    transform: translateY(-8px);
+    transition:
+      opacity 0.25s ease,
+      transform 0.25s ease;
+  }
+  .drawer[data-open] .drawer-links li,
+  .drawer[data-open] .drawer-foot {
+    opacity: 1;
+    transform: translateY(0);
+    transition-delay: calc(0.05s + var(--i, 0) * 0.04s);
   }
   .drawer-links a {
     display: block;
@@ -275,6 +320,15 @@ const isCurrent = (href: string) =>
     gap: 18px;
   }
 
+  @media (prefers-reduced-motion: reduce) {
+    .drawer,
+    .drawer-links li,
+    .drawer-foot {
+      transition-duration: 0.01ms !important;
+      transition-delay: 0s !important;
+    }
+  }
+
   @media (max-width: 1080px) {
     .nav-inner,
     .nav[data-scrolled] .nav-inner {
@@ -284,7 +338,7 @@ const isCurrent = (href: string) =>
     .nav-end {
       display: none;
     }
-    .burger {
+    .nav-mobile-only {
       display: flex;
     }
   }
