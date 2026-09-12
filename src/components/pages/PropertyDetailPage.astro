@@ -191,10 +191,6 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
         </a>
       </p>
 
-      <div class="detail-map no-print">
-        <Map mode="pin" lat={d.location.lat} lng={d.location.lng} precision={d.location.precision} locale={locale} id={`map-${d.ref}`} />
-      </div>
-
       <div class="price-row">
         <span class="price">{eur(d.price.eur)}</span>
         <span class="price-huf">{huf(d.price.huf, locale)}</span>
@@ -248,6 +244,10 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
       }
 
       <GoldRule class="prose-rule" />
+
+      <div class="detail-map no-print">
+        <Map mode="pin" lat={d.location.lat} lng={d.location.lng} precision={d.location.precision} locale={locale} id={`map-${d.ref}`} />
+      </div>
 
       {/* FODEL's actual USP, as a data-driven block rather than a slogan. */}
       {
