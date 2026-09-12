@@ -197,7 +197,6 @@ const schema = [websiteSchema(locale, path(locale, 'properties'))];
         <br />
         <em>{referral.titleEm}</em>
       </h2>
-      <GoldRule space="24px" />
       <p>{referral.body}</p>
       <ol class="referral-steps">
         {referral.steps.map((step: string, i: number) => (
@@ -507,6 +506,7 @@ const schema = [websiteSchema(locale, path(locale, 'properties'))];
     font-size: clamp(30px, 3.2vw, 48px);
     line-height: 1.12;
     color: var(--cream);
+    margin-bottom: 24px;
   }
   .referral-copy h2 em {
     font-style: italic;

@@ -20,7 +20,6 @@
  */
 import Base from '~/layouts/Base.astro';
 import Eyebrow from '~/components/Eyebrow.astro';
-import GoldRule from '~/components/GoldRule.astro';
 import Button from '~/components/Button.astro';
 import PackageCard from '~/components/PackageCard.astro';
 import FormShell from '~/components/forms/FormShell.astro';
@@ -232,7 +231,6 @@ const packageSchema = listingServiceSchema(locale, {
           <br />
           <em>{t.titleEm}</em>
         </h1>
-        <GoldRule space="24px" />
         <p class="intro-body">{t.body}</p>
       </header>
 
@@ -543,6 +541,7 @@ const packageSchema = listingServiceSchema(locale, {
     font-size: clamp(34px, 4vw, 56px);
     line-height: 1.04;
     color: var(--ink);
+    margin-bottom: 24px;
   }
   .intro h1 em {
     font-style: italic;
