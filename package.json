@@ -21,6 +21,7 @@
     "verify:workflow": "node scripts/verify-workflow.mjs"
   },
   "dependencies": {
+    "@astrojs/rss": "^4.0.19",
     "@astrojs/sitemap": "^3.6.0",
     "@astrojs/vercel": "^8.2.11",
     "@fontsource-variable/jost": "^5.3.0",
@@ -29,6 +30,7 @@
     "@supabase/supabase-js": "^2.45.4",
     "astro": "^5.16.2",
     "maplibre-gl": "^6.5.0",
+    "marked": "^18.0.12",
     "pmtiles": "^4.5.0",
     "resend": "^6.1.2",
     "sharp": "^0.34.4",

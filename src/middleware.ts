@@ -29,10 +29,13 @@ const ADMIN_ONLY_PREFIXES = [
   '/portal/review',
   '/portal/payments',
   '/portal/database',
-  // The CSV export lives under /api/portal/database, a distinct prefix from
-  // /portal/database — easy to forget on a "read-only" route, so it is listed
-  // explicitly rather than assumed covered.
+  '/portal/content',
+  // Each of these API prefixes is distinct from its /portal/... counterpart
+  // above and would NOT be covered by it — the same easy-to-forget gap the
+  // plan calls out for the database export route.
   '/api/portal/database',
+  '/api/portal/payments',
+  '/api/portal/content',
 ];
 
 export const onRequest = defineMiddleware(async (context, next) => {

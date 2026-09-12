@@ -26,8 +26,10 @@ export class MediaUploadError extends Error {
 
 export async function processAndUploadImage(
   supabase: SupabaseClient,
+  /** A path prefix, not necessarily a property id — the blog editor passes a post id into the `blog-media` bucket. */
   propertyId: string,
-  file: File
+  file: File,
+  bucket: string = BUCKET
 ): Promise<{ url: string; width: number; height: number }> {
   if (!ALLOWED_TYPES.has(file.type)) {
     throw new MediaUploadError('unsupported-type', `${file.type} is not an accepted image type`);
@@ -62,22 +64,22 @@ export async function processAndUploadImage(
   const outMeta = await sharp(output).metadata();
 
   const path = `${propertyId}/${crypto.randomUUID()}.webp`;
-  const { error } = await supabase.storage.from(BUCKET).upload(path, output, {
+  const { error } = await supabase.storage.from(bucket).upload(path, output, {
     contentType: 'image/webp',
     upsert: false,
   });
   if (error) throw new MediaUploadError('storage-failed', error.message);
 
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
   return { url: data.publicUrl, width: outMeta.width!, height: outMeta.height! };
 }
 
-export async function deleteImage(supabase: SupabaseClient, storagePath: string): Promise<void> {
+export async function deleteImage(supabase: SupabaseClient, storagePath: string, bucket: string = BUCKET): Promise<void> {
   // storagePath is the full public URL; storage.remove() wants the object
   // path relative to the bucket, which is everything after `/object/public/<bucket>/`.
-  const marker = `/object/public/${BUCKET}/`;
+  const marker = `/object/public/${bucket}/`;
   const idx = storagePath.indexOf(marker);
   if (idx === -1) return; // not a URL we manage (e.g. a local demo image) — nothing to delete
   const path = storagePath.slice(idx + marker.length);
-  await supabase.storage.from(BUCKET).remove([path]);
+  await supabase.storage.from(bucket).remove([path]);
 }

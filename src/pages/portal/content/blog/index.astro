@@ -1,0 +1,76 @@
+---
+/** Blog admin — list, same filter-chip pattern as /portal/payments. */
+export const prerender = false;
+
+import Portal from '~/layouts/Portal.astro';
+
+const { supabase, profile } = Astro.locals;
+if (profile?.role !== 'admin') return Astro.redirect('/portal/dashboard');
+
+const filter = Astro.url.searchParams.get('locale') ?? '';
+
+let query = supabase
+  .from('blog_posts')
+  .select('id, locale, slug, title, category, published, published_at, updated_at')
+  .order('updated_at', { ascending: false });
+if (filter) query = query.eq('locale', filter);
+
+const { data: posts } = await query;
+
+const dateFmt = new Intl.DateTimeFormat('hu-HU', { year: 'numeric', month: 'short', day: 'numeric' });
+---
+
+<Portal title="Blog">
+  <header class="head">
+    <p class="eyebrow">Tartalom</p>
+    <h1>Blog</h1>
+    <a href="/portal/content/blog/new" class="btn">+ Új cikk</a>
+  </header>
+
+  <div class="filters">
+    <a href="/portal/content/blog" aria-current={!filter ? 'page' : undefined}>Mind</a>
+    <a href="/portal/content/blog?locale=hu" aria-current={filter === 'hu' ? 'page' : undefined}>HU</a>
+    <a href="/portal/content/blog?locale=nl" aria-current={filter === 'nl' ? 'page' : undefined}>NL</a>
+  </div>
+
+  {posts && posts.length > 0 ? (
+    <table class="list">
+      <thead><tr><th>Cím</th><th>Nyelv</th><th>Kategória</th><th>Állapot</th><th>Frissítve</th></tr></thead>
+      <tbody>
+        {posts.map((p) => (
+          <tr>
+            <td><a href={`/portal/content/blog/${p.id}`}>{p.title || '(névtelen)'}</a></td>
+            <td>{p.locale.toUpperCase()}</td>
+            <td>{p.category || '—'}</td>
+            <td><span class:list={['pill', { published: p.published }]}>{p.published ? 'Publikus' : 'Piszkozat'}</span></td>
+            <td class="sub">{dateFmt.format(new Date(p.updated_at))}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  ) : (
+    <p class="empty">Nincs még cikk.</p>
+  )}
+</Portal>
+
+<style>
+  .head { margin-bottom: 20px; display: flex; align-items: baseline; gap: 20px; }
+  .eyebrow { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--taupe); flex-basis: 100%; margin-bottom: 4px; }
+  h1 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 26px; color: var(--ink); flex: 1; }
+  .btn { padding: 9px 18px; background: var(--ink); color: var(--cream); font-size: var(--fs-micro); letter-spacing: var(--ls-button); text-transform: uppercase; }
+
+  .filters { display: flex; gap: 4px; margin-bottom: 22px; }
+  .filters a { padding: 7px 14px; font-size: var(--fs-micro); letter-spacing: 0.04em; color: var(--taupe); border: 1px solid var(--border); }
+  .filters a[aria-current='page'] { background: var(--ink); color: var(--cream); border-color: var(--ink); }
+
+  .empty { color: var(--taupe); font-size: var(--fs-small); padding: 32px 0; }
+
+  .list { width: 100%; border-collapse: collapse; font-size: var(--fs-small); }
+  .list th { text-align: left; font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; color: var(--taupe); padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .list td { padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--ink); }
+  .list a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+  .sub { font-size: var(--fs-micro); color: var(--taupe); }
+
+  .pill { display: inline-block; font-size: var(--fs-micro); padding: 3px 10px; border: 1px solid var(--border); }
+  .pill.published { background: rgba(16, 42, 67, 0.08); border-color: var(--ink); }
+</style>

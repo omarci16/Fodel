@@ -1,0 +1,132 @@
+---
+/**
+ * Article detail — one shared component for both locales' [slug] routes,
+ * which were byte-identical apart from a locale literal. Supabase-backed
+ * since FODEL 1.2; see src/lib/blog.ts.
+ *
+ * Renders 404 itself (rather than the route file) so both thin wrappers stay
+ * truly thin — locale in, a real Response or nothing else out.
+ */
+export const prerender = false;
+
+import Eyebrow from '~/components/Eyebrow.astro';
+import GoldRule from '~/components/GoldRule.astro';
+import Button from '~/components/Button.astro';
+import Base from '~/layouts/Base.astro';
+import { UI, path, type Locale, LOCALES } from '~/i18n/ui';
+import { crumbs } from '~/lib/page';
+import { articleSchema, breadcrumbSchema } from '~/lib/seo';
+import { formatDate } from '~/lib/format';
+import { postBySlug, siblingPost } from '~/lib/blog';
+import { renderMarkdown } from '~/lib/markdown';
+
+interface Props {
+  locale: Locale;
+  slug: string;
+}
+
+const { locale, slug } = Astro.props;
+const post = await postBySlug(locale, slug);
+if (!post) return new Response('Cikk nem található.', { status: 404 });
+
+const ui = UI[locale];
+const url = `${path(locale, 'blog')}${post.slug}/`;
+const html = renderMarkdown(post.body_md);
+
+// hreflang only where a sibling actually exists — most posts have none, and
+// asserting otherwise is exactly the bug the plan's architecture review
+// flagged (Piacelemzés and Kopersgids are not translations of each other).
+const otherLocale = LOCALES.find((l) => l !== locale)!;
+const sibling = await siblingPost(post, otherLocale);
+const alternates: Partial<Record<Locale, string>> = {
+  [locale]: url,
+  ...(sibling ? { [otherLocale]: `${path(otherLocale, 'blog')}${sibling.slug}/` } : {}),
+};
+
+const trail = crumbs(locale, [
+  { name: ui.nav.blog, url: path(locale, 'blog') },
+  { name: post.title, url },
+]);
+---
+
+<Base
+  locale={locale}
+  title={post.seo_title || post.title}
+  description={post.seo_description || post.excerpt}
+  alternates={alternates}
+  ogType="article"
+  schema={[
+    articleSchema({
+      title: post.title,
+      description: post.excerpt,
+      url,
+      image: post.og_image_url ?? post.cover_url ?? undefined,
+      published: post.published_at ?? post.updated_at,
+      updated: post.updated_at,
+      locale,
+      author: post.author,
+    }),
+    breadcrumbSchema(trail),
+  ]}
+>
+  <nav class="crumbs" aria-label={ui.a11y.breadcrumb}>
+    <ol>
+      {trail.map((c, i) => (
+        <li>{i < trail.length - 1 ? <a href={c.url}>{c.name}</a> : <span aria-current="page">{c.name}</span>}</li>
+      ))}
+    </ol>
+  </nav>
+
+  <article class="article">
+    <header>
+      <Eyebrow space="14px">{post.category}</Eyebrow>
+      <h1>{post.title}</h1>
+      <GoldRule space="20px" />
+      <p class="meta">
+        {post.published_at && (
+          <time datetime={post.published_at.toISOString()}>{formatDate(post.published_at, locale)}</time>
+        )}
+        <span aria-hidden="true">·</span>
+        <span>{post.reading_minutes} {locale === 'hu' ? 'perc olvasás' : 'min. lezen'}</span>
+        <span aria-hidden="true">·</span>
+        <span>{post.author}</span>
+      </p>
+      <p class="excerpt">{post.excerpt}</p>
+    </header>
+
+    <div class="prose" set:html={html} />
+
+    <footer class="foot">
+      <Button variant="text" href={path(locale, 'blog')}>{ui.nav.blog}</Button>
+      <Button variant="dark" href={path(locale, 'properties')}>{ui.cta.browseProperties}</Button>
+    </footer>
+  </article>
+</Base>
+
+<style>
+  .crumbs { padding: 18px var(--pad-x); border-bottom: 1px solid var(--border); }
+  .crumbs ol { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; font-size: var(--fs-micro); color: var(--taupe); }
+  .crumbs li + li::before { content: '/'; margin-right: 8px; color: var(--border); }
+  .crumbs [aria-current] { color: var(--ink); }
+
+  .article { max-width: 72ch; padding: 64px var(--pad-x) var(--section-y); }
+  h1 { font-family: var(--serif); font-weight: var(--fw-light); font-size: clamp(32px, 4vw, 58px); line-height: 1.1; color: var(--ink); margin-bottom: 24px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px; font-size: var(--fs-micro); letter-spacing: 0.08em; color: var(--taupe); margin-bottom: 24px; }
+  .excerpt { font-size: var(--fs-lead); line-height: var(--lh-lead); color: var(--taupe); padding-bottom: 32px; border-bottom: 1px solid var(--border); margin-bottom: 40px; }
+
+  .prose :global(h2) { font-family: var(--serif); font-weight: var(--fw-regular); font-size: clamp(23px, 2.4vw, 32px); color: var(--ink); margin: 40px 0 16px; }
+  .prose :global(h3) { font-family: var(--serif); font-weight: var(--fw-medium); font-size: var(--fs-lead); color: var(--ink); margin: 28px 0 10px; }
+  .prose :global(p) { font-size: var(--fs-body); line-height: var(--lh-body); color: var(--taupe); margin-bottom: 18px; }
+  .prose :global(ul), .prose :global(ol) { margin: 0 0 18px 20px; }
+  .prose :global(li) { font-size: var(--fs-body); line-height: var(--lh-body); color: var(--taupe); margin-bottom: 8px; }
+  .prose :global(hr) { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+  .prose :global(blockquote) { border-left: 2px solid var(--accent); padding-left: 20px; margin: 24px 0; font-style: italic; color: var(--ink); }
+  .prose :global(strong) { font-weight: var(--fw-medium); color: var(--ink); }
+
+  .foot { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 56px; padding-top: 32px; border-top: 1px solid var(--border); }
+
+  @media (max-width: 768px) {
+    .crumbs { padding: 12px var(--pad-x-mob); }
+    .article { padding: 36px var(--pad-x-mob) var(--section-y-mob); }
+  }
+</style>

@@ -1,0 +1,27 @@
+---
+// Same "create then redirect into the editor" pattern as
+// /portal/properties/new.astro — a blank draft, not a separate empty form.
+export const prerender = false;
+
+const { supabase, user } = Astro.locals;
+if (!user) return Astro.redirect('/portal/login');
+
+const slug = `uj-cikk-${Date.now().toString(36)}`;
+const { data, error } = await supabase
+  .from('blog_posts')
+  .insert({
+    locale: 'hu',
+    slug,
+    title: 'Új cikk',
+    excerpt: '',
+    body_md: '',
+    category: '',
+    published: false,
+    created_by: user.id,
+  })
+  .select('id')
+  .single();
+
+if (error || !data) return new Response(error?.message ?? 'failed', { status: 500 });
+return Astro.redirect(`/portal/content/blog/${data.id}`);
+---

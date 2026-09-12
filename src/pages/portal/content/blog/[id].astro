@@ -1,0 +1,345 @@
+---
+/**
+ * Blog post editor: Markdown body + live preview, an SEO panel (SERP
+ * preview, length meters, heading-outline and internal-link checks, reading
+ * time), cover/OG upload through the existing sharp pipeline, a Facebook
+ * share preview, a copy-link button, a translation-link control, and the
+ * publish toggle.
+ */
+export const prerender = false;
+
+import Portal from '~/layouts/Portal.astro';
+import { SITE_URL } from '~/config/site.mjs';
+import { path } from '~/i18n/ui';
+
+const { supabase, profile } = Astro.locals;
+if (profile?.role !== 'admin') return Astro.redirect('/portal/dashboard');
+
+const { id } = Astro.params;
+const { data: post } = await supabase.from('blog_posts').select('*').eq('id', id).maybeSingle();
+if (!post) return new Response('Cikk nem található.', { status: 404 });
+
+const otherLocale = post.locale === 'hu' ? 'nl' : 'hu';
+const { data: candidates } = await supabase
+  .from('blog_posts')
+  .select('id, title, slug')
+  .eq('locale', otherLocale)
+  .neq('id', id)
+  .order('updated_at', { ascending: false })
+  .limit(50);
+
+let linkedSibling = null;
+if (post.group_id) {
+  const { data } = await supabase
+    .from('blog_posts')
+    .select('id, title, slug, locale')
+    .eq('group_id', post.group_id)
+    .neq('id', id)
+    .maybeSingle();
+  linkedSibling = data;
+}
+
+const publicUrl = post.published ? `${SITE_URL}${path(post.locale, 'blog')}${post.slug}/` : null;
+---
+
+<Portal title={post.title || 'Új cikk'}>
+  <header class="head">
+    <p class="eyebrow"><a href="/portal/content/blog">← Blog</a></p>
+    <h1>{post.title || '(névtelen)'}</h1>
+    <span class:list={['pill', { published: post.published }]} id="status-pill">{post.published ? 'Publikus' : 'Piszkozat'}</span>
+  </header>
+
+  <form id="editor" class="editor">
+    <div class="col main">
+      <label>Cím <input name="title" value={post.title} required /></label>
+      <div class="row">
+        <label>Slug <input name="slug" value={post.slug} required /></label>
+        <label>Nyelv
+          <select name="locale">
+            <option value="hu" selected={post.locale === 'hu'}>HU</option>
+            <option value="nl" selected={post.locale === 'nl'}>NL</option>
+          </select>
+        </label>
+        <label>Kategória <input name="category" value={post.category} /></label>
+      </div>
+      <label>Kivonat <textarea name="excerpt" rows="2">{post.excerpt}</textarea></label>
+
+      <div class="body-grid">
+        <label class="body-label">Szöveg (Markdown)
+          <textarea name="bodyMd" id="body-md" rows="24">{post.body_md}</textarea>
+        </label>
+        <div class="preview-pane">
+          <p class="preview-label">Előnézet</p>
+          <div class="prose" id="preview"></div>
+        </div>
+      </div>
+
+      <div class="seo-panel">
+        <h2>SEO</h2>
+        <label>SEO cím <input name="seoTitle" id="seo-title" value={post.seo_title ?? ''} maxlength="70" /></label>
+        <p class="meter" id="seo-title-meter"></p>
+        <label>SEO leírás <textarea name="seoDescription" id="seo-desc" rows="2" maxlength="160">{post.seo_description ?? ''}</textarea></label>
+        <p class="meter" id="seo-desc-meter"></p>
+
+        <div class="serp">
+          <p class="serp-title" id="serp-title"></p>
+          <p class="serp-url">{SITE_URL}{path(post.locale, 'blog')}<span id="serp-slug">{post.slug}</span>/</p>
+          <p class="serp-desc" id="serp-desc"></p>
+        </div>
+
+        <ul class="seo-checks" id="seo-checks">
+          <li id="check-h1">—</li>
+          <li id="check-links">—</li>
+          <li id="check-reading">—</li>
+        </ul>
+      </div>
+
+      <label class="checkbox"><input type="checkbox" name="featured" checked={post.featured} /> Kiemelt</label>
+
+      <div class="actions">
+        <button type="submit" class="btn">Mentés</button>
+        <button type="button" class="btn ghost" id="publish-btn">{post.published ? 'Visszavonás' : 'Publikálás'}</button>
+        <button type="button" class="btn ghost danger" id="delete-btn">Törlés</button>
+        <p class="action-status" id="action-status" role="status"></p>
+      </div>
+    </div>
+
+    <div class="col side">
+      <section class="panel">
+        <h2>Borítókép</h2>
+        {post.cover_url && <img src={post.cover_url} alt="" class="thumb" />}
+        <input type="file" id="cover-file" accept="image/jpeg,image/png,image/webp" />
+        <p class="hint" id="cover-status"></p>
+      </section>
+
+      <section class="panel">
+        <h2>OG kép (megosztáshoz)</h2>
+        {post.og_image_url && <img src={post.og_image_url} alt="" class="thumb" />}
+        <input type="file" id="og-file" accept="image/jpeg,image/png,image/webp" />
+        <p class="hint" id="og-status"></p>
+
+        <div class="fb-preview">
+          <div class="fb-media">{(post.og_image_url || post.cover_url) && <img src={post.og_image_url || post.cover_url} alt="" />}</div>
+          <div class="fb-body">
+            <p class="fb-domain">FODEL.HU</p>
+            <p class="fb-title" id="fb-title">{post.title}</p>
+            <p class="fb-desc" id="fb-desc">{post.excerpt}</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Fordítás összekapcsolása</h2>
+        {linkedSibling ? (
+          <p class="hint">Összekapcsolva: <a href={`/portal/content/blog/${linkedSibling.id}`}>{linkedSibling.title} ({linkedSibling.locale.toUpperCase()})</a></p>
+        ) : (
+          <select id="link-target">
+            <option value="">Nincs összekapcsolva</option>
+            {(candidates ?? []).map((c) => <option value={c.id}>{c.title}</option>)}
+          </select>
+        )}
+        {linkedSibling && <button type="button" class="btn ghost small" id="unlink-btn">Szétkapcsolás</button>}
+      </section>
+
+      {publicUrl && (
+        <section class="panel">
+          <h2>Publikus link</h2>
+          <input class="readonly-input" id="public-link" value={publicUrl} readonly />
+          <button type="button" class="btn ghost small" id="copy-link-btn">Másolás</button>
+        </section>
+      )}
+    </div>
+  </form>
+</Portal>
+
+<script define:vars={{ postId: post.id }}>
+  const form = document.getElementById('editor');
+  const actionStatus = document.getElementById('action-status');
+  const bodyMd = document.getElementById('body-md');
+  const preview = document.getElementById('preview');
+  const seoTitle = document.getElementById('seo-title');
+  const seoDesc = document.getElementById('seo-desc');
+  const slugInput = form.querySelector('[name="slug"]');
+  const titleInput = form.querySelector('[name="title"]');
+
+  async function post(url, body, isJson = true) {
+    const res = await fetch(url, {
+      method: 'POST',
+      ...(isJson
+        ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }
+        : { body }),
+    });
+    return { ok: res.ok, json: await res.json().catch(() => ({})) };
+  }
+
+  let previewTimer;
+  async function renderPreview() {
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(async () => {
+      const { json } = await post('/api/portal/content/blog/preview', { bodyMd: bodyMd.value });
+      preview.innerHTML = json.html ?? '';
+      runSeoChecks();
+    }, 400);
+  }
+
+  function runSeoChecks() {
+    const md = bodyMd.value;
+    const h1Count = (md.match(/^#\s/gm) ?? []).length;
+    const h2Count = (md.match(/^##\s/gm) ?? []).length;
+    document.getElementById('check-h1').textContent = `Kiemelések: ${h2Count} H2 (a cím a H1, ne ismételje a szövegben)${h1Count > 0 ? ' — ⚠ # a szövegben' : ''}`;
+
+    const linkCount = (md.match(/\]\(\/(hu|nl)\//g) ?? []).length;
+    document.getElementById('check-links').textContent = `Belső linkek: ${linkCount}`;
+
+    const words = md.split(/\s+/).filter(Boolean).length;
+    document.getElementById('check-reading').textContent = `Olvasási idő: ~${Math.max(1, Math.round(words / 200))} perc (${words} szó)`;
+
+    document.getElementById('seo-title-meter').textContent = `${seoTitle.value.length} / 70 karakter`;
+    document.getElementById('seo-desc-meter').textContent = `${seoDesc.value.length} / 160 karakter`;
+    document.getElementById('serp-title').textContent = seoTitle.value || titleInput.value || '(cím)';
+    document.getElementById('serp-desc').textContent = seoDesc.value || form.querySelector('[name="excerpt"]').value || '(leírás)';
+    document.getElementById('serp-slug').textContent = slugInput.value;
+    document.getElementById('fb-title').textContent = titleInput.value;
+    document.getElementById('fb-desc').textContent = form.querySelector('[name="excerpt"]').value;
+  }
+
+  bodyMd.addEventListener('input', renderPreview);
+  [seoTitle, seoDesc, slugInput, titleInput].forEach((el) => el.addEventListener('input', runSeoChecks));
+  renderPreview();
+
+  slugInput.addEventListener('blur', () => {
+    slugInput.value = slugInput.value.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    actionStatus.textContent = 'Mentés…';
+    const fd = new FormData(form);
+    const { ok, json } = await post(`/api/portal/content/blog/${postId}`, {
+      action: 'save',
+      locale: fd.get('locale'),
+      slug: fd.get('slug'),
+      title: fd.get('title'),
+      category: fd.get('category'),
+      excerpt: fd.get('excerpt'),
+      bodyMd: fd.get('bodyMd'),
+      seoTitle: fd.get('seoTitle'),
+      seoDescription: fd.get('seoDescription'),
+      featured: fd.get('featured') === 'on',
+    });
+    actionStatus.textContent = ok && json.ok ? 'Mentve.' : (json.error === 'title-and-slug-required' ? 'A cím és a slug kötelező.' : 'Nem sikerült menteni.');
+  });
+
+  document.getElementById('publish-btn')?.addEventListener('click', async () => {
+    const willPublish = document.getElementById('status-pill').textContent !== 'Publikus';
+    const { ok } = await post(`/api/portal/content/blog/${postId}`, { action: willPublish ? 'publish' : 'unpublish' });
+    if (ok) location.reload();
+  });
+
+  document.getElementById('delete-btn')?.addEventListener('click', async () => {
+    if (!confirm('Biztosan törli ezt a cikket?')) return;
+    const { ok } = await post(`/api/portal/content/blog/${postId}`, { action: 'delete' });
+    if (ok) location.href = '/portal/content/blog';
+  });
+
+  document.getElementById('link-target')?.addEventListener('change', async (e) => {
+    const targetId = e.target.value;
+    await post(`/api/portal/content/blog/${postId}`, { action: 'link_translation', targetId: targetId || null });
+    location.reload();
+  });
+
+  document.getElementById('unlink-btn')?.addEventListener('click', async () => {
+    await post(`/api/portal/content/blog/${postId}`, { action: 'link_translation', targetId: null });
+    location.reload();
+  });
+
+  async function upload(inputId, field, statusId) {
+    const input = document.getElementById(inputId);
+    input?.addEventListener('change', async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const status = document.getElementById(statusId);
+      status.textContent = 'Feltöltés…';
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('field', field);
+      const { ok, json } = await post(`/api/portal/content/blog/${postId}/media`, fd, false);
+      status.textContent = ok && json.ok ? 'Feltöltve.' : 'Nem sikerült feltölteni.';
+      if (ok && json.ok) location.reload();
+    });
+  }
+  upload('cover-file', 'cover', 'cover-status');
+  upload('og-file', 'og', 'og-status');
+
+  document.getElementById('copy-link-btn')?.addEventListener('click', async () => {
+    const input = document.getElementById('public-link');
+    try {
+      await navigator.clipboard.writeText(input.value);
+    } catch {
+      input.select();
+    }
+  });
+</script>
+
+<style>
+  .head { margin-bottom: 20px; display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+  .eyebrow { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--taupe); flex-basis: 100%; margin-bottom: 4px; }
+  .eyebrow a { text-decoration: underline; text-underline-offset: 2px; }
+  h1 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 24px; color: var(--ink); }
+  h2 { font-family: var(--serif); font-size: 15px; color: var(--ink); margin-bottom: 12px; }
+
+  .pill { display: inline-block; font-size: var(--fs-micro); padding: 3px 10px; border: 1px solid var(--border); }
+  .pill.published { background: rgba(16, 42, 67, 0.08); border-color: var(--ink); }
+
+  .editor { display: grid; grid-template-columns: 1fr 300px; gap: 40px; align-items: start; }
+  .col.main label, .panel label { display: block; font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; color: var(--taupe); margin-bottom: 6px; margin-top: 16px; }
+  .col.main input, .col.main select, .col.main textarea, .panel input, .panel select { width: 100%; border: 1px solid var(--border); background: #fff; padding: 9px 10px; font-size: var(--fs-small); color: var(--ink); font-family: inherit; }
+  .row { display: flex; gap: 16px; }
+  .row label { flex: 1; }
+
+  .body-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+  .body-label { grid-column: 1; }
+  #body-md { font-family: ui-monospace, monospace; font-size: 13px; line-height: 1.6; }
+  .preview-pane { border: 1px solid var(--border); padding: 12px; max-height: 480px; overflow-y: auto; margin-top: 22px; }
+  .preview-label { font-size: var(--fs-micro); text-transform: uppercase; color: var(--taupe); margin-bottom: 8px; }
+  .prose :global(h2) { font-family: var(--serif); font-size: 18px; margin: 16px 0 8px; }
+  .prose :global(p) { font-size: 13px; line-height: 1.6; color: var(--taupe); margin-bottom: 10px; }
+
+  .seo-panel { margin-top: 28px; padding: 20px; background: var(--linen); }
+  .meter { font-size: var(--fs-micro); color: var(--taupe); margin-top: -12px; margin-bottom: 4px; }
+  .serp { margin-top: 12px; padding: 12px; background: #fff; border: 1px solid var(--border); }
+  .serp-title { color: #1a0dab; font-size: 15px; }
+  .serp-url { color: #006621; font-size: 12px; }
+  .serp-desc { color: #545454; font-size: 12px; }
+  .seo-checks { list-style: none; margin-top: 12px; font-size: var(--fs-micro); color: var(--taupe); }
+  .seo-checks li { padding: 3px 0; }
+
+  .checkbox { display: flex; align-items: center; gap: 8px; margin-top: 16px; text-transform: none; }
+  .checkbox input { width: auto; }
+
+  .actions { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
+  .btn { padding: 10px 20px; background: var(--ink); color: var(--cream); font-size: var(--fs-micro); letter-spacing: var(--ls-button); text-transform: uppercase; margin-right: 10px; }
+  .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--ink); }
+  .btn.ghost.danger { color: #b3261e; border-color: #b3261e; }
+  .btn.small { padding: 6px 14px; font-size: 10px; margin-top: 10px; }
+  .action-status { font-size: var(--fs-small); color: var(--taupe); margin-top: 12px; min-height: 1.5em; }
+
+  .panel { margin-bottom: 28px; }
+  .thumb { width: 100%; aspect-ratio: 16/9; object-fit: cover; margin-bottom: 10px; background: var(--mist); }
+  .hint { font-size: var(--fs-micro); color: var(--taupe); margin-top: 8px; }
+
+  .fb-preview { margin-top: 14px; border: 1px solid var(--border); }
+  .fb-media { aspect-ratio: 1.9/1; background: var(--mist); overflow: hidden; }
+  .fb-media img { width: 100%; height: 100%; object-fit: cover; }
+  .fb-body { padding: 10px 12px; background: #f2f3f5; }
+  .fb-domain { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: #606770; }
+  .fb-title { font-size: 13px; font-weight: 600; color: #1c1e21; margin: 2px 0; }
+  .fb-desc { font-size: 12px; color: #606770; }
+
+  .readonly-input { margin-bottom: 8px; font-size: var(--fs-micro); }
+
+  @media (max-width: 1000px) {
+    .editor { grid-template-columns: 1fr; }
+    .body-grid { grid-template-columns: 1fr; }
+  }
+</style>

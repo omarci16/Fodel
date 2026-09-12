@@ -18,3 +18,4 @@ Allow: /
 
 Sitemap: https://fodel.nl/sitemap-index.xml
 Sitemap: https://fodel.nl/sitemap-properties.xml
+Sitemap: https://fodel.nl/sitemap-blog.xml

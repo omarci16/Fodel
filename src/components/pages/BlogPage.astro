@@ -2,16 +2,21 @@
 /**
  * Editorial index. FODEL publish long-form pieces on why Dutch buyers move to
  * Hungary; that content is a genuine organic-search asset for the Dutch market.
+ *
+ * Supabase-backed since FODEL 1.2 (previously two Markdown files) — see
+ * src/lib/blog.ts. `cover_url`/`og_image_url` are stored as plain public
+ * Storage URLs, not astro:assets ImageMetadata, so this uses a plain <img>
+ * rather than <Image> for post covers; the images already go through the
+ * sharp pipeline at upload time (src/lib/media.ts), just not through Astro's
+ * build-time optimiser.
  */
-import { Image } from 'astro:assets';
-import { getCollection } from 'astro:content';
 import Base from '~/layouts/Base.astro';
 import PageHeader from '~/components/PageHeader.astro';
 import Eyebrow from '~/components/Eyebrow.astro';
-import Button from '~/components/Button.astro';
 import { UI, path, type Locale } from '~/i18n/ui';
 import { alternatesFor } from '~/lib/page';
 import { formatDate } from '~/lib/format';
+import { publishedPosts } from '~/lib/blog';
 
 interface Props {
   locale: Locale;
@@ -21,9 +26,7 @@ const { locale } = Astro.props;
 const ui = UI[locale];
 const hu = locale === 'hu';
 
-const posts = (await getCollection('articles', (a) => a.data.locale === locale)).sort(
-  (a, b) => b.data.publishedAt.getTime() - a.data.publishedAt.getTime()
-);
+const posts = await publishedPosts(locale);
 
 const [lead, ...rest] = posts;
 
@@ -64,28 +67,24 @@ const t = hu
     {
       lead && (
         <article class="lead">
-          <a href={`${path(locale, 'blog')}${lead.id.split('/').pop()}/`}>
-            {lead.data.cover && (
+          <a href={`${path(locale, 'blog')}${lead.slug}/`}>
+            {lead.cover_url && (
               <div class="lead-media">
-                <Image
-                  src={lead.data.cover}
-                  alt={lead.data.coverAlt ?? ''}
-                  widths={[600, 900, 1400]}
-                  sizes="(max-width: 900px) 100vw, 60vw"
-                  loading="eager"
-                />
+                <img src={lead.cover_url} alt={lead.cover_alt ?? ''} loading="eager" width="900" height="600" />
               </div>
             )}
             <div class="lead-copy">
-              <Eyebrow space="12px">{lead.data.category}</Eyebrow>
-              <h2>{lead.data.title}</h2>
-              <p class="excerpt">{lead.data.excerpt}</p>
+              <Eyebrow space="12px">{lead.category}</Eyebrow>
+              <h2>{lead.title}</h2>
+              <p class="excerpt">{lead.excerpt}</p>
               <p class="meta">
-                <time datetime={lead.data.publishedAt.toISOString()}>
-                  {formatDate(lead.data.publishedAt, locale)}
-                </time>
+                {lead.published_at && (
+                  <time datetime={lead.published_at.toISOString()}>
+                    {formatDate(lead.published_at, locale)}
+                  </time>
+                )}
                 <span aria-hidden="true">·</span>
-                <span>{lead.data.readingMinutes} {hu ? 'perc olvasás' : 'min. lezen'}</span>
+                <span>{lead.reading_minutes} {hu ? 'perc olvasás' : 'min. lezen'}</span>
               </p>
               <span class="more">{ui.cta.readMore} <span aria-hidden="true">→</span></span>
             </div>
@@ -99,27 +98,23 @@ const t = hu
         <div class="grid">
           {rest.map((post) => (
             <article class="card reveal">
-              <a href={`${path(locale, 'blog')}${post.id.split('/').pop()}/`}>
-                {post.data.cover && (
+              <a href={`${path(locale, 'blog')}${post.slug}/`}>
+                {post.cover_url && (
                   <div class="card-media">
-                    <Image
-                      src={post.data.cover}
-                      alt={post.data.coverAlt ?? ''}
-                      widths={[400, 700]}
-                      sizes="(max-width: 900px) 100vw, 32vw"
-                      loading="lazy"
-                    />
+                    <img src={post.cover_url} alt={post.cover_alt ?? ''} loading="lazy" width="700" height="525" />
                   </div>
                 )}
-                <Eyebrow space="12px">{post.data.category}</Eyebrow>
-                <h3>{post.data.title}</h3>
-                <p class="excerpt">{post.data.excerpt}</p>
+                <Eyebrow space="12px">{post.category}</Eyebrow>
+                <h3>{post.title}</h3>
+                <p class="excerpt">{post.excerpt}</p>
                 <p class="meta">
-                  <time datetime={post.data.publishedAt.toISOString()}>
-                    {formatDate(post.data.publishedAt, locale)}
-                  </time>
+                  {post.published_at && (
+                    <time datetime={post.published_at.toISOString()}>
+                      {formatDate(post.published_at, locale)}
+                    </time>
+                  )}
                   <span aria-hidden="true">·</span>
-                  <span>{post.data.readingMinutes} {hu ? 'perc' : 'min.'}</span>
+                  <span>{post.reading_minutes} {hu ? 'perc' : 'min.'}</span>
                 </p>
               </a>
             </article>

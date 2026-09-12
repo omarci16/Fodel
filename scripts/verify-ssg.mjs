@@ -79,6 +79,10 @@ const LIVE_ROUTES = [
   ['nl/woningen/index.html', '/nl/woningen/'],
   ['hu/hirdetes-feladasa/index.html', '/hu/hirdetes-feladasa/'],
   ['nl/advertentie-plaatsen/index.html', '/nl/advertentie-plaatsen/'],
+  ['hu/blog/index.html', '/hu/blog/'],
+  ['nl/nieuws/index.html', '/nl/nieuws/'],
+  ['hu/blog/holland-migracio-okai/index.html', '/hu/blog/holland-migracio-okai/'],
+  ['nl/nieuws/wat-kost-een-huis-in-hongarije/index.html', '/nl/nieuws/wat-kost-een-huis-in-hongarije/'],
 ];
 
 async function fetchLivePages() {
@@ -175,6 +179,10 @@ console.log('Server-rendered content');
     ['nl/veelgestelde-vragen/index.html', ['courtage', 'volmacht']],
     ['hu/hirdetes-feladasa/index.html', ['Hirdesse ingatlanát', 'Olcsó hirdetés', 'Normál hirdetés']],
     ['nl/advertentie-plaatsen/index.html', ['Plaats uw woning', 'Voordelige advertentie', 'Normale advertentie']],
+    ['hu/blog/index.html', ['A holland migráció okai', 'Piacelemzés']],
+    ['nl/nieuws/index.html', ['Wat kost een huis in Hongarije', 'Kopersgids']],
+    ['hu/blog/holland-migracio-okai/index.html', ['Ár/érték arány', 'Népsűrűség']],
+    ['nl/nieuws/wat-kost-een-huis-in-hongarije/index.html', ['Overdrachtsbelasting', 'Notaris']],
   ];
   for (const [name, needles] of checks) {
     const html = getHtml(name);
