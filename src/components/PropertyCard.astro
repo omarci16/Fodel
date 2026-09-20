@@ -11,7 +11,7 @@
  */
 import { Image } from 'astro:assets';
 import Eyebrow from './Eyebrow.astro';
-import { categoryLabel, type Locale, type CategoryKey, UI } from '~/i18n/ui';
+import { type Locale, UI } from '~/i18n/ui';
 import { text, url as propertyUrl, type Property } from '~/lib/properties';
 import { eur, area, floorArea } from '~/lib/format';
 
@@ -21,16 +21,17 @@ interface Props {
   /** Above-the-fold cards skip lazy-loading so the LCP image is not delayed. */
   eager?: boolean;
   class?: string;
+  rank?: number;
 }
 
-const { property, locale, eager = false, class: className } = Astro.props;
+const { property, locale, eager = false, class: className, rank } = Astro.props;
 const d = property.data;
 const ui = UI[locale];
 
 const href = propertyUrl(property, locale);
 const title = text(d.title, locale);
 const tag = d.tag ? text(d.tag, locale) : null;
-const category = categoryLabel(d.category as CategoryKey, locale);
+const category = d.categoryLabels[locale] ?? d.categoryLabels.hu;
 const heroAlt = text(d.media.heroAlt, locale);
 
 const specs = [
@@ -53,6 +54,7 @@ const specs = [
   data-plot={d.areas.plotM2}
   data-beds={d.rooms?.bedrooms ?? 0}
   data-featured={d.listing.featured ? '1' : '0'}
+  data-bargain={d.listing.bargain ? '1' : '0'}
   data-published={d.listing.publishedAt.getTime()}
 >
   <a class="card-link" href={href}>
@@ -70,7 +72,7 @@ const specs = [
           inferSize={typeof d.media.hero === 'string'}
         />
       </div>
-      {tag && <span class="tag">{tag}</span>}
+      {(d.listing.bargain || tag) && <span class="tag">{d.listing.bargain ? (locale === 'hu' ? 'Alkalmi vétel' : 'Buitenkans') : tag}</span>}
       {
         d.status !== 'active' && (
           <span class="status">
@@ -81,6 +83,7 @@ const specs = [
     </div>
 
     <div class="card-body">
+      {rank && <span class="rank">{String(rank).padStart(2, '0')}</span>}
       <Eyebrow space="7px">{d.location.region} — {category}</Eyebrow>
       <h3 class="card-title">{title}</h3>
       <p class="card-location">
@@ -99,6 +102,7 @@ const specs = [
   .prop-card {
     position: relative;
   }
+  .rank { display:block; font-family:var(--serif); font-size:var(--fs-h2); font-weight:var(--fw-display); margin-bottom:10px; }
   .card-link {
     display: block;
   }

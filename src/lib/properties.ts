@@ -20,8 +20,9 @@
 
 import { getSupabase } from '~/lib/supabase';
 import { resolveImage } from '~/lib/property-images';
-import type { Locale, CategoryKey } from '~/i18n/ui';
+import type { Locale, PlannedLocale } from '~/i18n/ui';
 import { LOCALES, propertyPath } from '~/i18n/ui';
+import { getTaxonomy, type Taxonomy, type TaxonomyTerm } from '~/lib/runtime-config';
 import type { ImageMetadata } from 'astro';
 
 type LocalisedText = { hu: string; nl?: string; de?: string; en?: string; fr?: string };
@@ -30,7 +31,10 @@ export type Property = {
   id: string;
   data: {
     ref: string;
-    category: CategoryKey;
+    category: string;
+    categoryLabels: Partial<Record<PlannedLocale, string>> & { hu: string; nl: string };
+    categorySlugs: Partial<Record<PlannedLocale, string>>;
+    categorySchema: string;
     status: 'active' | 'reserved' | 'sold';
     title: LocalisedText;
     subtitle?: LocalisedText;
@@ -44,6 +48,7 @@ export type Property = {
       lat: number;
       lng: number;
       precision: 'exact' | 'approximate';
+      country: string;
     };
     areas: { floorM2?: number; plotM2: number };
     rooms?: { bedrooms: number; bathrooms: number };
@@ -74,6 +79,10 @@ export type Property = {
       publishedAt: Date;
       expiresAt: Date;
       languages: Locale[];
+      editorsPick: boolean;
+      editorsPickOrder: number;
+      bargain: boolean;
+      bargainSince?: Date;
     };
     seller: { contactVisible: boolean; name?: string; phone?: string; speaks: string[] };
     tag?: LocalisedText;
@@ -104,12 +113,13 @@ type MediaRow = {
 type PropertyRow = {
   id: string;
   ref: string;
-  category: CategoryKey;
+  category: string;
   status: 'published' | 'sold';
   reserved: boolean;
   settlement: string;
   county: string;
   region: string;
+  country: string;
   lat: number;
   lng: number;
   precision: 'exact' | 'approximate';
@@ -134,6 +144,10 @@ type PropertyRow = {
   featured: boolean;
   homepage_featured: boolean;
   homepage_order: number;
+  editors_pick: boolean;
+  editors_pick_order: number;
+  bargain: boolean;
+  bargain_since: string | null;
   published_at: string | null;
   expires_at: string | null;
   property_translations: TranslationRow[];
@@ -161,7 +175,7 @@ function localisedField(
   return out;
 }
 
-function mapRow(row: PropertyRow): Property {
+function mapRow(row: PropertyRow, taxonomy: Taxonomy): Property {
   const translations = row.property_translations;
   const media = [...row.property_media].sort((a, b) => a.sort_order - b.sort_order);
   const hero = media.find((m) => m.is_hero) ?? media[0];
@@ -171,11 +185,16 @@ function mapRow(row: PropertyRow): Property {
     .map((t) => t.locale)
     .filter((l): l is Locale => (LOCALES as readonly string[]).includes(l));
 
+  const category: TaxonomyTerm | undefined = taxonomy.category.find((term) => term.key === row.category);
+  const fallbackLabels = { hu: row.category, nl: row.category };
   return {
     id: row.id,
     data: {
       ref: row.ref,
       category: row.category,
+      categoryLabels: category?.labels ?? fallbackLabels,
+      categorySlugs: category?.slugs ?? { hu: row.category, nl: row.category },
+      categorySchema: category?.schemaType ?? 'Place',
       status: row.status === 'sold' ? 'sold' : row.reserved ? 'reserved' : 'active',
       title: localisedField(translations, 'title')!,
       subtitle: localisedField(translations, 'subtitle'),
@@ -194,6 +213,7 @@ function mapRow(row: PropertyRow): Property {
         lat: row.lat,
         lng: row.lng,
         precision: row.precision,
+        country: row.country,
       },
       areas: { floorM2: row.floor_m2 ?? undefined, plotM2: row.plot_m2 },
       rooms:
@@ -226,6 +246,10 @@ function mapRow(row: PropertyRow): Property {
         publishedAt: new Date(row.published_at ?? row.price_asof),
         expiresAt: new Date(row.expires_at ?? row.price_asof),
         languages,
+        editorsPick: row.editors_pick,
+        editorsPickOrder: row.editors_pick_order,
+        bargain: row.bargain,
+        bargainSince: row.bargain_since ? new Date(row.bargain_since) : undefined,
       },
       seller: {
         contactVisible: row.seller_contact_visible,
@@ -261,12 +285,13 @@ export function hasTranslation(p: Property, locale: Locale): boolean {
  * appears live. The route-level `s-maxage` header is where caching belongs.
  */
 async function fetchAll(): Promise<Property[]> {
+  const taxonomy = await getTaxonomy();
   const { data, error } = await getSupabase()
     .from('properties')
     .select('*, property_translations(*), property_media(*)')
     .in('status', ['published', 'sold']);
   if (error) throw new Error(`Failed to load properties from Supabase: ${error.message}`);
-  return ((data ?? []) as PropertyRow[]).map(mapRow).sort(sortByFeaturedThenDate);
+  return ((data ?? []) as PropertyRow[]).map((row) => mapRow(row, taxonomy)).sort(sortByFeaturedThenDate);
 }
 
 export async function allProperties(): Promise<Property[]> {
@@ -277,16 +302,21 @@ export type SearchParams = {
   locale: Locale;
   q?: string;
   category?: string;
+  country?: string;
   region?: string;
   county?: string;
   settlement?: string;
   priceMin?: number;
   priceMax?: number;
   floorMin?: number;
+  floorMax?: number;
+  plotMin?: number;
+  plotMax?: number;
   bedroomsMin?: number;
+  bargain?: boolean;
   /** [west, south, east, north] from the browse map's "search this area". */
   bbox?: [number, number, number, number];
-  sort?: 'featured' | 'price-asc' | 'price-desc' | 'area-desc';
+  sort?: 'featured' | 'price-asc' | 'price-desc' | 'area-desc' | 'bargain';
   page?: number;
   perPage?: number;
 };
@@ -295,12 +325,13 @@ export type SearchResult = { properties: Property[]; total: number; page: number
 
 /**
  * The Stage 6 server-side query. The `search_properties` Postgres function
- * (supabase/migrations/0004_search.sql) does the actual filtering, free-text
- * matching and ordering in one round trip and hands back matching ids in
- * order; this fetches the full rows for exactly those ids and re-applies
- * that order (Postgres doesn't guarantee `id = ANY(...)` preserves it) using
- * the same mapRow used everywhere else, so a search result is shaped
- * identically to any other Property.
+ * (originally supabase/migrations/0004_search.sql, recreated with a wider
+ * parameter list by 0013_search_country.sql) does the actual filtering,
+ * free-text matching and ordering in one round trip and hands back matching
+ * ids in order; this fetches the full rows for exactly those ids and
+ * re-applies that order (Postgres doesn't guarantee `id = ANY(...)`
+ * preserves it) using the same mapRow used everywhere else, so a search
+ * result is shaped identically to any other Property.
  */
 export async function searchProperties(params: SearchParams): Promise<SearchResult> {
   const perPage = params.perPage ?? 24;
@@ -310,14 +341,19 @@ export async function searchProperties(params: SearchParams): Promise<SearchResu
     p_locale: params.locale,
     p_query: params.q || null,
     p_category: params.category || null,
+    p_country: params.country || null,
     p_region: params.region || null,
     p_county: params.county || null,
     p_settlement: params.settlement || null,
     p_price_min: params.priceMin ?? null,
     p_price_max: params.priceMax ?? null,
     p_floor_min: params.floorMin ?? null,
+    p_floor_max: params.floorMax ?? null,
+    p_plot_min: params.plotMin ?? null,
+    p_plot_max: params.plotMax ?? null,
     p_bedrooms_min: params.bedroomsMin ?? null,
     p_bbox: params.bbox ?? null,
+    p_bargain: params.bargain ?? null,
     p_sort: params.sort ?? 'featured',
     p_limit: perPage,
     p_offset: (page - 1) * perPage,
@@ -334,7 +370,8 @@ export async function searchProperties(params: SearchParams): Promise<SearchResu
     .in('id', ids);
   if (error) throw new Error(`Failed to load search results: ${error.message}`);
 
-  const byId = new Map(((data ?? []) as PropertyRow[]).map((row) => [row.id, mapRow(row)]));
+  const taxonomy = await getTaxonomy();
+  const byId = new Map(((data ?? []) as PropertyRow[]).map((row) => [row.id, mapRow(row, taxonomy)]));
   const properties = ids
     .map((id: string) => byId.get(id))
     .filter((p: Property | undefined): p is Property => Boolean(p));
@@ -360,6 +397,14 @@ export async function homepageFeatured(limit = 3): Promise<Property[]> {
   const featured = active.filter((p) => p.data.listing.homepageFeatured);
   return (featured.length ? featured : active)
     .sort((a, b) => a.data.listing.homepageOrder - b.data.listing.homepageOrder)
+    .slice(0, limit);
+}
+
+/** Editorial recommendations never fall back to paid or newest inventory. */
+export async function editorsPick(limit = 10): Promise<Property[]> {
+  return (await activeProperties())
+    .filter((property) => property.data.listing.editorsPick)
+    .sort((a, b) => a.data.listing.editorsPickOrder - b.data.listing.editorsPickOrder)
     .slice(0, limit);
 }
 
@@ -405,7 +450,7 @@ function sortByFeaturedThenDate(a: Property, b: Property): number {
 }
 
 export function url(p: Property, locale: Locale): string {
-  return propertyPath(locale, p.data.category as CategoryKey, p.data.ref);
+  return propertyPath(locale, p.data.categorySlugs[locale] ?? p.data.category, p.data.ref);
 }
 
 /** Distinct regions present in the inventory, for filters and landing pages. */
@@ -417,8 +462,12 @@ export function countiesOf(properties: Property[]): string[] {
   return [...new Set(properties.map((p) => p.data.location.county))].sort();
 }
 
-export function categoriesOf(properties: Property[]): CategoryKey[] {
-  return [...new Set(properties.map((p) => p.data.category))] as CategoryKey[];
+export function categoriesOf(properties: Property[]): string[] {
+  return [...new Set(properties.map((p) => p.data.category))];
+}
+
+export function countriesOf(properties: Property[]): string[] {
+  return [...new Set(properties.map((p) => p.data.location.country))].sort();
 }
 
 /** URL-safe slug for a region or county name (handles Hungarian diacritics). */

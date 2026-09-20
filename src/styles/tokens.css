@@ -83,6 +83,13 @@
   --on-dark-field: rgba(244, 244, 242, 0.06);
   --on-dark-field-border: rgba(244, 244, 242, 0.28);
 
+  /* Shared search/form geometry. Both public search surfaces use these so a
+     larger homepage search still reads as the same product. */
+  --field-bg: #ffffff;
+  --field-border: #d0d4d6;
+  --field-padding-y: 15px;
+  --field-padding-x: 18px;
+
   /* ── Layout ── */
   --pad-x: 80px;
   --pad-x-mob: 24px;

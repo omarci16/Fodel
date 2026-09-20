@@ -108,6 +108,23 @@ export const NL = {
     vatNote: 'Alle genoemde bedragen zijn inclusief 21% Nederlandse btw.',
   },
 
+  approvedPublished: {
+    subject: (ref: string) => `Goedgekeurd en online — #${ref}`,
+    preheader: 'Uw advertentie staat al online; betaal de advertentiekosten binnen 14 dagen.',
+    heading: 'Uw advertentie staat nu online',
+    body: (title: string, ref: string) => `Wij hebben advertentie „${title}” (#${ref}) goedgekeurd en direct gepubliceerd.`,
+    viewCta: 'Advertentie bekijken',
+    orderTitle: 'Kosten van de advertentie',
+    discountLabel: 'Aanbrengkorting (10%)',
+    totalLabel: 'Te betalen',
+    dueLabel: 'Uiterste betaaldatum',
+    ctaCard: 'Betalen met creditcard',
+    cardNote: 'De betaling verloopt via de beveiligde omgeving van Stripe. FODEL ziet en bewaart uw kaartgegevens niet.',
+    bankTitle: 'Bankoverschrijving',
+    bankNote: (ref: string) => `Vermeld bij de overschrijving het referentienummer: ${ref}.`,
+    vatNote: 'Alle genoemde bedragen zijn inclusief 21% Nederlandse btw.',
+  },
+
   paymentReceipt: {
     subject: (ref: string) => `Betalingsbevestiging — #${ref}`,
     preheader: 'Dank u wel, wij hebben uw betaling ontvangen.',

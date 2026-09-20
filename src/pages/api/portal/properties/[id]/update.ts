@@ -12,6 +12,7 @@ import type { APIRoute } from 'astro';
 import { LOCALE_OPTIONS } from '~/lib/portal/properties';
 import { extractYouTubeId } from '~/lib/video';
 import { logEvent } from '~/lib/activity';
+import { boundsFor, COUNTRIES } from '~/config/countries';
 
 export const prerender = false;
 
@@ -32,7 +33,7 @@ export const POST: APIRoute = async ({ request, params, locals, redirect }) => {
 
   const { data: existing, error: fetchError } = await supabase
     .from('properties')
-    .select('id, owner_id, status')
+    .select('id, owner_id, status, bargain, bargain_since')
     .eq('id', id)
     .maybeSingle();
   if (fetchError || !existing) return back('error=not-found');
@@ -46,6 +47,9 @@ export const POST: APIRoute = async ({ request, params, locals, redirect }) => {
 
   const patch = {
     category: str(form, 'category'),
+    country: str(form, 'country') || 'HU',
+    condition_key: str(form, 'condition_key') || null,
+    heating_key: str(form, 'heating_key') || null,
     settlement: str(form, 'settlement'),
     county: str(form, 'county'),
     region: str(form, 'region'),
@@ -72,13 +76,24 @@ export const POST: APIRoute = async ({ request, params, locals, redirect }) => {
     ...(form.has('reserved') || existing.status === 'published'
       ? { reserved: form.get('reserved') === 'yes' }
       : {}),
+    ...(isAdmin ? {
+      featured: form.get('featured') === 'yes',
+      homepage_featured: form.get('homepage_featured') === 'yes',
+      homepage_order: num(form, 'homepage_order') ?? 99,
+      editors_pick: form.get('editors_pick') === 'yes',
+      editors_pick_order: num(form, 'editors_pick_order') ?? 99,
+      bargain: form.get('bargain') === 'yes',
+      bargain_since: form.get('bargain') === 'yes' ? (existing.bargain_since ?? new Date().toISOString()) : null,
+    } : {}),
   };
 
   if (!patch.settlement || !patch.county || !patch.region || patch.lat == null || patch.lng == null) {
     return back('error=' + encodeURIComponent('minden helyszín mező kitöltése kötelező'));
   }
-  if (patch.lat < 45.7 || patch.lat > 48.6 || patch.lng < 16 || patch.lng > 22.9) {
-    return back('error=' + encodeURIComponent('a szélesség/hosszúság Magyarország határain kívül esik (szélesség: 45.7–48.6, hosszúság: 16–22.9)'));
+  if (!(patch.country in COUNTRIES)) return back('error=' + encodeURIComponent('ismeretlen országkód'));
+  const bounds = boundsFor(patch.country)!;
+  if (patch.lng < bounds[0] || patch.lng > bounds[2] || patch.lat < bounds[1] || patch.lat > bounds[3]) {
+    return back('error=' + encodeURIComponent('a koordináta a kiválasztott ország határain kívül esik'));
   }
   if (patch.price_eur <= 0 || patch.price_huf <= 0) {
     return back('error=' + encodeURIComponent('az árnak pozitív számnak kell lennie'));

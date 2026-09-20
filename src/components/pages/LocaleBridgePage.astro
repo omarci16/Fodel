@@ -8,7 +8,7 @@
  * hardcoded inline in a number of small ternaries and would need careful,
  * page-by-page verification in three more languages to do safely, this is a
  * single self-contained page: FODEL's own verified name, tagline and
- * category vocabulary (already captured in BRAND/CATEGORIES for these
+ * category vocabulary (already captured in BRAND/CATEGORY_FALLBACK for these
  * locales), the verified contact facts (locale-neutral), and a clear path
  * into the two fully-built markets. It is genuinely useful to a DE/EN/FR
  * visitor today, and it is honest about what exists — full HomePage /
@@ -26,7 +26,7 @@
  * document instead, the same pattern src/pages/index.astro already uses for
  * the same reason (a page that sits outside the hu/nl-only shell).
  */
-import { BRAND, CATEGORIES, LOCALE_META, type PlannedLocale } from '~/i18n/ui';
+import { BRAND, CATEGORY_FALLBACK, LOCALE_META, type PlannedLocale } from '~/i18n/ui';
 import { COMPANY } from '~/config/company';
 import { abs } from '~/lib/seo';
 import '~/styles/global.css';
@@ -48,7 +48,7 @@ const organisationSchema = {
   description: brand.tagline,
   url: canonical,
   email: COMPANY.email.primary,
-  telephone: COMPANY.phones.map((p) => p.display),
+  telephone: COMPANY.phones.slice(0, 2).map((p) => p.display),
   address: {
     '@type': 'PostalAddress',
     streetAddress: COMPANY.address.street,
@@ -119,7 +119,7 @@ const STRINGS = {
       <section class="categories">
         <h2>{STRINGS.categories}</h2>
         <ul>
-          {Object.values(CATEGORIES).map((c) => <li>{(c as any)[locale]?.label ?? (c as any).en.label}</li>)}
+          {Object.values(CATEGORY_FALLBACK).map((c) => <li>{(c as any)[locale]?.label ?? (c as any).en.label}</li>)}
         </ul>
       </section>
 

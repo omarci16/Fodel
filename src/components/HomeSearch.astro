@@ -6,14 +6,14 @@
  * shareable, indexable URL instead of React state.
  */
 import Button from './Button.astro';
-import Eyebrow from './Eyebrow.astro';
-import { UI, CATEGORIES, path, type Locale, type CategoryKey } from '~/i18n/ui';
+import { UI, path, type Locale } from '~/i18n/ui';
+import { termLabel, type TaxonomyTerm } from '~/lib/runtime-config';
 import { PRICE_BANDS, priceBandLabel } from '~/lib/properties';
 
 interface Props {
   locale: Locale;
   regions: string[];
-  categories: CategoryKey[];
+  categories: TaxonomyTerm[];
 }
 
 const { locale, regions, categories } = Astro.props;
@@ -21,8 +21,11 @@ const ui = UI[locale];
 const action = path(locale, 'properties');
 ---
 
+<h2 class="search-heading">{ui.filters.heroHeading}</h2>
+
 <form class="search" method="GET" action={action} role="search">
-  <Eyebrow space="20px">{ui.filters.title}</Eyebrow>
+  <label class="query-label" for="s-query">{ui.filters.search}</label>
+  <input class="query" id="s-query" type="search" name="q" placeholder={locale === 'hu' ? 'Település, megye, vagy hirdetésszám' : 'Plaats, provincie of referentienummer'} />
 
   <div class="row">
     <div class="cell">
@@ -30,8 +33,8 @@ const action = path(locale, 'properties');
       <select id="s-type" name="type">
         <option value="">{ui.filters.all}</option>
         {
-          categories.map((key) => (
-            <option value={key}>{CATEGORIES[key][locale].label}</option>
+          categories.map((term) => (
+            <option value={term.key}>{termLabel(term, locale)}</option>
           ))
         }
       </select>
@@ -40,7 +43,7 @@ const action = path(locale, 'properties');
     <div class="cell">
       <label for="s-region">{ui.filters.region}</label>
       <select id="s-region" name="region">
-        <option value="">{ui.filters.all}</option>
+        <option value="">{ui.filters.entireCountry}</option>
         {regions.map((r) => <option value={r}>{r}</option>)}
       </select>
     </div>
@@ -58,10 +61,10 @@ const action = path(locale, 'properties');
     </div>
 
     <div class="cell">
-      <label for="s-beds">{ui.filters.beds}</label>
-      <select id="s-beds" name="beds">
+      <label for="s-floor">{ui.filters.area}</label>
+      <select id="s-floor" name="floor_min">
         <option value="">{ui.filters.any}</option>
-        {[2, 3, 4, 5].map((n) => <option value={String(n)}>{n}+</option>)}
+        {[60, 90, 120, 180, 250].map((n) => <option value={String(n)}>{n}+ m²</option>)}
       </select>
     </div>
 
@@ -72,16 +75,32 @@ const action = path(locale, 'properties');
 </form>
 
 <style>
+  .search {
+    /* A freestanding white panel on the section's cream ground gives the
+       search its own definition without a shadow — the site has no shadow
+       token and stays hard-edged throughout, so a solid --ink frame is what
+       "state of the art" means here, not elevation. */
+    background: #fff;
+    border: 1px solid var(--ink);
+  }
+  .search-heading {
+    margin: 0 0 24px;
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: clamp(26px, 2.8vw, 42px);
+    font-weight: var(--fw-display);
+    line-height: 1.2;
+  }
   .row {
     display: grid;
     grid-template-columns: repeat(4, 1fr) auto;
-    border: 1px solid var(--border);
+    border-top: 1px solid var(--border);
   }
   .cell {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    padding: 18px 22px;
+    gap: 10px;
+    padding: 22px 26px;
     border-right: 1px solid var(--border);
     /* Grid items are min-width:auto by default; a <select> with a long option
        then refuses to shrink and widens the whole document. */
@@ -108,20 +127,43 @@ const action = path(locale, 'properties');
     color: var(--taupe);
   }
   select {
+    /* appearance:none alone leaves some browsers sizing the box by its
+       content instead of the flex stretch this needs — display:block plus an
+       explicit width is what makes it reliably fill the cell, arrow included. */
+    display: block;
     width: 100%;
     appearance: none;
     border: none;
     background: transparent;
-    font-size: var(--fs-body);
+    font-size: var(--fs-body-lg);
     font-weight: var(--fw-body);
     color: var(--ink);
     cursor: pointer;
     padding-right: 22px;
-    background-image: linear-gradient(45deg, transparent 50%, var(--taupe) 50%),
-      linear-gradient(135deg, var(--taupe) 50%, transparent 50%);
-    background-position: 100% calc(50% + 2px), calc(100% + 5px) calc(50% + 2px);
-    background-size: 5px 5px;
+    /* A single crisp SVG chevron instead of a two-gradient hack — the
+       gradient version rendered as only half a mark at this field size. */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%233a464a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-position: right 2px center;
+    background-size: 10px 6px;
     background-repeat: no-repeat;
+  }
+  .query-label { position:absolute; inline-size:1px; block-size:1px; overflow:hidden; clip-path:inset(50%); }
+  .query {
+    box-sizing: border-box;
+    display: block;
+    width: 100%;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    background: transparent;
+    padding: 26px;
+    font-size: clamp(1.15rem, 2vw, 1.55rem);
+    font-family: var(--serif);
+    color: var(--ink);
+  }
+  .query::placeholder { color: var(--taupe); opacity: 0.7; }
+  .query:focus-visible, select:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: -2px;
   }
 
   @media (max-width: 900px) {

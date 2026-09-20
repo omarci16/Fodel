@@ -1,0 +1,53 @@
+---
+/** Stable term keys are read-only by design. Renaming is a data migration. */
+export const prerender = false;
+import Portal from '~/layouts/Portal.astro';
+const { supabase, profile } = Astro.locals;
+if (profile?.role !== 'admin') return Astro.redirect('/portal/dashboard');
+const { data: terms } = await supabase.from('taxonomy_terms').select('*').order('group_key').order('sort_order');
+const { data: properties } = await supabase.from('properties').select('category, features, condition_key, heating_key, status');
+const { data: blogPosts } = await supabase.from('blog_posts').select('locale, category, published');
+const groups = ['category','feature','condition','heating','county','region','blog_category'];
+function counts(term: any) {
+  if (term.group_key === 'blog_category') {
+    const matches = (blogPosts ?? []).filter((post: any) => post.category === term.labels?.[post.locale]);
+    return { total: matches.length, live: matches.filter((post: any) => post.published).length };
+  }
+  const labels = Object.values(term.labels ?? {});
+  const matches = (properties ?? []).filter((p: any) => term.group_key === 'category' ? p.category === term.key : term.group_key === 'feature' ? p.features?.includes(term.key) : term.group_key === 'condition' ? p.condition_key === term.key : term.group_key === 'heating' ? p.heating_key === term.key : term.group_key === 'county' ? labels.includes(p.county) : term.group_key === 'region' ? labels.includes(p.region) : false);
+  return { total: matches.length, live: matches.filter((p: any) => ['published','sold'].includes(p.status)).length };
+}
+---
+<Portal title="Szótár">
+  <header><p class="eyebrow">Admin</p><h1>Szótár</h1><p>Az új kategóriák mentés után, a gyorsítótár miatt legfeljebb 1 percen belül jelennek meg a nyilvános oldalon.</p></header>
+  <nav class="tabs">{groups.map((group) => <a href={`#${group}`}>{group}</a>)}</nav>
+  {groups.map((group) => <section id={group}>
+    <h2>{group}</h2>
+    <div class="rows">
+      {(terms ?? []).filter((term: any) => term.group_key === group).map((term: any) => {
+        const use = counts(term); return <form class="term" data-id={term.id} data-live={use.live}>
+          <code title="A kulcs nem nevezhető át">{term.key}</code>
+          <input name="hu" value={term.labels.hu ?? ''} aria-label="Magyar címke" required />
+          <input name="nl" value={term.labels.nl ?? ''} aria-label="Holland címke" required />
+          <input name="de" value={term.labels.de ?? ''} aria-label="Német címke" placeholder="DE" />
+          <input name="en" value={term.labels.en ?? ''} aria-label="Angol címke" placeholder="EN" />
+          <input name="fr" value={term.labels.fr ?? ''} aria-label="Francia címke" placeholder="FR" />
+          {group === 'category' && <><input name="slugHu" value={term.slugs.hu ?? ''} disabled={use.total > 0} title={use.total > 0 ? 'Használt kategória URL-je nem módosítható' : ''} /><input name="slugNl" value={term.slugs.nl ?? ''} disabled={use.total > 0} /><input name="schemaType" value={term.schema_type ?? ''} disabled={use.total > 0} /></>}
+          <input name="sortOrder" type="number" value={term.sort_order} aria-label="Sorrend" />
+          <span>{use.total} összes / {use.live} élő</span>
+          <label><input name="enabled" type="checkbox" checked={term.enabled} /> aktív</label>
+          <button>Mentés</button><button type="button" data-delete>Törlés</button><output></output>
+        </form>;
+      })}
+    </div>
+    <form class="create" data-group={group}><input name="key" placeholder="stabil-kulcs" required /><input name="hu" placeholder="Magyar címke" required /><input name="nl" placeholder="Holland címke" required /><input name="de" placeholder="Német címke" /><input name="en" placeholder="Angol címke" /><input name="fr" placeholder="Francia címke" />{group === 'category' && <><input name="slugHu" placeholder="magyar-slug" required /><input name="slugNl" placeholder="nederlandse-slug" required /><input name="schemaType" placeholder="schema.org típus" required /></>}<button>+ Új elem</button><output></output></form>
+  </section>)}
+</Portal>
+<script is:inline>
+  async function send(body){const response=await fetch('/api/portal/taxonomy',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});return {ok:response.ok,json:await response.json()};}
+  function labels(data){return Object.fromEntries(['hu','nl','de','en','fr'].map((locale)=>[locale,data.get(locale)]).filter(([,value])=>value));}
+  document.querySelectorAll('.term').forEach((form)=>form.addEventListener('submit',async(event)=>{event.preventDefault();const f=event.currentTarget;const data=new FormData(f);if(!data.has('enabled')&&Number(f.dataset.live)>0&&!confirm(`A kifejezést ${f.dataset.live} élő hirdetés használja. Biztosan kikapcsolja?`))return;const result=await send({action:'save',id:f.dataset.id,labels:labels(data),slugs:{hu:data.get('slugHu'),nl:data.get('slugNl')},schemaType:data.get('schemaType'),sortOrder:data.get('sortOrder'),enabled:data.has('enabled')});f.querySelector('output').textContent=result.ok?'Mentve — a nyilvános oldalon 1 percen belül frissül':result.json.error;}));
+  document.querySelectorAll('[data-delete]').forEach((button)=>button.addEventListener('click',async()=>{const f=button.closest('.term');if(!confirm('Biztosan törli?'))return;const result=await send({action:'delete',id:f.dataset.id});if(result.ok)location.reload();else f.querySelector('output').textContent=result.json.error==='in-use'?`Használatban (${result.json.count}); inkább kapcsolja ki.`:result.json.error;}));
+  document.querySelectorAll('.create').forEach((form)=>form.addEventListener('submit',async(event)=>{event.preventDefault();const f=event.currentTarget;const data=new FormData(f);const result=await send({action:'create',groupKey:f.dataset.group,key:data.get('key'),labels:labels(data),slugs:{hu:data.get('slugHu'),nl:data.get('slugNl')},schemaType:data.get('schemaType')});if(result.ok)location.reload();else f.querySelector('output').textContent=result.json.error;}));
+</script>
+<style>header{margin-bottom:28px}.tabs{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:36px}.tabs a{text-decoration:underline}section{margin-bottom:56px;scroll-margin-top:90px}.rows{display:grid;gap:8px}.term,.create{display:grid;grid-template-columns:120px repeat(5,minmax(95px,1fr)) repeat(3,minmax(100px,1fr)) 80px 130px auto auto auto;gap:8px;align-items:center;padding:10px;border:1px solid var(--border);overflow-x:auto}input{min-width:0;padding:8px;border:1px solid var(--border)}button{padding:8px 12px}.create{margin-top:12px}@media(max-width:1000px){.term,.create{grid-template-columns:1fr 1fr}}</style>

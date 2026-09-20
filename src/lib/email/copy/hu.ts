@@ -111,6 +111,23 @@ export const HU = {
     vatNote: 'A feltüntetett árak a 21% holland áfát tartalmazzák.',
   },
 
+  approvedPublished: {
+    subject: (ref: string) => `Jóváhagyva és élesítve — #${ref}`,
+    preheader: 'Hirdetése már látható; a hirdetési díjat 14 napon belül rendezheti.',
+    heading: 'Hirdetése már élő',
+    body: (title: string, ref: string) => `A(z) „${title}” (#${ref}) hirdetését jóváhagytuk és azonnal közzétettük.`,
+    viewCta: 'Hirdetés megtekintése',
+    orderTitle: 'A hirdetés díja',
+    discountLabel: 'Ajánlói kedvezmény (10%)',
+    totalLabel: 'Fizetendő',
+    dueLabel: 'Fizetési határidő',
+    ctaCard: 'Fizetés bankkártyával',
+    cardNote: 'A fizetés a Stripe biztonságos felületén történik. A kártyaadatokat a FODEL nem látja és nem tárolja.',
+    bankTitle: 'Banki átutalás',
+    bankNote: (ref: string) => `Átutaláskor kérjük, a közleménybe írja be a hirdetés azonosítóját: ${ref}.`,
+    vatNote: 'A feltüntetett árak a 21% holland áfát tartalmazzák.',
+  },
+
   paymentReceipt: {
     subject: (ref: string) => `Fizetési visszaigazolás — #${ref}`,
     preheader: 'Köszönjük, a fizetés megérkezett.',

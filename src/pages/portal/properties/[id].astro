@@ -14,13 +14,14 @@ export const prerender = false;
 
 import Portal from '~/layouts/Portal.astro';
 import Field from '~/components/forms/Field.astro';
-import { getProperty, STATUS_LABEL, CATEGORY_LABEL, EPC_OPTIONS, LOCALE_OPTIONS, OWNER_EDITABLE } from '~/lib/portal/properties';
-import { FEATURES, COUNTIES } from '~/data/features';
+import { getProperty, STATUS_LABEL, EPC_OPTIONS, LOCALE_OPTIONS, OWNER_EDITABLE } from '~/lib/portal/properties';
+import { getTaxonomy, termLabel } from '~/lib/runtime-config';
 import { resolveImage } from '~/lib/property-images';
 import { formatCents, type OrderLine } from '~/lib/orders';
 import { isStripeEnabled } from '~/lib/stripe';
 import { isAiEnabled } from '~/lib/ai/client';
 import { COMPANY } from '~/config/company';
+import { COUNTRIES } from '~/config/countries';
 
 /** A demo photo (bare filename) needs Astro's asset pipeline to become a real URL; a real upload already is one. */
 function mediaSrc(storagePath: string): string {
@@ -35,6 +36,17 @@ const isAdmin = profile?.role === 'admin';
 const property = await getProperty(supabase, id!);
 if (!property) {
   return new Response('Ingatlan nem található, vagy nincs hozzáférése.', { status: 404 });
+}
+const taxonomy = await getTaxonomy();
+// County is stored as a free-text label on properties (no FK — see 0011's
+// rationale), so options are keyed by label. A saved county whose taxonomy
+// term was disabled — or that predates the taxonomy entirely — must stay
+// selectable, or saving the form would silently overwrite it.
+const countyOptions = taxonomy.county
+  .filter((term) => term.enabled || termLabel(term, 'hu') === property.county)
+  .map((term) => ({ value: termLabel(term, 'hu'), label: termLabel(term, 'hu') }));
+if (property.county && !countyOptions.some((o) => o.value === property.county)) {
+  countyOptions.push({ value: property.county, label: property.county });
 }
 
 const isOwnProperty = property.owner_id === user?.id;
@@ -162,7 +174,7 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
         <h2>Alapadatok</h2>
         <div class="grid-2">
           <Field locale="hu" name="category" label="Típus" type="select" required
-            options={Object.entries(CATEGORY_LABEL).map(([value, label]) => ({ value, label }))}
+            options={taxonomy.category.filter((term) => term.enabled || term.key === property.category).map((term) => ({ value: term.key, label: termLabel(term, 'hu') }))}
             value={property.category} />
           <div class="field">
             <label>Azonosító</label>
@@ -175,17 +187,19 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
         <h2>Elhelyezkedés</h2>
         <div class="grid-2">
           <Field locale="hu" name="settlement" label="Település" required value={property.settlement} />
+          <Field locale="hu" name="country" label="Ország" type="select" required value={property.country}
+            options={Object.keys(COUNTRIES).map((code) => ({ value: code, label: COUNTRIES[code].labels.hu }))} />
           <Field locale="hu" name="county" label="Megye" type="select" required value={property.county}
-            options={COUNTIES.map((c) => ({ value: c, label: c }))} />
+            options={countyOptions} />
           <Field locale="hu" name="region" label="Régió" required value={property.region} />
           <Field locale="hu" name="precision" label="Pontosság" type="select" value={property.precision}
             options={[{ value: 'approximate', label: 'Közelítő (a pontos cím rejtve marad)' }, { value: 'exact', label: 'Pontos' }]} />
           <Field locale="hu" name="lat" label="Szélesség (lat)" type="number" required value={String(property.lat)}
-            min={45.7} max={48.6}
-            hint="Pl. 46.79 — Google Maps-en jobb klikk a helyre megadja. Magyarországon belül: 45.7–48.6." />
+            min={-90} max={90}
+            hint="Google Maps-en jobb klikk a helyre megadja. A kiválasztott ország határain belül legyen." />
           <Field locale="hu" name="lng" label="Hosszúság (lng)" type="number" required value={String(property.lng)}
-            min={16} max={22.9}
-            hint="Magyarországon belül: 16–22.9." />
+            min={-180} max={180}
+            hint="A kiválasztott ország határain belül legyen." />
         </div>
       </section>
 
@@ -205,6 +219,10 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
           <Field locale="hu" name="epc_class" label="Energetikai besorolás" type="select" value={property.epc_class}
             options={EPC_OPTIONS.map((v) => ({ value: v, label: v === 'pending' ? 'Folyamatban' : v === 'exempt' ? 'Nem kötelező' : v }))} />
           <Field locale="hu" name="video_url" label="Videó URL (YouTube)" type="url" value={property.video_url ?? ''} />
+          <Field locale="hu" name="condition_key" label="Állapot (szótár)" type="select" value={property.condition_key ?? ''}
+            options={[{value:'',label:'Nincs kiválasztva'}, ...taxonomy.condition.filter((term) => term.enabled).map((term) => ({value:term.key,label:termLabel(term,'hu')}))]} />
+          <Field locale="hu" name="heating_key" label="Fűtés (szótár)" type="select" value={property.heating_key ?? ''}
+            options={[{value:'',label:'Nincs kiválasztva'}, ...taxonomy.heating.filter((term) => term.enabled).map((term) => ({value:term.key,label:termLabel(term,'hu')}))]} />
         </div>
         <label class="checkbox">
           <input type="checkbox" name="price_negotiable" value="yes" checked={property.price_negotiable} />
@@ -218,13 +236,20 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
         )}
       </section>
 
+      {isAdmin && <section id="curation"><h2>Kiemelések</h2><div class="checkbox-grid">
+        <label class="checkbox"><input type="checkbox" name="featured" value="yes" checked={property.featured} /> Fizetős kategória-kiemelés</label>
+        <label class="checkbox"><input type="checkbox" name="homepage_featured" value="yes" checked={property.homepage_featured} /> Fizetős főoldali kiemelés</label>
+        <label class="checkbox"><input type="checkbox" name="editors_pick" value="yes" checked={property.editors_pick} /> FODEL Top 10</label>
+        <label class="checkbox"><input type="checkbox" name="bargain" value="yes" checked={property.bargain} /> Alkalmi vétel</label>
+      </div><div class="grid-2"><Field locale="hu" name="homepage_order" label="Főoldali sorrend" type="number" value={String(property.homepage_order)} /><Field locale="hu" name="editors_pick_order" label="Top 10 sorrend" type="number" value={String(property.editors_pick_order)} /></div></section>}
+
       <section id="features">
         <h2>Jellemzők</h2>
         <div class="checkbox-grid">
-          {Object.entries(FEATURES).map(([key, labels]) => (
+          {taxonomy.feature.filter((term) => term.enabled || property.features.includes(term.key)).map((term) => (
             <label class="checkbox">
-              <input type="checkbox" name="features" value={key} checked={property.features.includes(key)} />
-              {labels.hu}
+              <input type="checkbox" name="features" value={term.key} checked={property.features.includes(term.key)} />
+              {termLabel(term, 'hu')}
             </label>
           ))}
         </div>

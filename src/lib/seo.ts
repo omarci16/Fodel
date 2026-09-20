@@ -6,8 +6,9 @@
  * answer engines. Nothing is asserted that the page does not show.
  */
 
-import { COMPANY, COMMISSION } from '~/config/company';
-import { BRAND, CATEGORIES, LOCALE_META, type Locale, type CategoryKey } from '~/i18n/ui';
+import { COMMISSION } from '~/config/company';
+import type { Company } from '~/lib/runtime-config';
+import { BRAND, LOCALE_META, type Locale } from '~/i18n/ui';
 import type { Property } from './properties';
 import { text } from './properties';
 
@@ -17,41 +18,41 @@ export const abs = (path: string): string => new URL(path, SITE).toString();
 
 /* ── Organisation ─────────────────────────────────────────────────────── */
 
-export function organisationSchema(locale: Locale) {
+export function organisationSchema(locale: Locale, company: Company) {
   const brand = BRAND[locale];
 
   return {
     '@type': 'RealEstateAgent',
     '@id': `${SITE}/#organization`,
     name: brand.name,
-    legalName: COMPANY.names.legal,
+    legalName: company.names.legal,
     description: brand.tagline,
     url: abs(`/${locale}/`),
-    foundingDate: String(COMPANY.founded),
-    email: COMPANY.email.primary,
-    telephone: COMPANY.phones.map((p) => p.display),
+    foundingDate: String(company.founded),
+    email: company.email.primary,
+    telephone: company.phones.filter((phone) => phone.public).map((phone) => phone.display),
     address: {
       '@type': 'PostalAddress',
-      streetAddress: COMPANY.address.street,
-      postalCode: COMPANY.address.postalCode,
-      addressLocality: COMPANY.address.city,
-      addressCountry: COMPANY.address.countryCode,
+      streetAddress: company.address.street,
+      postalCode: company.address.postalCode,
+      addressLocality: company.address.city,
+      addressCountry: company.address.countryCode,
     },
     // Only emitted once verified — an unconfirmed identifier is worse than none.
-    ...(COMPANY.registration.kvk ? { identifier: COMPANY.registration.kvk } : {}),
-    ...(COMPANY.registration.vatVerified ? { vatID: COMPANY.registration.vat } : {}),
+    ...(company.registration.kvk ? { identifier: company.registration.kvk } : {}),
+    ...(company.registration.vatVerified ? { vatID: company.registration.vat } : {}),
     areaServed: [
       { '@type': 'Country', name: 'Hungary' },
       { '@type': 'Country', name: 'Netherlands' },
       { '@type': 'Country', name: 'Belgium' },
     ],
     knowsLanguage: ['hu', 'nl', 'de', 'en', 'fr'],
-    sameAs: [COMPANY.social.youtube, COMPANY.social.facebookNl, COMPANY.social.facebookHu],
+    sameAs: [company.social.youtube, company.social.facebookNl, company.social.facebookHu],
     openingHoursSpecification: {
       '@type': 'OpeningHoursSpecification',
       dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-      opens: COMPANY.hours.weekdays.from,
-      closes: COMPANY.hours.weekdays.to,
+      opens: company.hours.weekdays.from,
+      closes: company.hours.weekdays.to,
     },
   };
 }
@@ -79,7 +80,7 @@ export function websiteSchema(locale: Locale, searchPath: string) {
 
 export function propertySchema(p: Property, locale: Locale, pageUrl: string, imageUrl: string) {
   const d = p.data;
-  const residenceType = CATEGORIES[d.category as CategoryKey].schema;
+  const residenceType = d.categorySchema;
 
   const availability =
     d.status === 'sold'
@@ -123,7 +124,7 @@ export function propertySchema(p: Property, locale: Locale, pageUrl: string, ima
         '@type': 'PostalAddress',
         addressLocality: d.location.settlement,
         addressRegion: d.location.county,
-        addressCountry: 'HU',
+        addressCountry: d.location.country,
       },
       geo: {
         '@type': 'GeoCoordinates',

@@ -1,0 +1,44 @@
+---
+export const prerender = false;
+import Portal from '~/layouts/Portal.astro';
+const { supabase, profile } = Astro.locals;
+if (profile?.role !== 'admin') return Astro.redirect('/portal/dashboard');
+const { data: company } = await supabase.from('site_settings').select('*').eq('id', 1).single();
+if (!company) return new Response('Futtassa a 0012 migrációt.', { status: 503 });
+---
+<Portal title="Cégadatok">
+  <header><p class="eyebrow"><a href="/portal/settings">← Beállítások</a></p><h1>Cégadatok</h1><p>A nyilvános oldalak legfeljebb 1 percen belül frissülnek.</p></header>
+  {Astro.url.searchParams.has('saved') && <p class="notice">Mentve.</p>}
+  <form method="POST" action="/api/portal/settings/company">
+    <h2>Azonosítás</h2>
+    <label>Jogi név<input name="name_legal" value={company.names.legal} required /></label>
+    <label>Magyar márkanév<input name="name_hu" value={company.names.hu} required /></label>
+    <label>Holland márkanév<input name="name_nl" value={company.names.nl} required /></label>
+    <label>Kapcsolattartó<input name="principal" value={company.principal} required /></label>
+    <label>Alapítás éve<input name="founded" type="number" value={company.founded} required /></label>
+    <label>Alapítás helye<input name="founded_in" value={company.founded_in} required /><small>A magyar felületen a Den Haag név „Hága” alakban jelenik meg; a jogi cím változatlan marad.</small></label>
+    <h2>Elérhetőségek</h2>
+    {(company.phones ?? []).map((phone: any, index: number) => <div class="phone"><label>Telefon {index + 1}<input name={`phone_${index}`} value={phone.display} /></label><label><input type="checkbox" name={`phone_${index}_public`} value="yes" checked={phone.public} /> Nyilvános</label></div>)}
+    <label>E-mail<input name="email" type="email" value={company.emails.primary} required /></label>
+    <h2>Cím és nyilvántartás</h2>
+    <label>Utca<input name="street" value={company.address.street} /></label><label>Irányítószám<input name="postal_code" value={company.address.postalCode} /></label><label>Város<input name="city" value={company.address.city} /></label><label>Teljes jogi cím<input name="address_one_line" value={company.address.oneLine} /></label><label>KvK<input name="kvk" value={company.registration.kvk ?? ''} /></label>
+    <label>VAT / BTW<input name="vat" value={company.registration.vat ?? ''} /></label>
+    <label class="check"><input type="checkbox" name="vat_verified" value="yes" checked={company.registration.vatVerified} /> VAT ellenőrizve</label>
+    <h2>Nyitvatartás és pénzügy</h2>
+    <label>Hétköznap kezdés<input name="hours_from" type="time" value={company.hours.weekdays.from} /></label>
+    <label>Hétköznap zárás<input name="hours_to" type="time" value={company.hours.weekdays.to} /></label>
+    <label>Visszahívás eddig<input name="callback_to" type="time" value={company.hours.callback.to} /></label>
+    <label class="check"><input type="checkbox" name="callback_weekends" value="yes" checked={company.hours.callback.includesWeekends} /> Hétvégén is</label>
+    <label>NL IBAN<input name="iban" value={company.banks.nl.iban} /></label>
+    <label>BIC<input name="bic" value={company.banks.nl.bic} /></label>
+    <label>HU bankszámla<input name="hu_account" value={company.banks.hu.account} /></label>
+    <h2>Közösségi és elérés</h2>
+    <label>YouTube<input name="youtube" type="url" value={company.social.youtube} /></label>
+    <label>Facebook NL<input name="facebook_nl" type="url" value={company.social.facebookNl} /></label>
+    <label>Facebook HU<input name="facebook_hu" type="url" value={company.social.facebookHu} /></label>
+    <label>Országok száma<input name="reach_countries" type="number" min="1" value={company.reach.countries} /></label>
+    <label>Nyelvek száma<input name="reach_languages" type="number" min="1" value={company.reach.languages} /></label>
+    <button>Mentés</button>
+  </form>
+</Portal>
+<style>header,form{max-width:720px}header{margin-bottom:32px}form{display:grid;grid-template-columns:1fr 1fr;gap:18px}h2{grid-column:1/-1;margin-top:18px;border-bottom:1px solid var(--border);padding-bottom:8px}label{display:flex;flex-direction:column;gap:7px;font-size:var(--fs-small)}input{padding:10px;border:1px solid var(--border)}.phone{display:flex;align-items:end;gap:14px}.phone label:first-child{flex:1}.phone label:last-child,.check{display:block;padding-block:10px}.check input{margin-right:7px}button{grid-column:1/-1;justify-self:start;padding:12px 24px;background:var(--ink);color:var(--cream)}small{color:var(--taupe)}@media(max-width:700px){form{grid-template-columns:1fr}}</style>

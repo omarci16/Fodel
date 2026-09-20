@@ -1,0 +1,53 @@
+---
+/** One structural treatment for section eyebrow, heading and separator. */
+import Eyebrow from './Eyebrow.astro';
+import GoldRule from './GoldRule.astro';
+
+interface Props {
+  eyebrow: string;
+  title?: string;
+  align?: 'left' | 'center';
+  rule?: boolean;
+  class?: string;
+}
+
+const {
+  eyebrow,
+  title,
+  align = 'left',
+  rule = true,
+  class: className,
+} = Astro.props;
+const centered = align === 'center';
+---
+
+<div class:list={['section-head-standard', { centered }, className]}>
+  <div class="copy">
+    <Eyebrow center={centered} space="12px">{eyebrow}</Eyebrow>
+    <h2>{title ?? <slot name="title" />}</h2>
+    {rule && <GoldRule center={centered} space="24px" />}
+  </div>
+  <slot />
+</div>
+
+<style>
+  .section-head-standard {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+  }
+  .copy { min-width: 0; }
+  h2 {
+    margin: 0 0 18px;
+    color: var(--section-head-color, var(--ink));
+    font-family: var(--serif);
+    font-size: clamp(26px, 2.8vw, 42px);
+    font-weight: var(--fw-display);
+    line-height: 1.2;
+    white-space: pre-line;
+  }
+  .centered { display: block; text-align: center; }
+  .centered .copy { max-width: 850px; margin-inline: auto; }
+  :global([data-bg='dark']) .section-head-standard { --section-head-color: var(--cream); }
+</style>

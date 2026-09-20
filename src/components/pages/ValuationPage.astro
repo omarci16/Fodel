@@ -11,8 +11,8 @@ import Base from '~/layouts/Base.astro';
 import PageHeader from '~/components/PageHeader.astro';
 import FormShell from '~/components/forms/FormShell.astro';
 import Field from '~/components/forms/Field.astro';
-import { UI, CATEGORIES, type Locale, type CategoryKey } from '~/i18n/ui';
-import { COUNTIES } from '~/data/features';
+import { UI, type Locale } from '~/i18n/ui';
+import { getTaxonomy, termLabel } from '~/lib/runtime-config';
 import { alternatesFor } from '~/lib/page';
 import { serviceSchema } from '~/lib/seo';
 
@@ -56,9 +56,14 @@ const t = hu
         'Indicatieve schatting, geen taxatierapport. Vervangt geen officiële taxatie en hieraan kunnen geen rechten worden ontleend.',
     };
 
-const categoryOptions = (Object.keys(CATEGORIES) as CategoryKey[]).map((key) => ({
-  value: key,
-  label: CATEGORIES[key][locale].label,
+const taxonomy = await getTaxonomy();
+const categoryOptions = taxonomy.category.filter((term) => term.enabled).map((term) => ({
+  value: term.key, label: termLabel(term, locale),
+}));
+// County is stored as free-text on properties (no FK — see 0011's rationale),
+// so the option value is the label itself, not the taxonomy key.
+const countyOptions = taxonomy.county.filter((term) => term.enabled).map((term) => ({
+  value: termLabel(term, locale), label: termLabel(term, locale),
 }));
 ---
 
@@ -101,7 +106,7 @@ const categoryOptions = (Object.keys(CATEGORIES) as CategoryKey[]).map((key) => 
           label={hu ? 'Megye' : 'Comitaat'}
           type="select"
           required
-          options={COUNTIES.map((c) => ({ value: c, label: c }))}
+          options={countyOptions}
           span="half"
         />
         <Field locale={locale} name="settlement" label={hu ? 'Település' : 'Plaats'} span="half" />

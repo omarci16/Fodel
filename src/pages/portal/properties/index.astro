@@ -2,13 +2,21 @@
 export const prerender = false;
 
 import Portal from '~/layouts/Portal.astro';
-import { listProperties, STATUS_LABEL, CATEGORY_LABEL } from '~/lib/portal/properties';
+import { listProperties, STATUS_LABEL } from '~/lib/portal/properties';
+import { getTaxonomy, termLabel } from '~/lib/runtime-config';
 
 const { supabase, profile } = Astro.locals;
 const isAdmin = profile?.role === 'admin';
 const statusFilter = Astro.url.searchParams.get('status') ?? '';
+const view = Astro.url.searchParams.get('view') ?? '';
 
-const properties = await listProperties(supabase, statusFilter ? { status: statusFilter } : {});
+const allProperties = await listProperties(supabase, statusFilter ? { status: statusFilter } : {});
+const properties = view === 'curation'
+  ? allProperties.filter((property) => property.editors_pick || property.bargain)
+      .sort((a, b) => a.editors_pick_order - b.editors_pick_order)
+  : allProperties;
+const taxonomy = await getTaxonomy();
+const categoryLabel = (key: string) => termLabel(taxonomy.category.find((term) => term.key === key), 'hu') || key;
 
 const title = (p: (typeof properties)[number]) =>
   p.translations.find((t) => t.locale === 'hu')?.title || 'Névtelen hirdetés';
@@ -32,6 +40,7 @@ const ownerById = new Map((owners ?? []).map((o: any) => [o.id, o.full_name || o
   </header>
 
   <div class="filters">
+    {isAdmin && <a href="/portal/properties?view=curation" aria-current={view === 'curation' ? 'page' : undefined}>Top 10 és alkalmi vételek</a>}
     <a href="/portal/properties" aria-current={!statusFilter ? 'page' : undefined}>Mind</a>
     {Object.entries(STATUS_LABEL).map(([value, label]) => (
       <a href={`/portal/properties?status=${value}`} aria-current={statusFilter === value ? 'page' : undefined}>
@@ -57,6 +66,7 @@ const ownerById = new Map((owners ?? []).map((o: any) => [o.id, o.full_name || o
           <th>Település</th>
           <th>Ár</th>
           <th>Állapot</th>
+          {isAdmin && <th>Kiemelések</th>}
           {isAdmin && <th class="actions-col">Műveletek</th>}
         </tr>
       </thead>
@@ -66,10 +76,14 @@ const ownerById = new Map((owners ?? []).map((o: any) => [o.id, o.full_name || o
             <td><a href={`/portal/properties/${p.id}`}>#{p.ref}</a></td>
             <td><a href={`/portal/properties/${p.id}`}>{title(p)}</a></td>
             {isAdmin && <td class="owner">{(p.owner_id && ownerById.get(p.owner_id)) || '—'}</td>}
-            <td>{CATEGORY_LABEL[p.category] ?? p.category}</td>
+            <td>{categoryLabel(p.category)}</td>
             <td>{p.settlement}</td>
             <td>€{p.price_eur.toLocaleString('de-DE')}</td>
             <td><span class:list={['pill', `pill-${p.status}`]}>{STATUS_LABEL[p.status] ?? p.status}</span></td>
+            {isAdmin && <td>{[
+              p.featured && 'Kategória', p.homepage_featured && 'Főoldal',
+              p.editors_pick && `Top ${p.editors_pick_order}`, p.bargain && 'Alkalmi',
+            ].filter(Boolean).join(' · ') || '—'}</td>}
             {isAdmin && (
               <td class="actions-col">
                 <button type="button" class="delete-btn" data-delete={p.id} data-ref={p.ref}>

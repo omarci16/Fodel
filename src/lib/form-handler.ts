@@ -158,18 +158,18 @@ function buildEmail(def: FormDefinition, values: Record<string, string>, extras:
 const ACK = {
   hu: {
     subject: 'Köszönjük megkeresését — FODEL',
-    body: (name: string) =>
+    body: (name: string, phones: string) =>
       `<p>Kedves ${escapeHtml(name || 'Érdeklődőnk')}!</p>
        <p>Köszönjük, hogy felvette velünk a kapcsolatot. Üzenetét megkaptuk, és munkanapokon 09:00 és 18:00 között válaszolunk.</p>
-       <p>Ha sürgős, hívjon minket: +36 70 225 5255 vagy +31 6 4400 5550.</p>
+       <p>Ha sürgős, hívjon minket: ${escapeHtml(phones)}.</p>
        <p>Üdvözlettel,<br>FODEL Ingatlan</p>`,
   },
   nl: {
     subject: 'Bedankt voor uw bericht — FODEL',
-    body: (name: string) =>
+    body: (name: string, phones: string) =>
       `<p>Beste ${escapeHtml(name || 'bezoeker')},</p>
        <p>Bedankt voor uw bericht. Wij hebben het ontvangen en reageren op werkdagen tussen 09:00 en 18:00 uur.</p>
-       <p>Heeft u haast? Bel ons op +31 6 4400 5550.</p>
+       <p>Heeft u haast? Bel ons op ${escapeHtml(phones)}.</p>
        <p>Met vriendelijke groet,<br>FODEL Vastgoed</p>`,
   },
 } as const;
@@ -198,7 +198,7 @@ export async function handleForm(
   context: APIContext,
   def: FormDefinition
 ): Promise<Response> {
-  const { request, clientAddress, url } = context;
+  const { request, clientAddress } = context;
   const form = await request.formData();
   const wantsJson = request.headers.get('accept')?.includes('application/json');
 
@@ -292,11 +292,14 @@ export async function handleForm(
     // Acknowledge to the sender so they know it arrived.
     if (result.values.email && !def.skipAck) {
       const ack = ACK[locale];
+      const { getCompany } = await import('~/lib/runtime-config');
+      const company = await getCompany();
+      const phones = company.phones.filter((phone) => phone.public).map((phone) => phone.display).join(' / ');
       await resend.emails.send({
         from,
         to: result.values.email,
         subject: ack.subject,
-        html: ack.body(result.values.name ?? ''),
+        html: ack.body(result.values.name ?? '', phones),
       });
     }
 

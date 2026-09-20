@@ -67,8 +67,8 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
   if (action === 'link_translation') {
     const targetId = typeof body.targetId === 'string' ? body.targetId : null;
     if (!targetId) {
-      // Unlink: give this post its own fresh group.
-      const { error } = await supabase.from('blog_posts').update({ group_id: crypto.randomUUID() }).eq('id', id);
+      // An independent article has no translation group at all.
+      const { error } = await supabase.from('blog_posts').update({ group_id: null }).eq('id', id);
       if (error) return json(500, { ok: false, error: error.message });
       return json(200, { ok: true });
     }

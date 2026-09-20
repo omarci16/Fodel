@@ -10,7 +10,8 @@ import PageHeader from '~/components/PageHeader.astro';
 import Eyebrow from '~/components/Eyebrow.astro';
 import FormShell from '~/components/forms/FormShell.astro';
 import Field from '~/components/forms/Field.astro';
-import { UI, CATEGORIES, path, type Locale, type CategoryKey } from '~/i18n/ui';
+import { UI, type Locale } from '~/i18n/ui';
+import { getTaxonomy, termLabel } from '~/lib/runtime-config';
 import { alternatesFor } from '~/lib/page';
 import { serviceSchema } from '~/lib/seo';
 
@@ -68,9 +69,9 @@ const t = hu
         'Wij hebben uw zoekopdracht ontvangen. Zodra wij iets vinden dat aan uw criteria voldoet, nemen wij per e-mail contact op.',
     };
 
-const categoryOptions = (Object.keys(CATEGORIES) as CategoryKey[]).map((key) => ({
-  value: key,
-  label: CATEGORIES[key][locale].label,
+const taxonomy = await getTaxonomy();
+const categoryOptions = taxonomy.category.filter((term) => term.enabled).map((term) => ({
+  value: term.key, label: termLabel(term, locale),
 }));
 ---
 

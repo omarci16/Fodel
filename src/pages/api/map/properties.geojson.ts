@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { activeProperties, text, url as propertyUrl } from '~/lib/properties';
-import { categoryLabel, isLocale, type CategoryKey } from '~/i18n/ui';
+import { isLocale } from '~/i18n/ui';
 import { eur } from '~/lib/format';
 
 export const prerender = false;
@@ -10,7 +10,13 @@ export const GET: APIRoute = async ({ url }) => {
   const localeParam = url.searchParams.get('locale');
   const locale = isLocale(localeParam ?? '') ? (localeParam as 'hu' | 'nl') : 'hu';
 
-  const properties = await activeProperties();
+  const bbox = url.searchParams.get('bbox')?.split(',').map(Number);
+  const properties = (await activeProperties()).filter((property) =>
+    !bbox || bbox.length !== 4 || (
+      property.data.location.lng >= bbox[0] && property.data.location.lng <= bbox[2] &&
+      property.data.location.lat >= bbox[1] && property.data.location.lat <= bbox[3]
+    )
+  );
 
   const features = properties.map((p) => ({
     type: 'Feature' as const,
@@ -18,7 +24,7 @@ export const GET: APIRoute = async ({ url }) => {
     properties: {
       ref: p.data.ref,
       title: text(p.data.title, locale),
-      category: categoryLabel(p.data.category as CategoryKey, locale),
+      category: p.data.categoryLabels[locale] ?? p.data.categoryLabels.hu,
       price: eur(p.data.price.eur),
       url: propertyUrl(p, locale),
     },

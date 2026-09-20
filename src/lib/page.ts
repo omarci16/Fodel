@@ -6,7 +6,7 @@
  * alternates from the same route key rather than hand-writing URLs.
  */
 
-import { LOCALES, path, propertyPath, type Locale, type RouteKey, type CategoryKey } from '~/i18n/ui';
+import { LOCALES, path, propertyPath, type Locale, type RouteKey } from '~/i18n/ui';
 
 /** Alternates for a page that exists at the same route key in every locale. */
 export function alternatesFor(key: RouteKey, ...rest: string[]): Record<Locale, string> {
@@ -18,11 +18,11 @@ export function alternatesFor(key: RouteKey, ...rest: string[]): Record<Locale, 
 
 /** Alternates for a property detail page. */
 export function propertyAlternates(
-  category: CategoryKey,
+  categorySlugs: Partial<Record<Locale, string>>,
   ref: string
 ): Record<Locale, string> {
   return Object.fromEntries(
-    LOCALES.map((l) => [l, propertyPath(l, category, ref)])
+    LOCALES.map((l) => [l, propertyPath(l, categorySlugs[l] ?? '', ref)])
   ) as Record<Locale, string>;
 }
 

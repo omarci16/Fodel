@@ -17,6 +17,7 @@
  */
 
 import type { Locale } from '~/i18n/ui';
+import { COMPANY } from '~/config/company';
 
 export type FaqAudience = 'seller' | 'buyer' | 'both';
 
@@ -46,7 +47,7 @@ export const FAQ: Record<Locale, FaqEntry[]> = {
       id: 'miert-fizetek-hirdetesert',
       question: 'Miért fizetek a hirdetésemért?',
       answer: [
-        '„A FODEL egyedülálló hirdetési és kizárólagosság nélküli értékesítési modelljében minden hirdetés 5 nyelven jelenik meg 8 országban."',
+        `„A FODEL egyedülálló hirdetési és kizárólagosság nélküli értékesítési modelljében minden hirdetés ${COMPANY.reach.languages} nyelven jelenik meg ${COMPANY.reach.countries} országban."`,
         'A hirdetési díj tartalmazza a szöveg szerkesztését, a fordítást, a képfeldolgozást, a címalkotást és a hirdetés összeállítását. Munkatársaink egy-egy anyag adminisztrációjával 1–4 órát töltenek el.',
       ],
       audience: 'seller',

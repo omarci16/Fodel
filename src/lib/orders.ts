@@ -44,16 +44,7 @@ export type OrderSelection = {
 // own marketing copy for these. These are the invoice wordings — shorter,
 // literal, and safe to sit on a payment record for years.
 
-const PACKAGE_LABEL: Record<string, Record<OrderLocale, string>> = {
-  'cheap-6m': {
-    hu: 'Hirdetés — 6 hónap',
-    nl: 'Advertentie — 6 maanden',
-  },
-  'normal-12m': {
-    hu: 'Hirdetés — 12 hónap',
-    nl: 'Advertentie — 12 maanden',
-  },
-};
+const PACKAGE_LABEL = Object.fromEntries(LISTING_PACKAGES.map((pkg) => [pkg.id, pkg.names])) as Record<string, Record<OrderLocale, string>>;
 
 const EXTRA_LABEL: Record<string, Record<OrderLocale, string>> = {
   translation: { hu: 'Fordítás', nl: 'Vertaling' },

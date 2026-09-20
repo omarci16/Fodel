@@ -16,6 +16,10 @@ let query = supabase
 if (filter) query = query.eq('locale', filter);
 
 const { data: posts } = await query;
+const [{ count: huCount }, { count: nlCount }] = await Promise.all([
+  supabase.from('blog_posts').select('id', { count: 'exact', head: true }).eq('locale', 'hu'),
+  supabase.from('blog_posts').select('id', { count: 'exact', head: true }).eq('locale', 'nl'),
+]);
 
 const dateFmt = new Intl.DateTimeFormat('hu-HU', { year: 'numeric', month: 'short', day: 'numeric' });
 ---
@@ -24,13 +28,14 @@ const dateFmt = new Intl.DateTimeFormat('hu-HU', { year: 'numeric', month: 'shor
   <header class="head">
     <p class="eyebrow">Tartalom</p>
     <h1>Blog</h1>
-    <a href="/portal/content/blog/new" class="btn">+ Új cikk</a>
+    <a href="/portal/content/blog/new?locale=hu" class="btn">+ HU cikk</a>
+    <a href="/portal/content/blog/new?locale=nl" class="btn">+ NL cikk</a>
   </header>
 
   <div class="filters">
     <a href="/portal/content/blog" aria-current={!filter ? 'page' : undefined}>Mind</a>
-    <a href="/portal/content/blog?locale=hu" aria-current={filter === 'hu' ? 'page' : undefined}>HU</a>
-    <a href="/portal/content/blog?locale=nl" aria-current={filter === 'nl' ? 'page' : undefined}>NL</a>
+    <a href="/portal/content/blog?locale=hu" aria-current={filter === 'hu' ? 'page' : undefined}>HU <span>{huCount ?? 0}</span></a>
+    <a href="/portal/content/blog?locale=nl" aria-current={filter === 'nl' ? 'page' : undefined}>NL <span>{nlCount ?? 0}</span></a>
   </div>
 
   {posts && posts.length > 0 ? (
@@ -62,6 +67,7 @@ const dateFmt = new Intl.DateTimeFormat('hu-HU', { year: 'numeric', month: 'shor
   .filters { display: flex; gap: 4px; margin-bottom: 22px; }
   .filters a { padding: 7px 14px; font-size: var(--fs-micro); letter-spacing: 0.04em; color: var(--taupe); border: 1px solid var(--border); }
   .filters a[aria-current='page'] { background: var(--ink); color: var(--cream); border-color: var(--ink); }
+  .filters span { margin-left: 5px; opacity: 0.65; }
 
   .empty { color: var(--taupe); font-size: var(--fs-small); padding: 32px 0; }
 

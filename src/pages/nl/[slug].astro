@@ -13,14 +13,14 @@ export const prerender = false;
 
 import PropertyDetailPage from '~/components/pages/PropertyDetailPage.astro';
 import { activeProperties, text } from '~/lib/properties';
-import { CATEGORIES, ROUTES } from '~/i18n/ui';
+import { ROUTES } from '~/i18n/ui';
 
 const { slug } = Astro.params;
 const properties = await activeProperties();
 const property = properties.find(
   (p) =>
     slug ===
-    ROUTES['nl'].detail(CATEGORIES[p.data.category as keyof typeof CATEGORIES]['nl'].slug, p.data.ref)
+    ROUTES.nl.detail(p.data.categorySlugs.nl ?? p.data.category, p.data.ref)
 );
 
 if (!property) {

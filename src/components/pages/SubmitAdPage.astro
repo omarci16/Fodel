@@ -24,9 +24,9 @@ import Button from '~/components/Button.astro';
 import PackageCard from '~/components/PackageCard.astro';
 import FormShell from '~/components/forms/FormShell.astro';
 import Field from '~/components/forms/Field.astro';
-import { UI, CATEGORIES, LOCALE_META, path, type Locale, type CategoryKey } from '~/i18n/ui';
-import { COMPANY, LISTING_PACKAGES, LISTING_EXTRAS, TRANSLATION_LANGUAGES } from '~/config/company';
-import { COUNTIES } from '~/data/features';
+import { UI, LOCALE_META, path, type Locale } from '~/i18n/ui';
+import { getTaxonomy, getCompany, termLabel } from '~/lib/runtime-config';
+import { LISTING_PACKAGES, LISTING_EXTRAS, TRANSLATION_LANGUAGES } from '~/config/company';
 import { alternatesFor } from '~/lib/page';
 import { formatCents } from '~/lib/orders';
 import { listingServiceSchema } from '~/lib/seo';
@@ -38,30 +38,30 @@ interface Props {
 const { locale } = Astro.props;
 const ui = UI[locale];
 const hu = locale === 'hu';
+const COMPANY = await getCompany();
 
 const t = hu
   ? {
       metaTitle: 'Hirdetés feladása — Hirdesse ingatlanát Nyugat-Európában',
       metaDescription:
-        'Adja fel ingatlanhirdetését 69 €-tól. 5 nyelven, 8 országban, kizárólagossági szerződés nélkül. Töltse ki az űrlapot — fizetni csak a jóváhagyás után kell.',
+        `Adja fel ingatlanhirdetését 69 €-tól. Jóváhagyás után azonnal megjelenik ${COMPANY.reach.languages} nyelven, ${COMPANY.reach.countries} országban — előrefizetés és kizárólagosság nélkül.`,
       eyebrow: 'Hirdetésfeladás',
       title: 'Hirdesse ingatlanát',
       titleEm: 'Nyugat-Európában',
-      body: 'Töltse ki az alábbi űrlapot. Azonnal kap egy e-mailt, amivel jelszót állíthat be, és saját felületén folytathatja a hirdetés összeállítását — a fényképekkel együtt. Munkatársunk átnézi, és csak a jóváhagyás után kell fizetnie.',
+      body: 'Töltse ki az alábbi űrlapot. Azonnal kap egy e-mailt, amivel jelszót állíthat be, és saját felületén folytathatja a hirdetés összeállítását — a fényképekkel együtt. Nincs előrefizetés: munkatársunk átnézi, és jóváhagyáskor azonnal közzéteszi.',
       processHead: 'A folyamat',
       steps: [
         { n: '01', t: 'Csomag kiválasztása', b: 'Kiválasztja a csomagot és a kért kiegészítőket, majd kitölti az ingatlan adatait.' },
         { n: '02', t: 'Fiók megnyitása', b: 'E-mailben küldünk egy linket, amivel jelszót állít be — az itt megadott adatok már be lesznek töltve.' },
         { n: '03', t: 'Hirdetés összeállítása', b: 'Saját felületén kiegészíti a leírást és feltölti a fényképeket. Nem sürgeti semmi.' },
         { n: '04', t: 'Ellenőrzés', b: 'Munkatársunk átnézi a hirdetést, és ha szükséges, javítást kér.' },
-        { n: '05', t: 'Fizetés', b: 'A jóváhagyás után rendezi a díjat — bankkártyával vagy átutalással. Elutasított hirdetésért soha nem kell fizetni.' },
-        { n: '06', t: 'Megjelenés', b: 'A fizetés beérkezése után a hirdetés azonnal élesedik, 5 nyelven, 8 országban.' },
+        { n: '05', t: 'Jóváhagyás és megjelenés', b: `A jóváhagyott hirdetés azonnal élesedik, ${COMPANY.reach.languages} nyelven, ${COMPANY.reach.countries} országban. Elutasított hirdetésért soha nem kell fizetni.` },
+        { n: '06', t: 'Díjrendezés', b: 'A hirdetési díjat ezután bankkártyával vagy átutalással rendezheti; a fizetés nem késlelteti a megjelenést.' },
       ],
       packagesHead: 'Válasszon csomagot',
       recommended: 'Ajánlott',
       packages: [
         {
-          name: 'Olcsó hirdetés',
           price: '69 €',
           duration: '6 hónap',
           features: [
@@ -71,7 +71,6 @@ const t = hu
           ],
         },
         {
-          name: 'Normál hirdetés',
           price: '129 €',
           priceAlt: '179 €',
           priceAltNote: '150 millió Ft feletti ingatlan esetén',
@@ -102,7 +101,7 @@ const t = hu
       yes: 'Igen, jelenjen meg a nevem és a telefonszámom',
       no: 'Nem, csak a FODEL elérhetősége jelenjen meg',
       bankHead: 'Bankszámlaszámaink',
-      bankNote: 'A hirdetés jóváhagyása után ezekre a számlákra utalhat — vagy fizethet bankkártyával a saját felületén.',
+      bankNote: 'A jóváhagyáskor a hirdetés azonnal megjelenik; a díjat ezután ezekre a számlákra utalhatja, vagy bankkártyával rendezheti a saját felületén.',
       submit: 'Hirdetés elküldése',
       successTitle: 'Köszönjük!',
       successBody:
@@ -111,25 +110,24 @@ const t = hu
   : {
       metaTitle: 'Advertentie plaatsen — Uw woning in West-Europa',
       metaDescription:
-        'Plaats uw advertentie vanaf € 69. In 5 talen, in 8 landen, zonder exclusiviteit. Vul het formulier in — u betaalt pas na goedkeuring.',
+        `Plaats uw advertentie vanaf € 69. Na goedkeuring verschijnt deze direct in ${COMPANY.reach.languages} talen en ${COMPANY.reach.countries} landen — zonder vooruitbetaling of exclusiviteit.`,
       eyebrow: 'Adverteren',
       title: 'Plaats uw woning',
       titleEm: 'in West-Europa',
-      body: 'Vul onderstaand formulier in. U ontvangt direct een e-mail waarmee u een wachtwoord instelt en zelf verdergaat met uw advertentie — inclusief de foto’s. Wij beoordelen hem, en pas daarna betaalt u.',
+      body: 'Vul onderstaand formulier in. U ontvangt direct een e-mail waarmee u een wachtwoord instelt en zelf verdergaat met uw advertentie — inclusief de foto’s. U betaalt niet vooraf: na onze beoordeling publiceren wij een goedgekeurde advertentie direct.',
       processHead: 'Het proces',
       steps: [
         { n: '01', t: 'Pakket kiezen', b: 'U kiest het pakket en de gewenste opties, en vult de gegevens van de woning in.' },
         { n: '02', t: 'Account openen', b: 'U krijgt een e-mail met een link om een wachtwoord in te stellen — uw gegevens staan er al in.' },
         { n: '03', t: 'Advertentie samenstellen', b: 'In uw eigen omgeving vult u de tekst aan en uploadt u de foto’s. Neem er rustig de tijd voor.' },
         { n: '04', t: 'Beoordeling', b: 'Onze medewerker beoordeelt de advertentie en vraagt zo nodig om een aanpassing.' },
-        { n: '05', t: 'Betaling', b: 'Na goedkeuring betaalt u — met creditcard of per overschrijving. Voor een afgewezen advertentie betaalt u nooit.' },
-        { n: '06', t: 'Publicatie', b: 'Zodra de betaling binnen is staat de advertentie direct online, in 5 talen en 8 landen.' },
+        { n: '05', t: 'Goedkeuring en publicatie', b: `Een goedgekeurde advertentie staat direct online, in ${COMPANY.reach.languages} talen en ${COMPANY.reach.countries} landen. Voor een afgewezen advertentie betaalt u nooit.` },
+        { n: '06', t: 'Factuur betalen', b: 'Daarna betaalt u met creditcard of per overschrijving; de betaling houdt de publicatie niet tegen.' },
       ],
       packagesHead: 'Kies een pakket',
       recommended: 'Aanbevolen',
       packages: [
         {
-          name: 'Voordelige advertentie',
           price: '€ 69',
           duration: '6 maanden',
           features: [
@@ -139,7 +137,6 @@ const t = hu
           ],
         },
         {
-          name: 'Normale advertentie',
           price: '€ 129',
           priceAlt: '€ 179',
           priceAltNote: 'bij een vraagprijs boven 150 miljoen HUF',
@@ -170,16 +167,21 @@ const t = hu
       yes: 'Ja, toon mijn naam en telefoonnummer',
       no: 'Nee, toon alleen de gegevens van FODEL',
       bankHead: 'Onze bankrekeningen',
-      bankNote: 'Na goedkeuring van uw advertentie kunt u naar deze rekeningen overmaken — of in uw eigen omgeving met creditcard betalen.',
+      bankNote: 'Bij goedkeuring gaat uw advertentie direct online; daarna maakt u het bedrag over naar een van deze rekeningen of betaalt u met creditcard.',
       submit: 'Advertentie aanmelden',
       successTitle: 'Dank u wel!',
       successBody:
         'Wij hebben uw aanmelding ontvangen. Binnen enkele minuten ontvangt u een e-mail met een link om een wachtwoord in te stellen — daarna gaat u direct verder met uw advertentie en de foto’s. Kijk ook even in uw spammap.',
     };
 
-const categoryOptions = (Object.keys(CATEGORIES) as CategoryKey[]).map((key) => ({
-  value: key,
-  label: CATEGORIES[key][locale].label,
+const taxonomy = await getTaxonomy();
+const categoryOptions = taxonomy.category.filter((term) => term.enabled).map((term) => ({
+  value: term.key, label: termLabel(term, locale),
+}));
+// County is stored as free-text on properties (no FK — see 0011's rationale),
+// so the option value is the label itself, not the taxonomy key.
+const countyOptions = taxonomy.county.filter((term) => term.enabled).map((term) => ({
+  value: termLabel(term, locale), label: termLabel(term, locale),
 }));
 
 /**
@@ -191,6 +193,7 @@ const packageCards = LISTING_PACKAGES.map((cfg, i) => ({
   id: cfg.id,
   priceCents: cfg.priceEur * 100,
   ...t.packages[i],
+  name: cfg.names[locale],
 }));
 
 const categoryHighlight = LISTING_EXTRAS.find((e) => e.id === 'category-highlight')!;
@@ -370,7 +373,7 @@ const packageSchema = listingServiceSchema(locale, {
             label={hu ? 'Megye' : 'Comitaat'}
             type="select"
             required
-            options={COUNTIES.map((c) => ({ value: c, label: c }))}
+            options={countyOptions}
             span="full" onDark
           />
           <Field locale={locale} name="settlement" label={hu ? 'Település' : 'Plaats'} required span="full" onDark />
@@ -461,7 +464,7 @@ const packageSchema = listingServiceSchema(locale, {
 
         <div class="help">
           <p>{hu ? 'Segítségre van szüksége?' : 'Hulp nodig?'}</p>
-          {COMPANY.phones.slice(0, 2).map((p) => <a href={p.href}>{p.display}</a>)}
+          {COMPANY.phones.filter((p) => p.public).map((p) => <a href={p.href}>{p.display}</a>)}
           <Button variant="text" href={path(locale, 'faq')}>
             {hu ? 'Gyakori kérdések' : 'Veelgestelde vragen'}
           </Button>

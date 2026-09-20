@@ -34,6 +34,7 @@ let query = supabase
   .order('created_at', { ascending: false })
   .limit(500);
 if (filter) query = query.eq('status', filter);
+if (view === 'overdue') query = query.eq('status', 'pending').lt('due_at', new Date().toISOString());
 if (month) {
   const start = `${month}-01`;
   const end = new Date(`${month}-01T00:00:00Z`);
@@ -122,6 +123,7 @@ const nextMonth = new Date(Date.UTC(calYear, calMon, 1)).toISOString().slice(0, 
     <h1>{orderRows.length} tétel</h1>
     <div class="view-toggle">
       <a href={`/portal/payments?${new URLSearchParams({ ...(filter && { status: filter }) })}`} aria-current={view === 'list' ? 'page' : undefined}>Lista</a>
+      <a href="/portal/payments?view=overdue" aria-current={view === 'overdue' ? 'page' : undefined}>Lejárt</a>
       <a href={`/portal/payments?view=calendar&month=${calendarMonth}`} aria-current={view === 'calendar' ? 'page' : undefined}>Naptár</a>
     </div>
   </header>

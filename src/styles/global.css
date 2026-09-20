@@ -341,7 +341,7 @@ svg {
   color: rgba(244, 244, 242, 0.9);
   font-family: var(--sans);
   font-size: var(--fs-micro);
-  letter-spacing: 0.28em;
+  letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   white-space: nowrap;
 }

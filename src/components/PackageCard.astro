@@ -208,8 +208,10 @@ const inputId = `pkg-${radioName}-${pkg.id ?? pkg.name}`;
   }
   .package-select:has(input:checked) {
     border-color: var(--ink);
-    background: var(--linen);
+    background: var(--ink);
+    color: var(--on-dark-strong);
   }
+  .package-select:has(input:checked) :global(*) { color: inherit; }
   .package-select:has(input:focus-visible) {
     outline: var(--focus-ring);
     outline-offset: 2px;

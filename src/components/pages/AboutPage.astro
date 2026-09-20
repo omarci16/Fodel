@@ -2,19 +2,18 @@
 /**
  * About. Ported from the prototype.
  *
- * Two corrections to the prototype's copy: the "several hundred transactions
- * since 2013" claim is removed — FODEL publish no such figure and we had no
- * source for it — and the location is now stated accurately: founded in
- * Almere-Buiten, based in Den Haag today. Their own documents page publishes a
- * company extract following an address change, which is what settles it.
+ * The unsupported "several hundred transactions since 2013" claim is removed.
+ * Per the explicit 1.3 client direction, company summaries say founded in Den
+ * Haag; the historical Almere-Buiten origin story remains in the narrative.
+ * See company.ts for the documented source conflict.
  */
 import Base from '~/layouts/Base.astro';
 import PageHeader from '~/components/PageHeader.astro';
 import Eyebrow from '~/components/Eyebrow.astro';
 import GoldRule from '~/components/GoldRule.astro';
-import Button from '~/components/Button.astro';
+import SectionHead from '~/components/SectionHead.astro';
 import { UI, path, type Locale } from '~/i18n/ui';
-import { COMPANY } from '~/config/company';
+import { getCompany } from '~/lib/runtime-config';
 import { copy } from '~/data/copy';
 import { alternatesFor } from '~/lib/page';
 import kuria from '~/assets/properties/kuria.jpg';
@@ -28,6 +27,7 @@ const ui = UI[locale];
 const c = copy(locale).about;
 const stats = copy(locale).stats;
 const hu = locale === 'hu';
+const COMPANY = await getCompany();
 ---
 
 <Base
@@ -59,10 +59,7 @@ const hu = locale === 'hu';
 
   {/* ── Values ── */}
   <section class="values">
-    <div class="v-head reveal">
-      <Eyebrow center space="16px">{c.values.eyebrow}</Eyebrow>
-      <h2>{c.values.title}</h2>
-    </div>
+    <SectionHead eyebrow={c.values.eyebrow} title={c.values.title} align="center" class="v-head reveal" />
     <ol class="v-grid">
       {
         c.values.items.map((v: any) => (
@@ -91,11 +88,9 @@ const hu = locale === 'hu';
   {/* ── Approach + story ── */}
   <div class="split">
     <section class="approach reveal">
-      <Eyebrow space="16px">{c.approach.eyebrow}</Eyebrow>
-      <h2>
-        {c.approach.title}<br /><em>{c.approach.titleEm}</em>
-      </h2>
-      <GoldRule space="28px" />
+      <SectionHead eyebrow={c.approach.eyebrow}>
+        <Fragment slot="title">{c.approach.title}<br /><em>{c.approach.titleEm}</em></Fragment>
+      </SectionHead>
       <ul class="points">
         {
           c.approach.points.map((p: string) => (
@@ -109,11 +104,9 @@ const hu = locale === 'hu';
     </section>
 
     <section class="story reveal">
-      <Eyebrow space="16px">{c.story.eyebrow}</Eyebrow>
-      <h2>
-        {c.story.title}<br /><em>{c.story.titleEm}</em>
-      </h2>
-      <GoldRule space="28px" />
+      <SectionHead eyebrow={c.story.eyebrow}>
+        <Fragment slot="title">{c.story.title}<br /><em>{c.story.titleEm}</em></Fragment>
+      </SectionHead>
       {c.story.paragraphs.map((p: string) => <p class="story-p">{p}</p>)}
 
       <dl class="details">
@@ -133,17 +126,6 @@ const hu = locale === 'hu';
     </section>
   </div>
 
-  {/* ── CTA ── */}
-  <section class="cta">
-    <div>
-      <h2 class="cta-title">{c.cta.title}</h2>
-      <p class="cta-body">{c.cta.body}</p>
-    </div>
-    <div class="cta-actions">
-      <Button variant="dark" href={path(locale, 'contact')}>{ui.cta.callback}</Button>
-      <Button variant="outline" href={path(locale, 'sellers')}>{ui.cta.advertise}</Button>
-    </div>
-  </section>
 </Base>
 
 <style>
@@ -168,7 +150,7 @@ const hu = locale === 'hu';
   }
   .o-source {
     font-size: var(--fs-eyebrow);
-    letter-spacing: 0.28em;
+    letter-spacing: var(--ls-eyebrow);
     text-transform: uppercase;
     color: var(--on-dark-body);
   }
@@ -357,7 +339,6 @@ const hu = locale === 'hu';
     .origin {
       padding: 56px var(--pad-x-mob);
     }
-    .o-rule,
     blockquote {
       margin-bottom: 28px;
     }

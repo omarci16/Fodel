@@ -1,0 +1,33 @@
+---
+import Base from '~/layouts/Base.astro';
+import Eyebrow from '~/components/Eyebrow.astro';
+import GoldRule from '~/components/GoldRule.astro';
+import PropertyCard from '~/components/PropertyCard.astro';
+import { type Locale } from '~/i18n/ui';
+import { alternatesFor } from '~/lib/page';
+import { editorsPick } from '~/lib/properties';
+
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+const properties = await editorsPick(10);
+// The heading stays the brand term "FODEL Top 10" in both locales; the
+// <title>/meta title need their own locale-distinct text, or the two pages
+// render an identical <title> (verify-ssg's duplicate-title check catches
+// this — Base.astro leaves a title containing "FODEL" untouched, so a bare
+// "FODEL Top 10" on both locales never gets a distinguishing suffix).
+const heading = 'FODEL Top 10';
+const metaTitle = locale === 'hu' ? 'FODEL Top 10 — Szerkesztőségi ajánlás' : 'FODEL Top 10 — Aanbevolen door de redactie';
+const description = locale === 'hu'
+  ? 'A FODEL szerkesztői által ajánlott tíz ingatlan, függetlenül a fizetős kiemelésektől.'
+  : 'Tien woningen aanbevolen door de redactie van FODEL, los van betaalde uitlichting.';
+---
+<Base locale={locale} title={metaTitle} description={description} alternates={alternatesFor('top10')}>
+  <header class="head"><Eyebrow space="12px">FODEL</Eyebrow><h1>{heading}</h1><GoldRule space="24px" /><p>{description}</p></header>
+  <section class="grid">
+    {properties.map((property, index) => <PropertyCard property={property} locale={locale} rank={index + 1} />)}
+    {properties.length === 0 && <p>{locale === 'hu' ? 'A válogatás hamarosan érkezik.' : 'De selectie volgt binnenkort.'}</p>}
+  </section>
+</Base>
+<style>
+  .head{padding:96px var(--pad-x) 48px;max-width:850px}.head p{max-width:65ch}.grid{padding:0 var(--pad-x) 110px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px}@media(max-width:900px){.grid{grid-template-columns:1fr}}
+</style>

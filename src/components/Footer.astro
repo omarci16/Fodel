@@ -10,8 +10,8 @@
  */
 import Logo from './Logo.astro';
 import Eyebrow from './Eyebrow.astro';
-import { COMPANY, formatHours } from '~/config/company';
-import { UI, BRAND, CATEGORIES, path, type Locale, type CategoryKey } from '~/i18n/ui';
+import { UI, BRAND, CATEGORY_FALLBACK, path, type Locale } from '~/i18n/ui';
+import { getCompany } from '~/lib/runtime-config';
 import { slugify } from '~/lib/properties';
 
 interface Props {
@@ -22,6 +22,11 @@ const { locale } = Astro.props;
 const ui = UI[locale];
 const brand = BRAND[locale];
 const year = new Date().getFullYear();
+const COMPANY = await getCompany();
+const weekdayHours = locale === 'hu'
+  ? `Hétfő–Péntek · ${COMPANY.hours.weekdays.from}–${COMPANY.hours.weekdays.to}`
+  : `Maandag–vrijdag · ${COMPANY.hours.weekdays.from}–${COMPANY.hours.weekdays.to}`;
+const foundedPlace = locale === 'hu' ? 'Hága, Hollandia' : 'Den Haag, Nederland';
 
 const navItems = [
   { key: 'properties', label: ui.nav.properties },
@@ -40,7 +45,7 @@ const legalItems = [
   { key: 'accessibility', label: locale === 'hu' ? 'Akadálymentesítés' : 'Toegankelijkheid' },
 ] as const;
 
-const featuredCategories: CategoryKey[] = [
+const featuredCategories: (keyof typeof CATEGORY_FALLBACK)[] = [
   'house',
   'mansion',
   'farm',
@@ -58,8 +63,8 @@ const featuredCategories: CategoryKey[] = [
       <p class="founded">
         {
           locale === 'hu'
-            ? `Alapítva ${COMPANY.founded}-ban, ${COMPANY.foundedIn}.`
-            : `Opgericht in ${COMPANY.founded} te ${COMPANY.foundedIn}.`
+            ? `Alapítva ${COMPANY.founded}-ban, ${foundedPlace}.`
+            : `Opgericht in ${COMPANY.founded} te ${foundedPlace}.`
         }
       </p>
     </div>
@@ -83,8 +88,8 @@ const featuredCategories: CategoryKey[] = [
         {
           featuredCategories.map((key) => (
             <li>
-              <a href={`${path(locale, 'properties')}${slugify(CATEGORIES[key][locale].slug)}/`}>
-                {CATEGORIES[key][locale].label}
+              <a href={`${path(locale, 'properties')}${slugify(CATEGORY_FALLBACK[key][locale].slug)}/`}>
+                {CATEGORY_FALLBACK[key][locale].label}
               </a>
             </li>
           ))
@@ -96,7 +101,7 @@ const featuredCategories: CategoryKey[] = [
       <Eyebrow space="18px">{ui.footer.contact}</Eyebrow>
       <ul class="contact">
         {
-          COMPANY.phones.map((p) => (
+          COMPANY.phones.filter((p) => p.public).map((p) => (
             <li>
               <a href={p.href}>{p.display}</a>
             </li>
@@ -107,7 +112,7 @@ const featuredCategories: CategoryKey[] = [
         </li>
       </ul>
       <p class="hours">
-        {formatHours(locale)}<br />
+        {weekdayHours}<br />
         {
           locale === 'hu'
             ? `Visszahívás ${COMPANY.hours.callback.to}-ig, hétvégén is.`

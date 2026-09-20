@@ -8,8 +8,7 @@
  */
 import Base from '~/layouts/Base.astro';
 import PageHeader from '~/components/PageHeader.astro';
-import Eyebrow from '~/components/Eyebrow.astro';
-import GoldRule from '~/components/GoldRule.astro';
+import SectionHead from '~/components/SectionHead.astro';
 import Button from '~/components/Button.astro';
 import { UI, path, type Locale } from '~/i18n/ui';
 import { COMMISSION, LISTING_PACKAGES } from '~/config/company';
@@ -59,9 +58,7 @@ const sellerFaq = faqFor(locale, 'seller').slice(0, 8);
   {/* ── Benefits + buyer personas ── */}
   <div class="split">
     <section class="benefits reveal">
-      <Eyebrow space="16px">{c.benefits.eyebrow}</Eyebrow>
-      <h2>{c.benefits.title}</h2>
-      <GoldRule space="28px" />
+      <SectionHead eyebrow={c.benefits.eyebrow} title={c.benefits.title} />
       <ul class="points">
         {
           c.benefits.points.map((point: string) => (
@@ -75,9 +72,7 @@ const sellerFaq = faqFor(locale, 'seller').slice(0, 8);
     </section>
 
     <section class="personas reveal">
-      <Eyebrow space="16px">{c.personas.eyebrow}</Eyebrow>
-      <h2>{c.personas.title}</h2>
-      <GoldRule space="28px" />
+      <SectionHead eyebrow={c.personas.eyebrow} title={c.personas.title} />
       <dl>
         {
           c.personas.items.map((p: any) => (
@@ -93,10 +88,7 @@ const sellerFaq = faqFor(locale, 'seller').slice(0, 8);
 
   {/* ── Three-step model ── */}
   <section class="how">
-    <div class="how-head reveal">
-      <Eyebrow center space="16px">{c.how.eyebrow}</Eyebrow>
-      <h2>{c.how.title}</h2>
-    </div>
+    <SectionHead eyebrow={c.how.eyebrow} title={c.how.title} align="center" class="how-head reveal" />
     <ol class="steps">
       {
         steps.map((step: any) => (
@@ -113,15 +105,11 @@ const sellerFaq = faqFor(locale, 'seller').slice(0, 8);
   {/* ── Pricing summary ── */}
   <section class="pricing reveal">
     <div class="pricing-inner">
-      <Eyebrow space="16px">{c.commission.eyebrow}</Eyebrow>
-      <h2>
-        {
-          locale === 'hu'
-            ? `Hirdetés már ${cheapest} €-tól`
-            : `Adverteren vanaf € ${cheapest}`
-        }
-      </h2>
-      <GoldRule space="28px" />
+      <SectionHead
+        eyebrow={c.commission.eyebrow}
+        title={locale === 'hu' ? `Hirdetés már ${cheapest} €-tól` : `Adverteren vanaf € ${cheapest}`}
+        align="center"
+      />
       <p class="pricing-body">
         {
           locale === 'hu'
@@ -139,8 +127,7 @@ const sellerFaq = faqFor(locale, 'seller').slice(0, 8);
   {/* ── Commission band ── */}
   <section class="commission" data-bg="dark">
     <div class="commission-copy reveal">
-      <Eyebrow space="16px">{c.commission.eyebrow}</Eyebrow>
-      <h2>{c.commission.title}</h2>
+      <SectionHead eyebrow={c.commission.eyebrow} title={c.commission.title} rule={false} />
       <p>{c.commission.body}</p>
     </div>
     <div class="commission-figure reveal">
@@ -153,10 +140,12 @@ const sellerFaq = faqFor(locale, 'seller').slice(0, 8);
 
   {/* ── Seller FAQ ── */}
   <section class="faq">
-    <div class="faq-head reveal">
-      <Eyebrow center space="16px">{locale === 'hu' ? 'Gyakori kérdések' : 'Veelgestelde vragen'}</Eyebrow>
-      <h2>{locale === 'hu' ? 'Amit az eladók kérdezni szoktak' : 'Wat verkopers ons vragen'}</h2>
-    </div>
+    <SectionHead
+      eyebrow={locale === 'hu' ? 'Gyakori kérdések' : 'Veelgestelde vragen'}
+      title={locale === 'hu' ? 'Amit az eladók kérdezni szoktak' : 'Wat verkopers ons vragen'}
+      align="center"
+      class="faq-head reveal"
+    />
 
     <div class="faq-list">
       {
@@ -308,8 +297,7 @@ const sellerFaq = faqFor(locale, 'seller').slice(0, 8);
     max-width: 60ch;
     margin-inline: auto;
   }
-  .pricing :global(.eyebrow),
-  .pricing .s-rule {
+  .pricing :global(.eyebrow) {
     margin-inline: auto;
   }
   .pricing h2 {

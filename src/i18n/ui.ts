@@ -92,7 +92,7 @@ export const BRAND = {
    own category names in each market, taken from their live navigation.
    ------------------------------------------------------------------------ */
 
-export const CATEGORIES = {
+export const CATEGORY_FALLBACK = {
   house: {
     hu: { label: 'Eladó ház', slug: 'haz' },
     nl: { label: 'Huis', slug: 'huis' },
@@ -157,9 +157,15 @@ export const CATEGORIES = {
     fr: { label: 'Appartement' },
     schema: 'Apartment',
   },
+  industrial: {
+    hu: { label: 'Ipari ingatlan', slug: 'ipari-ingatlan' },
+    nl: { label: 'Bedrijfspand', slug: 'bedrijfspand' },
+    de: { label: 'Industrieimmobilie' },
+    en: { label: 'Industrial property' },
+    fr: { label: 'Immobilier industriel' },
+    schema: 'Place',
+  },
 } as const;
-
-export type CategoryKey = keyof typeof CATEGORIES;
 
 /* ── Route slugs ──────────────────────────────────────────────────────────
    Localised per market so each language ranks on its own keywords.
@@ -186,6 +192,7 @@ export const ROUTES = {
     emigration: 'holland-koltozes',
     sold: 'eladva',
     map: 'terkep',
+    top10: 'top-10',
     privacy: 'adatvedelem',
     terms: 'aszf',
     cookies: 'cookie-tajekoztato',
@@ -214,6 +221,7 @@ export const ROUTES = {
     emigration: 'emigreren',
     sold: 'verkocht',
     map: 'kaart',
+    top10: 'top-10',
     privacy: 'privacy',
     terms: 'voorwaarden',
     cookies: 'cookies',
@@ -296,6 +304,8 @@ export const UI = {
 
     filters: {
       title: 'Ingatlanok szűrése',
+      /** Bold intro line above the homepage search card, separate from it. */
+      heroHeading: 'Találja meg álmai ingatlanát',
       type: 'Típus',
       region: 'Régió',
       price: 'Ár',
@@ -315,7 +325,14 @@ export const UI = {
       noResults: 'Nincs a szűrésnek megfelelő ingatlan.',
       noResultsHint: 'Próbálja tágabb feltételekkel, vagy kérjen ingyenes kerestetést.',
       county: 'Megye',
-      areaFrom: 'Alapterület',
+      country: 'Ország',
+      settlement: 'Település',
+      areaFrom: 'Alapterület ettől',
+      areaTo: 'Alapterület eddig',
+      landFrom: 'Telek ettől',
+      landTo: 'Telek eddig',
+      entireCountry: 'Egész ország',
+      bargain: 'Alkalmi vételek',
       viewMap: 'Megtekintés térképen',
       viewList: 'Vissza a listához',
       /** Shown on the map page when a bounding box came from "search this area". */
@@ -435,6 +452,8 @@ export const UI = {
 
     filters: {
       title: 'Gefilterde zoekopdracht',
+      /** Bold intro line above the homepage search card, separate from it. */
+      heroHeading: 'Vind uw droomwoning',
       type: 'Type',
       region: 'Regio',
       price: 'Prijs',
@@ -454,7 +473,14 @@ export const UI = {
       noResults: 'Geen woningen gevonden met deze filters.',
       noResultsHint: 'Probeer ruimere criteria, of plaats een gratis zoekopdracht.',
       county: 'Provincie',
-      areaFrom: 'Woonoppervlak',
+      country: 'Land',
+      settlement: 'Plaats',
+      areaFrom: 'Woonoppervlak vanaf',
+      areaTo: 'Woonoppervlak tot',
+      landFrom: 'Perceel vanaf',
+      landTo: 'Perceel tot',
+      entireCountry: 'Heel Hongarije',
+      bargain: 'Buitenkansen',
       viewMap: 'Op de kaart bekijken',
       viewList: 'Terug naar de lijst',
       areaFiltered: 'Gefilterd op het gekozen kaartgebied',
@@ -518,13 +544,8 @@ export function path(locale: Locale, key: RouteKey, ...rest: string[]): string {
 }
 
 /** Detail URL for a property, in FODEL's existing `type-te-koop-ref` shape. */
-export function propertyPath(locale: Locale, category: CategoryKey, ref: string): string {
-  const categorySlug = CATEGORIES[category][locale].slug;
+export function propertyPath(locale: Locale, categorySlug: string, ref: string): string {
   return `/${locale}/${ROUTES[locale].detail(categorySlug, ref)}/`;
-}
-
-export function categoryLabel(category: CategoryKey, locale: Locale): string {
-  return CATEGORIES[category][locale].label;
 }
 
 export function isLocale(value: string): value is Locale {

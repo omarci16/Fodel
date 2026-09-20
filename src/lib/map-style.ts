@@ -18,7 +18,7 @@ export function mapStyle(pmtilesUrl: string) {
         url: `pmtiles://${pmtilesUrl}`,
       },
     },
-    glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
+    glyphs: '/fonts/{fontstack}/{range}.pbf',
     layers: [
       { id: 'background', type: 'background', paint: { 'background-color': '#F4F4F2' } },
       {

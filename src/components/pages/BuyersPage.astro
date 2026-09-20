@@ -8,7 +8,7 @@
 import Base from '~/layouts/Base.astro';
 import PageHeader from '~/components/PageHeader.astro';
 import Eyebrow from '~/components/Eyebrow.astro';
-import GoldRule from '~/components/GoldRule.astro';
+import SectionHead from '~/components/SectionHead.astro';
 import Button from '~/components/Button.astro';
 import PropertyCard from '~/components/PropertyCard.astro';
 import ParallaxCta from '~/components/ParallaxCta.astro';
@@ -78,15 +78,12 @@ const wants = hu
   {/* ── Direct-from-owner explainer ── */}
   <section class="direct" data-bg="dark">
     <div class="direct-inner reveal">
-      <Eyebrow space="16px">{hu ? 'A FODEL-modell' : 'Het FODEL-model'}</Eyebrow>
-      <h2>
-        {
-          hu
-            ? 'A hirdetésben a tulajdonos neve és telefonszáma is szerepel.'
-            : 'Bij de advertentie staan ook de naam en het nummer van de eigenaar.'
-        }
-      </h2>
-      <GoldRule space="28px" />
+      <SectionHead
+        eyebrow={hu ? 'A FODEL-modell' : 'Het FODEL-model'}
+        title={hu
+          ? 'A hirdetésben a tulajdonos neve és telefonszáma is szerepel.'
+          : 'Bij de advertentie staan ook de naam en het nummer van de eigenaar.'}
+      />
       <p>
         {
           hu
@@ -100,9 +97,7 @@ const wants = hu
   {/* ── What we handle ── */}
   <div class="split">
     <section class="services reveal">
-      <Eyebrow space="16px">{c.services.eyebrow}</Eyebrow>
-      <h2>{c.services.title}</h2>
-      <GoldRule space="28px" />
+      <SectionHead eyebrow={c.services.eyebrow} title={c.services.title} />
       <ul class="points">
         {
           c.services.points.map((p: string) => (
@@ -119,9 +114,7 @@ const wants = hu
     </section>
 
     <section class="wants reveal">
-      <Eyebrow space="16px">{c.reasons.eyebrow}</Eyebrow>
-      <h2>{c.reasons.title}</h2>
-      <GoldRule space="28px" />
+      <SectionHead eyebrow={c.reasons.eyebrow} title={c.reasons.title} />
       <ul class="points">
         {
           wants.map((w) => (
@@ -161,10 +154,11 @@ const wants = hu
 
   {/* ── Featured ── */}
   <section class="featured">
-    <div class="feat-head reveal">
-      <Eyebrow space="16px">{hu ? 'Válogatás' : 'Selectie'}</Eyebrow>
-      <h2>{hu ? 'Kiemelt ingatlanok' : 'Uitgelicht aanbod'}</h2>
-    </div>
+    <SectionHead
+      eyebrow={hu ? 'Válogatás' : 'Selectie'}
+      title={hu ? 'Kiemelt ingatlanok' : 'Uitgelicht aanbod'}
+      class="feat-head reveal"
+    />
     <div class="feat-grid">
       {featured.map((p) => <PropertyCard property={p} locale={locale} class="reveal" />)}
     </div>
@@ -175,10 +169,12 @@ const wants = hu
 
   {/* ── FAQ ── */}
   <section class="faq">
-    <div class="faq-head reveal">
-      <Eyebrow center space="16px">{hu ? 'Gyakori kérdések' : 'Veelgestelde vragen'}</Eyebrow>
-      <h2>{hu ? 'Amit a vevők kérdezni szoktak' : 'Wat kopers ons vragen'}</h2>
-    </div>
+    <SectionHead
+      eyebrow={hu ? 'Gyakori kérdések' : 'Veelgestelde vragen'}
+      title={hu ? 'Amit a vevők kérdezni szoktak' : 'Wat kopers ons vragen'}
+      align="center"
+      class="faq-head reveal"
+    />
     <div class="faq-list">
       {
         buyerFaq.map((entry) => (

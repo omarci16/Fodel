@@ -20,6 +20,7 @@ const referralLink = profile?.referral_code
     <p class="eyebrow">Beállítások</p>
     <h1>Profil</h1>
   </header>
+  {profile?.role === 'admin' && <p><a href="/portal/settings/company">Cégadatok és nyilvános elérhetőségek →</a></p>}
 
   {saved === 'profile' && <p class="notice ok">Profil mentve.</p>}
   {saved === 'password' && <p class="notice ok">Jelszó megváltoztatva.</p>}

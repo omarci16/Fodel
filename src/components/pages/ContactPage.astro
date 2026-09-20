@@ -12,7 +12,7 @@ import GoldRule from '~/components/GoldRule.astro';
 import FormShell from '~/components/forms/FormShell.astro';
 import Field from '~/components/forms/Field.astro';
 import { UI, type Locale } from '~/i18n/ui';
-import { COMPANY, formatHours } from '~/config/company';
+import { getCompany } from '~/lib/runtime-config';
 import { copy } from '~/data/copy';
 import { alternatesFor } from '~/lib/page';
 
@@ -24,6 +24,10 @@ const { locale } = Astro.props;
 const ui = UI[locale];
 const c = copy(locale).contact;
 const hu = locale === 'hu';
+const COMPANY = await getCompany();
+const weekdayHours = hu
+  ? `Hétfő–Péntek · ${COMPANY.hours.weekdays.from}–${COMPANY.hours.weekdays.to}`
+  : `Maandag–vrijdag · ${COMPANY.hours.weekdays.from}–${COMPANY.hours.weekdays.to}`;
 ---
 
 <Base
@@ -43,11 +47,11 @@ const hu = locale === 'hu';
 
       <dl class="channels">
         {
-          COMPANY.phones.map((p) => (
+          COMPANY.phones.filter((p) => p.public).map((p) => (
             <div class="channel">
               <dt>{p.label[locale]}</dt>
               <dd><a href={p.href}>{p.display}</a></dd>
-              <dd class="note">{p.note[locale]}</dd>
+              {p.note && <dd class="note">{p.note[locale]}</dd>}
             </div>
           ))
         }
@@ -57,7 +61,7 @@ const hu = locale === 'hu';
         </div>
         <div class="channel">
           <dt>{ui.footer.hours}</dt>
-          <dd>{formatHours(locale)}</dd>
+          <dd>{weekdayHours}</dd>
           <dd class="note">
             {
               hu

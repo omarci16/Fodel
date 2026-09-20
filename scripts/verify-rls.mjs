@@ -192,10 +192,27 @@ async function main() {
 
   await admin.from('referrals').delete().eq('id', referralA.id);
 
+  // 12. FODEL 1.3 runtime configuration is publicly readable so SSR pages
+  // can resolve labels and company facts, but only an admin may mutate it.
+  const publicClient = createClient(url, anonKey, { auth: { persistSession: false } });
+  const { data: publicTerms } = await publicClient.from('taxonomy_terms').select('key').eq('group_key', 'category');
+  if (!publicTerms?.length) fail('public client cannot read taxonomy terms');
+  else pass('taxonomy terms are publicly readable');
+  const { data: publicSettings } = await publicClient.from('site_settings').select('id').eq('id', 1);
+  if (!publicSettings?.length) fail('public client cannot read site settings');
+  else pass('site settings are publicly readable');
+  const { data: ownerTaxonomyWrite } = await clientA.from('taxonomy_terms')
+    .update({ sort_order: 999 }).eq('group_key', 'category').eq('key', 'house').select('id');
+  if (ownerTaxonomyWrite?.length) fail('owner could edit taxonomy');
+  else pass('owner cannot edit taxonomy');
+  const { data: ownerSettingsWrite } = await clientA.from('site_settings')
+    .update({ founded_in: 'RLS hijack' }).eq('id', 1).select('id');
+  if (ownerSettingsWrite?.length) fail('owner could edit site settings');
+  else pass('owner cannot edit site settings');
+
   // 10. Once published, the SAME property must become publicly readable —
   // proves the policy is a real status-based gate, not just "always deny".
   await admin.from('properties').update({ status: 'published', published_at: new Date().toISOString() }).eq('id', propertyId);
-  const publicClient = createClient(url, anonKey, { auth: { persistSession: false } });
   const { data: publicRead } = await publicClient.from('properties').select('id').eq('id', propertyId);
   if (!publicRead || publicRead.length === 0) fail('published property is not publicly readable (over-restrictive policy)');
   else pass('published property IS publicly readable — the gate is status-based, not a blanket deny');

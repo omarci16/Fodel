@@ -14,7 +14,7 @@ interface Props {
   space?: string;
 }
 
-const { center = false, class: className, as: Tag = 'div', space } = Astro.props;
+const { center = false, class: className, as: Tag = 'div', space }: Props = Astro.props;
 ---
 
 <Tag class:list={['eyebrow', { center }, className]} style={space ? `--eyebrow-space:${space}` : undefined}>
@@ -28,7 +28,7 @@ const { center = false, class: className, as: Tag = 'div', space } = Astro.props
     font-weight: var(--fw-regular);
     /* ADJUSTED: 10px in the prototype. */
     font-size: var(--fs-eyebrow);
-    letter-spacing: 0.28em;
+    letter-spacing: var(--ls-eyebrow);
     line-height: 1.4;
     text-transform: uppercase;
     color: var(--accent);

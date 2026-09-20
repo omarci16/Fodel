@@ -18,6 +18,7 @@
 import Button from '~/components/Button.astro';
 import GoldRule from '~/components/GoldRule.astro';
 import { UI, path, type Locale } from '~/i18n/ui';
+import { getCompany } from '~/lib/runtime-config';
 
 interface Props {
   locale: Locale;
@@ -44,6 +45,9 @@ const {
 } = Astro.props;
 
 const ui = UI[locale];
+const company = await getCompany();
+const publicPhones = company.phones.filter((phone) => phone.public);
+const contactPhone = locale === 'hu' ? (publicPhones.find((phone) => phone.href.startsWith('tel:+36')) ?? publicPhones[0]) : (publicPhones.find((phone) => phone.href.startsWith('tel:+31')) ?? publicPhones[0]);
 ---
 
 <div class:list={['form-shell', { 'on-dark': onDark }]}>
@@ -97,8 +101,8 @@ const ui = UI[locale];
       <p class="noscript">
         {
           locale === 'hu'
-            ? 'Ha az űrlap nem működne, hívjon minket a +36 70 225 5255 számon vagy írjon az info@fodel.nl címre.'
-            : 'Werkt het formulier niet? Bel ons op +31 6 4400 5550 of mail naar info@fodel.nl.'
+            ? `Ha az űrlap nem működne, hívjon minket a ${contactPhone?.display ?? ''} számon vagy írjon az ${company.email.primary} címre.`
+            : `Werkt het formulier niet? Bel ons op ${contactPhone?.display ?? ''} of mail naar ${company.email.primary}.`
         }
       </p>
     </noscript>

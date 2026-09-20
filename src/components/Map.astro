@@ -32,7 +32,9 @@ interface Props {
 const { mode, lat, lng, precision = 'approximate', zoom = mode === 'pin' ? 13 : 7, locale = 'hu', id = 'fodel-map' } =
   Astro.props;
 
-const pmtilesUrl = import.meta.env.PMTILES_URL ?? '';
+// Runtime lookup: Vercel environment changes must not require rebuilding the
+// server bundle merely to turn the basemap on.
+const pmtilesUrl = process.env.PMTILES_URL ?? '';
 ---
 
 <div
@@ -115,7 +117,9 @@ const pmtilesUrl = import.meta.env.PMTILES_URL ?? '';
     const listUrl = locale === 'hu' ? '/hu/ingatlanok/' : '/nl/woningen/';
 
     map.on('load', async () => {
-      const res = await fetch(`/api/map/properties.geojson?locale=${locale}`);
+      const bounds = map.getBounds();
+      const bbox = [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()].join(',');
+      const res = await fetch(`/api/map/properties.geojson?locale=${locale}&bbox=${encodeURIComponent(bbox)}`);
       const data = await res.json();
 
       map.addSource('listings', {
@@ -174,6 +178,24 @@ const pmtilesUrl = import.meta.env.PMTILES_URL ?? '';
 
       map.on('mouseenter', 'unclustered', () => (map.getCanvas().style.cursor = 'pointer'));
       map.on('mouseleave', 'unclustered', () => (map.getCanvas().style.cursor = ''));
+
+      // Keep the clustered payload bounded after a pan as well as on first
+      // load. A short debounce prevents a burst of requests while the camera
+      // is still easing after a cluster click.
+      let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+      map.on('moveend', () => {
+        clearTimeout(refreshTimer);
+        refreshTimer = setTimeout(async () => {
+          const nextBounds = map.getBounds();
+          const nextBbox = [
+            nextBounds.getWest(), nextBounds.getSouth(), nextBounds.getEast(), nextBounds.getNorth(),
+          ].join(',');
+          const response = await fetch(`/api/map/properties.geojson?locale=${locale}&bbox=${encodeURIComponent(nextBbox)}`);
+          if (!response.ok) return;
+          const source = map.getSource('listings') as GeoJSONSource | undefined;
+          source?.setData(await response.json());
+        }, 180);
+      });
     });
 
     const searchBtn = document.getElementById('search-this-area');

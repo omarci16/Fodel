@@ -11,6 +11,7 @@ import { Image } from 'astro:assets';
 import Base from '~/layouts/Base.astro';
 import Eyebrow from '~/components/Eyebrow.astro';
 import GoldRule from '~/components/GoldRule.astro';
+import SectionHead from '~/components/SectionHead.astro';
 import Button from '~/components/Button.astro';
 import PropertyCard from '~/components/PropertyCard.astro';
 import HomeSearch from '~/components/HomeSearch.astro';
@@ -20,7 +21,8 @@ import Field from '~/components/forms/Field.astro';
 import { UI, path, type Locale } from '~/i18n/ui';
 import { copy } from '~/data/copy';
 import { homeAlternates } from '~/lib/page';
-import { activeProperties, homepageFeatured, regionsOf, categoriesOf, text, url } from '~/lib/properties';
+import { activeProperties, homepageFeatured, editorsPick, regionsOf, text, url } from '~/lib/properties';
+import { getTaxonomy } from '~/lib/runtime-config';
 import { websiteSchema } from '~/lib/seo';
 import { eur } from '~/lib/format';
 
@@ -35,6 +37,8 @@ const steps = copy(locale).steps;
 
 const all = await activeProperties();
 const featured = await homepageFeatured(3);
+const top = await editorsPick(3);
+const taxonomy = await getTaxonomy();
 const hero = featured[0];
 const referral = c.referral;
 
@@ -113,7 +117,7 @@ const schema = [websiteSchema(locale, path(locale, 'properties'))];
 
   {/* ── SEARCH ── */}
   <section class="search-band">
-    <HomeSearch locale={locale} regions={regionsOf(all)} categories={categoriesOf(all)} />
+    <HomeSearch locale={locale} regions={regionsOf(all)} categories={taxonomy.category.filter((term) => term.enabled)} />
   </section>
 
   {/* ── DUAL AUDIENCE ── */}
@@ -121,9 +125,7 @@ const schema = [websiteSchema(locale, path(locale, 'properties'))];
     {
       c.audiences.map((col: any) => (
         <div class="audience reveal">
-          <Eyebrow space="16px">{col.eyebrow}</Eyebrow>
-          <h2>{col.title}</h2>
-          <GoldRule space="18px" />
+          <SectionHead eyebrow={col.eyebrow} title={col.title} />
           <p>{col.body}</p>
           <Button variant="text" light href={path(locale, col.to)}>
             {col.cta}
@@ -135,15 +137,11 @@ const schema = [websiteSchema(locale, path(locale, 'properties'))];
 
   {/* ── FEATURED ── */}
   <section class="featured">
-    <div class="section-head reveal">
-      <div>
-        <Eyebrow space="12px">{c.featured.eyebrow}</Eyebrow>
-        <h2>{c.featured.title}</h2>
-      </div>
+    <SectionHead eyebrow={c.featured.eyebrow} title={c.featured.title} class="section-head reveal">
       <Button variant="text" href={path(locale, 'properties')} class="head-link">
         {ui.cta.allProperties}
       </Button>
-    </div>
+    </SectionHead>
 
     <div class="cards">
       {featured.map((p, i) => <PropertyCard property={p} locale={locale} eager={i === 0} class="reveal" />)}
@@ -153,6 +151,13 @@ const schema = [websiteSchema(locale, path(locale, 'properties'))];
       {ui.cta.allProperties}
     </Button>
   </section>
+
+  {top.length > 0 && <section class="top-picks">
+    <SectionHead eyebrow="FODEL Top 10" title={locale === 'hu' ? 'A FODEL ajánlásával' : 'Aanbevolen door FODEL'} class="section-head reveal">
+      <Button variant="text" href={path(locale, 'top10')}>{locale === 'hu' ? 'Mind a 10' : 'Alle 10'}</Button>
+    </SectionHead>
+    <div class="cards">{top.map((p, index) => <PropertyCard property={p} locale={locale} rank={index + 1} class="reveal" />)}</div>
+  </section>}
 
   {/* ── QUOTE ── */}
   <section class="quote-band" data-bg="dark">
@@ -166,10 +171,7 @@ const schema = [websiteSchema(locale, path(locale, 'properties'))];
 
   {/* ── HOW IT WORKS ── */}
   <section class="how">
-    <div class="how-head reveal">
-      <Eyebrow center space="12px">{c.how.eyebrow}</Eyebrow>
-      <h2>{c.how.title}</h2>
-    </div>
+    <SectionHead eyebrow={c.how.eyebrow} title={c.how.title} align="center" class="how-head reveal" />
 
     <ol class="steps">
       {
@@ -390,6 +392,7 @@ const schema = [websiteSchema(locale, path(locale, 'properties'))];
   .featured {
     padding: var(--section-y) var(--pad-x);
   }
+  .top-picks { padding:96px var(--pad-x); background:var(--linen); }
   .section-head {
     display: flex;
     justify-content: space-between;
@@ -436,7 +439,7 @@ const schema = [websiteSchema(locale, path(locale, 'properties'))];
   }
   .quote-source {
     font-size: var(--fs-eyebrow);
-    letter-spacing: 0.28em;
+    letter-spacing: var(--ls-eyebrow);
     text-transform: uppercase;
     color: var(--on-dark-body);
   }

@@ -17,7 +17,7 @@ export const prerender = false;
 
 import Portal from '~/layouts/Portal.astro';
 import { invoiceLines, issuerDetails } from '~/lib/invoice';
-import { formatCents, type OrderLine } from '~/lib/orders';
+import { formatCents } from '~/lib/orders';
 import { createSupabaseAdminClient } from '~/lib/supabase-server';
 
 const { supabase, profile, user } = Astro.locals;

@@ -13,17 +13,19 @@
  * "you're online!" email.
  */
 import { SITE_URL } from '~/config/site.mjs';
-import { CATEGORIES, ROUTES } from '~/i18n/ui';
+import { ROUTES } from '~/i18n/ui';
+import { getTaxonomy } from '~/lib/runtime-config';
 import { LISTING_PACKAGES } from '~/config/company';
 import { deliver, localeOf, templates } from '~/lib/email/send';
 import { logEvent } from '~/lib/activity';
 
 /** The public URL of a listing, in the owner's own language. */
-export function publicUrl(
+export async function publicUrl(
   property: { category: string; ref: string },
   locale: 'hu' | 'nl' = 'hu'
-): string {
-  const slug = (CATEGORIES as any)[property.category]?.[locale]?.slug ?? property.category;
+): Promise<string> {
+  const taxonomy = await getTaxonomy();
+  const slug = taxonomy.category.find((term) => term.key === property.category)?.slugs[locale] ?? property.category;
   return `${SITE_URL}/${locale}/${ROUTES[locale].detail(slug, property.ref)}/`;
 }
 
@@ -40,7 +42,7 @@ export type PublishResult =
  * @param client Must be able to update the property. The webhook has no user
  *   session, so it passes the service-role client; the admin action passes the
  *   signed-in admin's own session client and RLS authorises it.
- * @param dedupeKey The Stripe event id, when this call is triggered by a
+ * @param opts.dedupeKey The Stripe event id, when this call is triggered by a
  *   webhook delivery — see src/lib/activity.ts. Stripe can legitimately
  *   deliver the same event twice even on success; this is what stops a retry
  *   from writing "listing.published" a second time. Manual publication
@@ -50,7 +52,7 @@ export type PublishResult =
 export async function publishProperty(
   client: any,
   propertyId: string,
-  dedupeKey?: string | null
+  opts: { dedupeKey?: string | null; notifyOwner?: boolean } = {}
 ): Promise<PublishResult> {
   const { data: property, error } = await client
     .from('properties')
@@ -79,7 +81,7 @@ export async function publishProperty(
 
   if (updateError) return { ok: false, error: updateError.message };
 
-  await notifyOwnerPublished(client, property);
+  if (opts.notifyOwner !== false) await notifyOwnerPublished(client, property);
 
   // The only place a listing goes live, so the only place this is logged —
   // never also in the Stripe webhook or the manual-publish action, which
@@ -89,8 +91,8 @@ export async function publishProperty(
     subjectType: 'property',
     subjectId: propertyId,
     propertyId,
-    source: dedupeKey ? 'stripe-webhook' : 'portal',
-    dedupeKey: dedupeKey ?? null,
+    source: opts.dedupeKey ? 'stripe-webhook' : 'portal',
+    dedupeKey: opts.dedupeKey ?? null,
   }).catch(() => {});
 
   return { ok: true, alreadyPublished: false };
@@ -117,7 +119,7 @@ async function notifyOwnerPublished(
     templates.published(locale, {
       ref: property.ref,
       title,
-      url: publicUrl(property, locale),
+      url: await publicUrl(property, locale),
     })
   );
 }

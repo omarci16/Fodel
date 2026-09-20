@@ -10,13 +10,12 @@ import { Image, getImage } from 'astro:assets';
 import Base from '~/layouts/Base.astro';
 import Eyebrow from '~/components/Eyebrow.astro';
 import GoldRule from '~/components/GoldRule.astro';
-import Button from '~/components/Button.astro';
 import PropertyCard from '~/components/PropertyCard.astro';
 import Map from '~/components/Map.astro';
 import VideoEmbed from '~/components/VideoEmbed.astro';
 import FormShell from '~/components/forms/FormShell.astro';
 import Field from '~/components/forms/Field.astro';
-import { UI, categoryLabel, path, type Locale, type CategoryKey } from '~/i18n/ui';
+import { UI, path, type Locale } from '~/i18n/ui';
 import { COMPANY } from '~/config/company';
 import { featureLabel } from '~/data/features';
 import { activeProperties, similarTo, text, url as propUrl, type Property } from '~/lib/properties';
@@ -37,7 +36,7 @@ const ui = UI[locale];
 const title = text(d.title, locale);
 const subtitle = d.subtitle ? text(d.subtitle, locale) : '';
 const description = text(d.description, locale);
-const category = categoryLabel(d.category as CategoryKey, locale);
+const category = d.categoryLabels[locale] ?? d.categoryLabels.hu;
 const tag = d.tag ? text(d.tag, locale) : null;
 
 const gallery = [
@@ -103,7 +102,7 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
   locale={locale}
   title={`${title} — ${d.location.settlement}`}
   description={metaDescription}
-  alternates={propertyAlternates(d.category as CategoryKey, d.ref)}
+  alternates={propertyAlternates(d.categorySlugs, d.ref)}
   ogType="article"
   ogImage={shareImage.src}
   schema={[
@@ -433,7 +432,7 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
   }
   .hero-kicker {
     font-size: var(--fs-eyebrow);
-    letter-spacing: 0.28em;
+    letter-spacing: var(--ls-eyebrow);
     text-transform: uppercase;
     opacity: 0.85;
   }

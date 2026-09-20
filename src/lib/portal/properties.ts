@@ -9,7 +9,7 @@
  * touch a given property.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { CATEGORIES, type CategoryKey } from '~/i18n/ui';
+import { getTaxonomy, termLabel } from '~/lib/runtime-config';
 
 export type PortalTranslation = {
   locale: string;
@@ -40,6 +40,9 @@ export type PortalProperty = {
   status: string;
   reserved: boolean;
   category: string;
+  country: string;
+  condition_key: string | null;
+  heating_key: string | null;
   settlement: string;
   county: string;
   region: string;
@@ -67,6 +70,10 @@ export type PortalProperty = {
   featured: boolean;
   homepage_featured: boolean;
   homepage_order: number;
+  editors_pick: boolean;
+  editors_pick_order: number;
+  bargain: boolean;
+  bargain_since: string | null;
   published_at: string | null;
   expires_at: string | null;
   submitted_at: string | null;
@@ -174,15 +181,17 @@ export type ListingIntake = {
 };
 
 /**
- * The ad-submission form's type dropdown is built from CATEGORIES, so it
- * submits a category key ('house', 'mansion', …) directly — not a label and
- * not free text. Validating against the same source that built the dropdown
- * means the two can never drift, and an unrecognised value is simply ignored
- * rather than silently filed as a house.
+ * The ad-submission form's type dropdown is built from the same taxonomy
+ * this function validates against, so it submits a category key ('house',
+ * 'mansion', …) directly — not a label and not free text. Validating
+ * against the same source that built the dropdown means the two can never
+ * drift, and an unrecognised value is simply ignored rather than silently
+ * filed as a house.
  */
-function intakeCategory(value: string | undefined): CategoryKey | null {
+async function intakeCategory(value: string | undefined): Promise<string | null> {
   const key = (value ?? '').trim();
-  return key in CATEGORIES ? (key as CategoryKey) : null;
+  const taxonomy = await getTaxonomy();
+  return taxonomy.category.some((term) => term.key === key && term.enabled) ? key : null;
 }
 
 /**
@@ -227,7 +236,7 @@ export async function applyIntake(
 ): Promise<void> {
   const patch: Record<string, unknown> = {};
 
-  const category = intakeCategory(intake.propertyType);
+  const category = await intakeCategory(intake.propertyType);
   if (category) patch.category = category;
 
   if (intake.settlement) patch.settlement = intake.settlement.slice(0, 120);
@@ -271,7 +280,7 @@ export async function applyIntake(
         // The Hungarian label, not the raw key — otherwise a kúria arrives in
         // the editor titled "Csemő — mansion".
         title: intake.settlement
-          ? `${intake.settlement} — ${category ? CATEGORIES[category].hu.label : 'ingatlan'}`
+          ? `${intake.settlement} — ${category ? termLabel((await getTaxonomy()).category.find((term) => term.key === category), 'hu') : 'ingatlan'}`
           : 'Új hirdetés',
       })
       .eq('property_id', propertyId)
@@ -292,17 +301,6 @@ export const STATUS_LABEL: Record<string, string> = {
 
 /** Statuses whose fields an owner may still change. Mirrors the RLS policy exactly. */
 export const OWNER_EDITABLE = ['draft', 'changes_requested'];
-
-export const CATEGORY_LABEL: Record<string, string> = {
-  house: 'Ház',
-  holiday: 'Nyaraló',
-  farm: 'Tanya',
-  land: 'Telek',
-  commercial: 'Üzleti ingatlan',
-  agricultural: 'Agráringatlan',
-  mansion: 'Kúria, kastély',
-  apartment: 'Lakás',
-};
 
 export const EPC_OPTIONS = [
   'AA++', 'AA+', 'AA', 'BB', 'CC', 'DD', 'EE', 'FF', 'GG', 'HH', 'II', 'JJ', 'pending', 'exempt',

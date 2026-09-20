@@ -17,6 +17,7 @@
     "og": "node scripts/build-og.mjs",
     "build:pmtiles": "node scripts/build-pmtiles.mjs",
     "seed:500": "node scripts/seed-500.mjs",
+    "seed:demo": "node scripts/seed-demo.mjs",
     "verify:rls": "node scripts/verify-rls.mjs",
     "verify:workflow": "node scripts/verify-workflow.mjs"
   },

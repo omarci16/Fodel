@@ -17,7 +17,8 @@
 export const prerender = false;
 
 import Portal from '~/layouts/Portal.astro';
-import { getProperty, CATEGORY_LABEL, STATUS_LABEL } from '~/lib/portal/properties';
+import { getProperty, STATUS_LABEL } from '~/lib/portal/properties';
+import { getTaxonomy, termLabel } from '~/lib/runtime-config';
 import { resolveImage } from '~/lib/property-images';
 import { catalogue, suggestSelection, isAboveThreshold, REFERRAL_DISCOUNT_PERCENT } from '~/lib/orders';
 import { eur, huf } from '~/lib/format';
@@ -32,6 +33,8 @@ const { id } = Astro.params;
 
 const property = await getProperty(supabase, id!);
 if (!property) return new Response('Ingatlan nem található.', { status: 404 });
+const taxonomy = await getTaxonomy();
+const categoryLabel = termLabel(taxonomy.category.find((term) => term.key === property.category), 'hu');
 
 const hu = property.translations.find((t) => t.locale === 'hu');
 const hero = property.media.find((m) => m.is_hero) ?? property.media[0];
@@ -121,7 +124,7 @@ const { data: creditableReferral } = property.owner_id
   <div class="preview">
     {hero && <img src={mediaSrc(hero.storage_path)} alt="" class="hero" />}
     <dl class="facts">
-      <div><dt>Típus</dt><dd>{CATEGORY_LABEL[property.category] ?? property.category}</dd></div>
+      <div><dt>Típus</dt><dd>{categoryLabel || property.category}</dd></div>
       <div><dt>Település</dt><dd>{property.settlement}, {property.county}</dd></div>
       <div><dt>Ár</dt><dd>{eur(property.price_eur)} / {huf(property.price_huf, 'hu')}</dd></div>
       <div><dt>Alapterület</dt><dd>{property.floor_m2 ?? '—'} m² / {property.plot_m2} m² telek</dd></div>

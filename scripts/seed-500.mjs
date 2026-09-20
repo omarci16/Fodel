@@ -30,7 +30,6 @@ if (!url || !key) {
 }
 const supabase = createClient(url, key);
 
-const CATEGORIES = ['house', 'holiday', 'farm', 'land', 'commercial', 'agricultural', 'mansion', 'apartment'];
 const REGIONS = [
   { region: 'Balaton', county: 'Veszprém', settlements: ['Badacsony', 'Balatonfüred', 'Tihany'] },
   { region: 'Balaton-felvidék', county: 'Veszprém', settlements: ['Nemesvámos', 'Vászoly'] },
@@ -50,6 +49,9 @@ function rand(n) { return Math.floor(Math.random() * n); }
 function pick(arr) { return arr[rand(arr.length)]; }
 
 async function main() {
+  const { data: categoryTerms, error: categoryError } = await supabase.from('taxonomy_terms').select('key').eq('group_key', 'category').eq('enabled', true);
+  if (categoryError || !categoryTerms?.length) throw categoryError ?? new Error('Run migration 0011 before seed:500');
+  const categories = categoryTerms.map((term) => term.key);
   console.log('Removing any previously generated synthetic listings…');
   await supabase.from('properties').delete().gte('ref', '9000').lte('ref', '9499');
 
@@ -60,7 +62,7 @@ async function main() {
       const n = batch * 50 + i;
       const ref = String(9000 + n);
       const place = pick(REGIONS);
-      const category = pick(CATEGORIES);
+      const category = pick(categories);
       const priceEur = 40000 + rand(60) * 5000;
       rows.push({
         ref,
@@ -93,7 +95,7 @@ async function main() {
     const { data: inserted, error } = await supabase.from('properties').insert(rows).select('id, ref');
     if (error) throw error;
 
-    const translations = inserted.map((p, i) => {
+    const translations = inserted.map((p) => {
       const title = `${pick(TITLES_HU)} #${p.ref}`;
       return {
         property_id: p.id,

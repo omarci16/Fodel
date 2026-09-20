@@ -128,7 +128,8 @@ const STATUS_LABEL: Record<string, string> = {
         )}
         <button type="button" class="btn ghost" id="resend-btn">Díjbekérő e-mail újraküldése</button>
         {order.status === 'pending' && (
-          <button type="button" class="btn ghost" id="cancel-btn">Rendelés visszavonása</button>
+          <><button type="button" class="btn" id="mark-paid-btn">Átutalás beérkezett</button>
+          <button type="button" class="btn ghost" id="cancel-btn">Rendelés visszavonása</button></>
         )}
         <p class="action-status" id="action-status" role="status"></p>
       </section>
@@ -204,6 +205,13 @@ const STATUS_LABEL: Record<string, string> = {
     const { ok, json } = await post('cancel');
     if (ok && json.ok) location.reload();
     else actionStatus.textContent = 'Nem sikerült visszavonni.';
+  });
+  document.getElementById('mark-paid-btn')?.addEventListener('click', async () => {
+    if (!confirm('Biztosan beérkezett az átutalás?')) return;
+    actionStatus.textContent = 'Rögzítés…';
+    const { ok, json } = await post('mark_paid');
+    if (ok && json.ok) location.reload();
+    else actionStatus.textContent = 'Nem sikerült rögzíteni.';
   });
 </script>
 

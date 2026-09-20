@@ -17,7 +17,9 @@ import Eyebrow from '~/components/Eyebrow.astro';
 import GoldRule from '~/components/GoldRule.astro';
 import Button from '~/components/Button.astro';
 import PropertyCard from '~/components/PropertyCard.astro';
-import { UI, CATEGORIES, path, type Locale, type CategoryKey } from '~/i18n/ui';
+import { UI, path, type Locale } from '~/i18n/ui';
+import { getTaxonomy, termLabel } from '~/lib/runtime-config';
+import { countryLabel as labelCountry } from '~/config/countries';
 import { alternatesFor, crumbs } from '~/lib/page';
 import {
   activeProperties,
@@ -25,6 +27,7 @@ import {
   regionsOf,
   countiesOf,
   categoriesOf,
+  countriesOf,
   PRICE_BANDS,
   priceBandLabel,
 } from '~/lib/properties';
@@ -36,9 +39,11 @@ interface Props {
   intro?: string;
   metaTitle?: string;
   metaDescription?: string;
+  fixedCategory?: string;
+  alternates?: Partial<Record<Locale, string>>;
 }
 
-const { locale, heading, intro, metaTitle, metaDescription } = Astro.props;
+const { locale, heading, intro, metaTitle, metaDescription, fixedCategory, alternates } = Astro.props;
 const ui = UI[locale];
 const params = Astro.url.searchParams;
 
@@ -49,18 +54,27 @@ const facetSource = await activeProperties();
 const regions = regionsOf(facetSource);
 const counties = countiesOf(facetSource);
 const categories = categoriesOf(facetSource);
+const countries = countriesOf(facetSource);
+const taxonomy = await getTaxonomy();
+const categoryLabel = (key: string) => termLabel(taxonomy.category.find((term) => term.key === key), locale) || key;
 
 const q = params.get('q') ?? '';
-const type = params.get('type') ?? '';
+const type = fixedCategory ?? params.get('type') ?? '';
 const region = params.get('region') ?? '';
 // County was supported by search_properties() and searchProperties() from
 // Stage 6 but never had a control. Hungarian buyers navigate by county far
 // more naturally than by FODEL's larger marketing regions.
 const county = params.get('county') ?? '';
+const country = params.get('country') ?? '';
+const settlement = params.get('settlement') ?? '';
 const priceBandId = params.get('price') ?? '';
 const beds = params.get('beds') ?? '';
-const floor = params.get('floor') ?? '';
-const sort = (params.get('sort') as 'featured' | 'price-asc' | 'price-desc' | 'area-desc') || 'featured';
+const floorMin = params.get('floor_min') ?? params.get('floor') ?? '';
+const floorMax = params.get('floor_max') ?? '';
+const plotMin = params.get('plot_min') ?? '';
+const plotMax = params.get('plot_max') ?? '';
+const bargain = params.get('bargain') === '1';
+const sort = (params.get('sort') as 'featured' | 'price-asc' | 'price-desc' | 'area-desc' | 'bargain') || 'featured';
 const page = Math.max(1, Number(params.get('page') ?? '1') || 1);
 
 const priceBand = PRICE_BANDS.find((b) => b.id === priceBandId);
@@ -74,12 +88,18 @@ const { properties, total, perPage } = await searchProperties({
   locale,
   q,
   category: type || undefined,
+  country: country || undefined,
   region: region || undefined,
   county: county || undefined,
+  settlement: settlement || undefined,
   priceMin: priceBand?.min,
   priceMax: priceBand?.max,
-  floorMin: floor ? Number(floor) : undefined,
+  floorMin: floorMin ? Number(floorMin) : undefined,
+  floorMax: floorMax ? Number(floorMax) : undefined,
+  plotMin: plotMin ? Number(plotMin) : undefined,
+  plotMax: plotMax ? Number(plotMax) : undefined,
   bedroomsMin: beds ? Number(beds) : undefined,
+  bargain: bargain || undefined,
   bbox,
   sort,
   page,
@@ -118,7 +138,7 @@ function withParam(key: string, value: string): string {
   locale={locale}
   title={metaTitle ?? title}
   description={metaDescription ?? intro ?? defaultDescription}
-  alternates={alternatesFor('properties')}
+  alternates={alternates ?? alternatesFor('properties')}
   schema={[breadcrumbSchema(trail)]}
 >
   <nav class="crumbs" aria-label={ui.a11y.breadcrumb}>
@@ -152,20 +172,33 @@ function withParam(key: string, value: string): string {
     </div>
 
     <div class="filter-row">
-      <div class="fcell">
+      {!fixedCategory && <div class="fcell">
         <label for="f-type">{ui.filters.type}</label>
         <select id="f-type" name="type">
           <option value="">{ui.filters.all}</option>
-          {categories.map((k) => <option value={k} selected={k === type}>{CATEGORIES[k][locale].label}</option>)}
+          {categories.map((k) => <option value={k} selected={k === type}>{categoryLabel(k)}</option>)}
         </select>
-      </div>
+      </div>}
+
+      {countries.length > 1 && <div class="fcell">
+        <label for="f-country">{ui.filters.country}</label>
+        <select id="f-country" name="country">
+          <option value="">{locale === 'hu' ? 'Minden ország' : 'Alle landen'}</option>
+          {countries.map((code) => <option value={code} selected={code === country}>{labelCountry(code, locale)}</option>)}
+        </select>
+      </div>}
 
       <div class="fcell">
         <label for="f-region">{ui.filters.region}</label>
         <select id="f-region" name="region">
-          <option value="">{ui.filters.all}</option>
+          <option value="">{ui.filters.entireCountry}</option>
           {regions.map((r) => <option value={r} selected={r === region}>{r}</option>)}
         </select>
+      </div>
+
+      <div class="fcell">
+        <label for="f-settlement">{ui.filters.settlement}</label>
+        <input id="f-settlement" name="settlement" value={settlement} />
       </div>
 
       <div class="fcell">
@@ -193,13 +226,20 @@ function withParam(key: string, value: string): string {
       </div>
 
       <div class="fcell">
-        <label for="f-floor">{ui.filters.areaFrom}</label>
-        <select id="f-floor" name="floor">
-          <option value="">{ui.filters.any}</option>
-          {[60, 90, 120, 180, 250].map((n) => (
-            <option value={String(n)} selected={String(n) === floor}>{n}+ m²</option>
-          ))}
-        </select>
+        <label for="f-floor-min">{ui.filters.areaFrom}</label>
+        <input id="f-floor-min" type="number" min="0" name="floor_min" value={floorMin} placeholder="m²" />
+      </div>
+      <div class="fcell">
+        <label for="f-floor-max">{ui.filters.areaTo}</label>
+        <input id="f-floor-max" type="number" min="0" name="floor_max" value={floorMax} placeholder="m²" />
+      </div>
+      <div class="fcell">
+        <label for="f-plot-min">{ui.filters.landFrom}</label>
+        <input id="f-plot-min" type="number" min="0" name="plot_min" value={plotMin} placeholder="m²" />
+      </div>
+      <div class="fcell">
+        <label for="f-plot-max">{ui.filters.landTo}</label>
+        <input id="f-plot-max" type="number" min="0" name="plot_max" value={plotMax} placeholder="m²" />
       </div>
 
       <div class="fcell">
@@ -209,9 +249,12 @@ function withParam(key: string, value: string): string {
           <option value="price-asc" selected={sort === 'price-asc'}>{ui.filters.sortPriceAsc}</option>
           <option value="price-desc" selected={sort === 'price-desc'}>{ui.filters.sortPriceDesc}</option>
           <option value="area-desc" selected={sort === 'area-desc'}>{ui.filters.sortAreaDesc}</option>
+          <option value="bargain" selected={sort === 'bargain'}>{ui.filters.bargain}</option>
         </select>
       </div>
     </div>
+
+    <label class="chip"><input type="checkbox" name="bargain" value="1" checked={bargain} /> {ui.filters.bargain}</label>
 
     {
       bbox && (
@@ -364,7 +407,7 @@ function withParam(key: string, value: string): string {
     text-transform: uppercase;
     color: var(--taupe);
   }
-  .fcell select {
+  .fcell select, .fcell input {
     width: 100%;
     appearance: none;
     border: none;
@@ -374,12 +417,15 @@ function withParam(key: string, value: string): string {
     color: var(--ink);
     cursor: pointer;
     padding-right: 22px;
-    background-image: linear-gradient(45deg, transparent 50%, var(--taupe) 50%),
-      linear-gradient(135deg, var(--taupe) 50%, transparent 50%);
-    background-position: 100% calc(50% + 2px), calc(100% + 5px) calc(50% + 2px);
-    background-size: 5px 5px;
+    /* A single crisp SVG chevron instead of a two-gradient hack — the
+       gradient version rendered as only half a mark at this field size. */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%233a464a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-position: right 2px center;
+    background-size: 10px 6px;
     background-repeat: no-repeat;
   }
+  .fcell input { background-image:none; padding:0; cursor:text; }
+  .chip { display:inline-flex; align-items:center; gap:8px; margin-top:14px; padding:9px 14px; border:1px solid var(--border); font-size:var(--fs-small); }
 
   .area-note {
     font-size: var(--fs-small);

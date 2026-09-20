@@ -1,0 +1,6 @@
+---
+export const prerender = false;
+import TopTenPage from '~/components/pages/TopTenPage.astro';
+Astro.response.headers.set('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=86400');
+---
+<TopTenPage locale="nl" />

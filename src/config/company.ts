@@ -22,13 +22,9 @@ export const COMPANY = {
 
   founded: 2013,
 
-  /**
-   * Founded in Almere-Buiten; the business later moved. Their own documents
-   * page publishes a "Címváltozást követő cégkivonat" (company extract
-   * following an address change), which is what resolves the conflict
-   * between the brand doc and the live site.
-   */
-  foundedIn: 'Almere-Buiten, Flevoland',
+  /** Client-directed 1.3 wording. This conflicts with the published company
+   * extract and brand document; keeping it in one field makes correction safe. */
+  foundedIn: 'Den Haag',
 
   principal: 'Födelmesi Gábor',
 
@@ -139,6 +135,7 @@ export const LISTING_VAT_PERCENT = 21;
 export const LISTING_PACKAGES = [
   {
     id: 'cheap-6m',
+    names: { hu: 'Standard hirdetés', nl: 'Standaard advertentie' },
     priceEur: 69,
     months: 6,
     maxImages: 20,
@@ -147,6 +144,7 @@ export const LISTING_PACKAGES = [
   },
   {
     id: 'normal-12m',
+    names: { hu: 'Kiemelt hirdetés', nl: 'Uitgelichte advertentie' },
     priceEur: 129,
     priceEurAbove: 179,
     /** The €179 tier applies above 150M HUF. */
@@ -197,6 +195,18 @@ export const AGRI_HECTARE_LIMIT = 300;
 export function formatHours(locale: 'hu' | 'nl'): string {
   const { from, to } = COMPANY.hours.weekdays;
   return locale === 'hu' ? `Hétfő–Péntek · ${from}–${to}` : `Maandag–vrijdag · ${from}–${to}`;
+}
+
+/**
+ * The founding city, localised for display — Hungarian uses the exonym
+ * ("Hága"), Dutch and the legal/imprint spelling stay "Den Haag". Reads
+ * `foundedIn` rather than hardcoding the city so the correction stays a
+ * one-field change (see the field's own comment for the 1.3 background).
+ */
+const HU_CITY_EXONYMS: Record<string, string> = { 'Den Haag': 'Hága' };
+export function foundedInLabel(locale: 'hu' | 'nl'): string {
+  if (locale === 'nl') return `${COMPANY.foundedIn}, Nederland`;
+  return `${HU_CITY_EXONYMS[COMPANY.foundedIn] ?? COMPANY.foundedIn}, Hollandia`;
 }
 
 /** True once every legally-required identifier is present. */

@@ -84,7 +84,7 @@ export const POST: APIRoute = async ({ request }) => {
       .update({ status: 'paid', paid_at: paidAt.toISOString() })
       .eq('id', order.id);
 
-    const result = await publishProperty(admin, order.property_id, event.id);
+    const result = await publishProperty(admin, order.property_id, { dedupeKey: event.id });
     if (!result.ok) {
       // The money is in and recorded; publication failed. Returning 500 asks
       // Stripe to retry, which is exactly right — the retry will find the

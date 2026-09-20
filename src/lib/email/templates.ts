@@ -383,6 +383,30 @@ ${common.signOff}`,
   };
 }
 
+/** 1.3 approval: the listing is already live; billing remains fully intact. */
+export function approvedPublished(
+  locale: EmailLocale,
+  opts: {
+    ref: string; title: string; items: OrderLine[]; discount?: string; total: string;
+    payUrl: string | null; viewUrl: string; dueDate: string;
+  }
+): BuiltEmail {
+  const c = copyFor(locale).approvedPublished;
+  const common = copyFor(locale).common;
+  const discountLine = opts.discount ? facts([[c.discountLabel, opts.discount]]) : '';
+  const cardBlock = opts.payUrl ? button(c.ctaCard, opts.payUrl) + small(c.cardNote) : '';
+  const bankBlock = h2(c.bankTitle) + facts([['IBAN', COMPANY.banks.nl.iban], ['BIC', COMPANY.banks.nl.bic]]) + small(c.bankNote(`#${opts.ref}`));
+  return {
+    subject: c.subject(opts.ref),
+    html: shell({ locale, preheader: c.preheader, body:
+      h1(c.heading) + lead(c.body(opts.title, opts.ref)) + button(c.viewCta, opts.viewUrl) +
+      h2(c.orderTitle) + itemisedTotal(opts.items, c.totalLabel, opts.total) + discountLine +
+      facts([[c.dueLabel, opts.dueDate]]) + small(c.vatNote) + cardBlock + bankBlock + signOff(locale),
+    }),
+    text: textShell({ locale, body: `${c.heading}\n\n${c.body(opts.title, opts.ref)}\n\n${textCta(c.viewCta, opts.viewUrl)}\n\n${c.orderTitle}\n${opts.items.map((item) => `  ${item.label} — ${item.amount}`).join('\n')}\n${opts.discount ? `  ${c.discountLabel}: ${opts.discount}\n` : ''}  ${c.totalLabel}: ${opts.total}\n${c.dueLabel}: ${opts.dueDate}\n${c.vatNote}\n${opts.payUrl ? `\n${textCta(c.ctaCard, opts.payUrl)}\n${c.cardNote}\n` : ''}\n${c.bankTitle}\n  IBAN: ${COMPANY.banks.nl.iban}\n  BIC: ${COMPANY.banks.nl.bic}\n${c.bankNote(`#${opts.ref}`)}\n\n${common.signOff}` }),
+  };
+}
+
 /* ── 8. Payment receipt ──────────────────────────────────────────────────── */
 
 export function paymentReceipt(
@@ -724,6 +748,7 @@ export const templates = {
   adminNewSubmission,
   changesRequested,
   approvedAwaitingPayment,
+  approvedPublished,
   paymentReceipt,
   published,
   newEnquiry,

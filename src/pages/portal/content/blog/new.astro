@@ -6,13 +6,15 @@ export const prerender = false;
 const { supabase, user } = Astro.locals;
 if (!user) return Astro.redirect('/portal/login');
 
-const slug = `uj-cikk-${Date.now().toString(36)}`;
+const locale = Astro.url.searchParams.get('locale') === 'nl' ? 'nl' : Astro.url.searchParams.get('locale') === 'hu' ? 'hu' : null;
+if (!locale) return Astro.redirect('/portal/content/blog');
+const slug = `${locale === 'hu' ? 'uj-cikk' : 'nieuw-artikel'}-${Date.now().toString(36)}`;
 const { data, error } = await supabase
   .from('blog_posts')
   .insert({
-    locale: 'hu',
+    locale,
     slug,
-    title: 'Új cikk',
+    title: locale === 'hu' ? 'Új cikk' : 'Nieuw artikel',
     excerpt: '',
     body_md: '',
     category: '',

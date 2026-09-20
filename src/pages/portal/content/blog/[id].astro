@@ -18,6 +18,12 @@ if (profile?.role !== 'admin') return Astro.redirect('/portal/dashboard');
 const { id } = Astro.params;
 const { data: post } = await supabase.from('blog_posts').select('*').eq('id', id).maybeSingle();
 if (!post) return new Response('Cikk nem található.', { status: 404 });
+const { data: categoryTerms } = await supabase
+  .from('taxonomy_terms')
+  .select('key, labels')
+  .eq('group_key', 'blog_category')
+  .eq('enabled', true)
+  .order('sort_order');
 
 const otherLocale = post.locale === 'hu' ? 'nl' : 'hu';
 const { data: candidates } = await supabase
@@ -35,8 +41,8 @@ if (post.group_id) {
     .select('id, title, slug, locale')
     .eq('group_id', post.group_id)
     .neq('id', id)
-    .maybeSingle();
-  linkedSibling = data;
+    .limit(1);
+  linkedSibling = data?.[0] ?? null;
 }
 
 const publicUrl = post.published ? `${SITE_URL}${path(post.locale, 'blog')}${post.slug}/` : null;
@@ -60,7 +66,17 @@ const publicUrl = post.published ? `${SITE_URL}${path(post.locale, 'blog')}${pos
             <option value="nl" selected={post.locale === 'nl'}>NL</option>
           </select>
         </label>
-        <label>Kategória <input name="category" value={post.category} /></label>
+        <label>Kategória
+          <select name="category" id="blog-category">
+            {!(categoryTerms ?? []).some((term: any) => term.labels?.[post.locale] === post.category) && <option value={post.category}>{post.category}</option>}
+            {(categoryTerms ?? []).map((term: any) => <option
+              value={term.labels?.[post.locale] ?? term.labels.hu}
+              data-hu={term.labels.hu}
+              data-nl={term.labels.nl}
+              selected={(term.labels?.[post.locale] ?? term.labels.hu) === post.category}
+            >{term.labels?.[post.locale] ?? term.labels.hu}</option>)}
+          </select>
+        </label>
       </div>
       <label>Kivonat <textarea name="excerpt" rows="2">{post.excerpt}</textarea></label>
 
@@ -83,7 +99,7 @@ const publicUrl = post.published ? `${SITE_URL}${path(post.locale, 'blog')}${pos
 
         <div class="serp">
           <p class="serp-title" id="serp-title"></p>
-          <p class="serp-url">{SITE_URL}{path(post.locale, 'blog')}<span id="serp-slug">{post.slug}</span>/</p>
+          <p class="serp-url"><span id="serp-prefix">{SITE_URL}{path(post.locale, 'blog')}</span><span id="serp-slug">{post.slug}</span>/</p>
           <p class="serp-desc" id="serp-desc"></p>
         </div>
 
@@ -161,6 +177,8 @@ const publicUrl = post.published ? `${SITE_URL}${path(post.locale, 'blog')}${pos
   const seoDesc = document.getElementById('seo-desc');
   const slugInput = form.querySelector('[name="slug"]');
   const titleInput = form.querySelector('[name="title"]');
+  const localeInput = form.querySelector('[name="locale"]');
+  const categoryInput = document.getElementById('blog-category');
 
   async function post(url, body, isJson = true) {
     const res = await fetch(url, {
@@ -199,12 +217,23 @@ const publicUrl = post.published ? `${SITE_URL}${path(post.locale, 'blog')}${pos
     document.getElementById('serp-title').textContent = seoTitle.value || titleInput.value || '(cím)';
     document.getElementById('serp-desc').textContent = seoDesc.value || form.querySelector('[name="excerpt"]').value || '(leírás)';
     document.getElementById('serp-slug').textContent = slugInput.value;
+    const locale = form.querySelector('[name="locale"]').value;
+    document.getElementById('serp-prefix').textContent = `${location.origin}/${locale}/${locale === 'hu' ? 'blog' : 'nieuws'}/`;
     document.getElementById('fb-title').textContent = titleInput.value;
     document.getElementById('fb-desc').textContent = form.querySelector('[name="excerpt"]').value;
   }
 
   bodyMd.addEventListener('input', renderPreview);
   [seoTitle, seoDesc, slugInput, titleInput].forEach((el) => el.addEventListener('input', runSeoChecks));
+  localeInput.addEventListener('change', () => {
+    const locale = localeInput.value;
+    categoryInput?.querySelectorAll('option[data-hu]').forEach((option) => {
+      const label = option.dataset[locale] || option.dataset.hu;
+      option.value = label;
+      option.textContent = label;
+    });
+    runSeoChecks();
+  });
   renderPreview();
 
   slugInput.addEventListener('blur', () => {

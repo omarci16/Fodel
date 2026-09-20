@@ -12,6 +12,10 @@
  */
 
 import type { Locale } from '~/i18n/ui';
+import { COMPANY, formatHours, foundedInLabel } from '~/config/company';
+
+const REACH_COUNTRIES = COMPANY.reach.countries;
+const REACH_LANGUAGES = COMPANY.reach.languages;
 
 export interface Step {
   num: string;
@@ -35,13 +39,13 @@ export const COPY: Record<Locale, any> = {
       meta: {
         title: 'FODEL Ingatlan — Magyar ingatlanok hirdetése Nyugat-Európában',
         description:
-          'Hirdesse magyar ingatlanát 5 nyelven, 8 országban — kizárólagossági szerződés nélkül. Készpénzes holland, belga és német vevők. Jutalék csak sikeres eladás esetén.',
+          `Hirdesse magyar ingatlanát ${REACH_LANGUAGES} nyelven, ${REACH_COUNTRIES} országban — kizárólagossági szerződés nélkül. Készpénzes holland, belga és német vevők. Jutalék csak sikeres eladás esetén.`,
       },
       hero: {
-        eyebrow: 'Alapítva 2013 — Den Haag, Hollandia',
+        eyebrow: `Alapítva 2013 — ${foundedInLabel('hu')}`,
         title: ['Magyar', 'Ingatlanok', 'Nyugat-Európában'],
         emphasis: 1,
-        body: 'Egyedülálló hirdetési modell: 5 nyelven, 8 országban — kizárólagossági szerződés nélkül. Komoly, készpénzes külföldi vevők.',
+        body: `Egyedülálló hirdetési modell: ${REACH_LANGUAGES} nyelven, ${REACH_COUNTRIES} országban — kizárólagossági szerződés nélkül. Komoly, készpénzes külföldi vevők.`,
         primary: 'Ingatlanok',
         secondary: 'Hirdessen nálunk',
         featuredLabel: 'Kiemelt ingatlan',
@@ -50,7 +54,7 @@ export const COPY: Record<Locale, any> = {
         {
           eyebrow: 'Eladóknak',
           title: 'Hirdesse ingatlanát\nNyugat-Európában',
-          body: 'Kizárólagossági szerződés nélkül. Hirdetése 5 nyelven jelenik meg 8 országban, célzottan holland, belga és német készpénzes vevőknek.',
+          body: `Kizárólagossági szerződés nélkül. Hirdetése ${REACH_LANGUAGES} nyelven jelenik meg ${REACH_COUNTRIES} országban, célzottan holland, belga és német készpénzes vevőknek.`,
           cta: 'Tudjon meg többet',
           to: 'sellers',
         },
@@ -71,7 +75,7 @@ export const COPY: Record<Locale, any> = {
         eyebrow: 'Lépjen kapcsolatba velünk',
         title: 'Forduljon hozzánk',
         titleEm: 'bizalommal!',
-        body: 'Munkanapokon 09:00–18:00 · A visszahívás ingyenes.',
+        body: `${formatHours('hu')} · A visszahívás ingyenes.`,
       },
       referral: {
         eyebrow: 'Ajánlói program',
@@ -97,8 +101,8 @@ export const COPY: Record<Locale, any> = {
     steps: [
       {
         num: '01',
-        title: 'Hirdetés 8 országban',
-        body: 'Ingatlanát 5 nyelven hirdetjük meg Hollandiában, Belgiumban, Németországban, Angliában és más uniós országokban — kizárólagossági szerződés nélkül.',
+        title: `Hirdetés ${REACH_COUNTRIES} országban`,
+        body: `Ingatlanát ${REACH_LANGUAGES} nyelven hirdetjük meg Hollandiában, Belgiumban, Németországban, Angliában és más uniós országokban — kizárólagossági szerződés nélkül.`,
       },
       {
         num: '02',
@@ -129,7 +133,7 @@ export const COPY: Record<Locale, any> = {
         eyebrow: 'Eladóknak',
         title: 'Hirdesse ingatlanát',
         titleEm: 'Nyugat-Európában',
-        body: 'A FODEL egyedülálló hirdetési modelljével ingatlana 5 nyelven jelenik meg 8 országban — kizárólagossági szerződés nélkül. Csak komoly, készpénzes külföldi vevőkkel dolgozunk.',
+        body: `A FODEL egyedülálló hirdetési modelljével ingatlana ${REACH_LANGUAGES} nyelven jelenik meg ${REACH_COUNTRIES} országban — kizárólagossági szerződés nélkül. Csak komoly, készpénzes külföldi vevőkkel dolgozunk.`,
         cta: 'Hirdetés feladása',
         secondary: 'Árlista megtekintése',
       },
@@ -256,22 +260,21 @@ export const COPY: Record<Locale, any> = {
         ],
       },
       story: {
-        eyebrow: 'Den Haag, Hollandia',
+        eyebrow: foundedInLabel('hu'),
         title: 'A híd, amelyet',
         titleEm: 'megépítettünk',
         paragraphs: [
           'A FODEL Hollandiában élő magyarok által alapított ingatlanközvetítő iroda. Almere-Buitenben indultunk el 2013-ban, ahol rájöttünk: rengeteg holland és belga érdeklődő szeretne autentikus magyar ingatlant vásárolni — de nem tudja, hogyan fogjon hozzá.',
-          'Ma 8 országban hirdetünk, 5 nyelven — és minden tranzakciót elejétől a végéig kísérünk. Kétnyelvű adásvételi szerződéssel, meghatalmazásos képviselettel, földhivatali ügyintézéssel. Irodánk ma Den Haagban működik.',
+          `Ma ${REACH_COUNTRIES} országban hirdetünk, ${REACH_LANGUAGES} nyelven — és minden tranzakciót elejétől a végéig kísérünk. Kétnyelvű adásvételi szerződéssel, meghatalmazásos képviselettel, földhivatali ügyintézéssel. Irodánk ma Hágában működik.`,
         ],
       },
-      cta: { title: 'Dolgozzunk együtt!', body: 'Munkanapokon 09:00–18:00 · A visszahívás ingyenes.' },
     },
 
     contact: {
       meta: {
         title: 'Kapcsolat — Forduljon hozzánk bizalommal',
         description:
-          'Hívjon minket munkanapokon 09:00 és 18:00 között, vagy kérjen ingyenes visszahívást. A hívást mi fizetjük.',
+          `Hívjon minket munkanapokon ${COMPANY.hours.weekdays.from} és ${COMPANY.hours.weekdays.to} között, vagy kérjen ingyenes visszahívást. A hívást mi fizetjük.`,
       },
       hero: {
         eyebrow: 'Kapcsolat',
@@ -298,7 +301,7 @@ export const COPY: Record<Locale, any> = {
           'Huizen, boerderijen en landgoederen in Hongarije, vaak rechtstreeks van de eigenaar. Nederlandse begeleiding en tweetalige contracten.',
       },
       hero: {
-        eyebrow: 'Sinds 2013 — Den Haag, Nederland',
+        eyebrow: `Sinds 2013 — ${foundedInLabel('nl')}`,
         title: ['Vastgoed', 'in Hongarije', 'direct van de eigenaar'],
         emphasis: 1,
         body: 'Bij een groot deel van ons aanbod staat de eigenaar er zelf bij vermeld. U onderhandelt rechtstreeks — of laat de hele afwikkeling aan ons over.',
@@ -317,7 +320,7 @@ export const COPY: Record<Locale, any> = {
         {
           eyebrow: 'Adverteren',
           title: 'Uw Hongaarse woning\nin West-Europa',
-          body: 'Adverteer in 5 talen in 8 landen, zonder exclusiviteitscontract. Courtage alleen wanneer wij de koper aanbrengen.',
+          body: `Adverteer in ${REACH_LANGUAGES} talen in ${REACH_COUNTRIES} landen, zonder exclusiviteitscontract. Courtage alleen wanneer wij de koper aanbrengen.`,
           cta: 'Meer informatie',
           to: 'sellers',
         },
@@ -331,7 +334,7 @@ export const COPY: Record<Locale, any> = {
         eyebrow: 'Neem contact op',
         title: 'Wij bellen u',
         titleEm: 'graag terug',
-        body: 'Op werkdagen 09:00–18:00 · Terugbellen kost u niets.',
+        body: `${formatHours('nl')} · Terugbellen kost u niets.`,
       },
       referral: {
         eyebrow: 'Aanbevelingsprogramma',
@@ -357,8 +360,8 @@ export const COPY: Record<Locale, any> = {
     steps: [
       {
         num: '01',
-        title: 'Aanbod in 8 landen',
-        body: 'Wij adverteren in 5 talen in Nederland, België, Duitsland, Engeland en andere EU-landen — zonder exclusiviteitscontract met de verkoper.',
+        title: `Aanbod in ${REACH_COUNTRIES} landen`,
+        body: `Wij adverteren in ${REACH_LANGUAGES} talen in Nederland, België, Duitsland, Engeland en andere EU-landen — zonder exclusiviteitscontract met de verkoper.`,
       },
       {
         num: '02',
@@ -383,13 +386,13 @@ export const COPY: Record<Locale, any> = {
       meta: {
         title: 'Adverteren — Uw Hongaarse woning in West-Europa',
         description:
-          'Adverteer uw Hongaarse woning in 5 talen in 8 landen, vanaf € 69 en zonder exclusiviteit. Courtage alleen als FODEL de koper aanbrengt: 4% + 21% btw.',
+          `Adverteer uw Hongaarse woning in ${REACH_LANGUAGES} talen in ${REACH_COUNTRIES} landen, vanaf € 69 en zonder exclusiviteit. Courtage alleen als FODEL de koper aanbrengt: 4% + 21% btw.`,
       },
       hero: {
         eyebrow: 'Adverteren',
         title: 'Uw woning',
         titleEm: 'in West-Europa',
-        body: 'Met het model van FODEL verschijnt uw woning in 5 talen in 8 landen — zonder exclusiviteitscontract. Wij werken uitsluitend met serieuze kopers.',
+        body: `Met het model van FODEL verschijnt uw woning in ${REACH_LANGUAGES} talen in ${REACH_COUNTRIES} landen — zonder exclusiviteitscontract. Wij werken uitsluitend met serieuze kopers.`,
         cta: 'Advertentie plaatsen',
         secondary: 'Tarieven bekijken',
       },
@@ -516,22 +519,21 @@ export const COPY: Record<Locale, any> = {
         ],
       },
       story: {
-        eyebrow: 'Den Haag, Nederland',
+        eyebrow: foundedInLabel('nl'),
         title: 'De brug die wij',
         titleEm: 'hebben gebouwd',
         paragraphs: [
           'FODEL is opgericht door in Nederland wonende Hongaren. Wij begonnen in 2013 in Almere-Buiten, waar wij merkten hoeveel Nederlanders en Belgen een authentieke Hongaarse woning wilden kopen — maar niet wisten hoe ze moesten beginnen.',
-          'Vandaag adverteren wij in 8 landen en 5 talen, en begeleiden wij elke transactie van begin tot eind: tweetalig koopcontract, vertegenwoordiging met volmacht en inschrijving bij het kadaster. Ons kantoor is gevestigd in Den Haag.',
+          `Vandaag adverteren wij in ${REACH_COUNTRIES} landen en ${REACH_LANGUAGES} talen, en begeleiden wij elke transactie van begin tot eind: tweetalig koopcontract, vertegenwoordiging met volmacht en inschrijving bij het kadaster. Ons kantoor is gevestigd in Den Haag.`,
         ],
       },
-      cta: { title: 'Laten wij samenwerken', body: 'Op werkdagen 09:00–18:00 · Terugbellen kost u niets.' },
     },
 
     contact: {
       meta: {
         title: 'Contact — Wij bellen u graag terug',
         description:
-          'Bel ons op werkdagen tussen 09:00 en 18:00, of vraag om teruggebeld te worden. Het gesprek kost u niets.',
+          `Bel ons op werkdagen tussen ${COMPANY.hours.weekdays.from} en ${COMPANY.hours.weekdays.to}, of vraag om teruggebeld te worden. Het gesprek kost u niets.`,
       },
       hero: { eyebrow: 'Contact', title: 'Wij bellen u', titleEm: 'graag terug' },
       formTitle: 'Vraag om teruggebeld te worden',

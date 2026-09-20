@@ -83,6 +83,8 @@ const LIVE_ROUTES = [
   ['nl/nieuws/index.html', '/nl/nieuws/'],
   ['hu/blog/holland-migracio-okai/index.html', '/hu/blog/holland-migracio-okai/'],
   ['nl/nieuws/wat-kost-een-huis-in-hongarije/index.html', '/nl/nieuws/wat-kost-een-huis-in-hongarije/'],
+  ['hu/top-10/index.html', '/hu/top-10/'],
+  ['nl/top-10/index.html', '/nl/top-10/'],
 ];
 
 async function fetchLivePages() {
@@ -177,8 +179,8 @@ console.log('Server-rendered content');
     ['hu/arlista/index.html', ['69', '129', '179', '25']],
     ['hu/gyik/index.html', ['ingatlanturistára', 'kizárólagosság']],
     ['nl/veelgestelde-vragen/index.html', ['courtage', 'volmacht']],
-    ['hu/hirdetes-feladasa/index.html', ['Hirdesse ingatlanát', 'Olcsó hirdetés', 'Normál hirdetés']],
-    ['nl/advertentie-plaatsen/index.html', ['Plaats uw woning', 'Voordelige advertentie', 'Normale advertentie']],
+    ['hu/hirdetes-feladasa/index.html', ['Hirdesse ingatlanát', 'Standard hirdetés', 'Kiemelt hirdetés']],
+    ['nl/advertentie-plaatsen/index.html', ['Plaats uw woning', 'Standaard advertentie', 'Uitgelichte advertentie']],
     ['hu/blog/index.html', ['A holland migráció okai', 'Piacelemzés']],
     ['nl/nieuws/index.html', ['Wat kost een huis in Hongarije', 'Kopersgids']],
     ['hu/blog/holland-migracio-okai/index.html', ['Ár/érték arány', 'Népsűrűség']],

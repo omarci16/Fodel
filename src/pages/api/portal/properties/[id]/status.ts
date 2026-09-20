@@ -1,18 +1,18 @@
 /**
  * The status machine.
  *
- *   draft ──submit──▶ submitted ──approve──▶ awaiting_payment ──┬─[Stripe]──▶ published
- *                         │                                     │
- *                         │                                     └─publish_manually──▶ published
+ *   draft ──submit──▶ submitted ──approve──▶ published ──▶ sold | archived
+ *                         │                 │
+ *                         │                 └─request_changes──▶ changes_requested
  *                         └──request_changes──▶ changes_requested ──▶ (owner edits, submits again)
  *
- *                                                        published ──▶ sold | archived
+ *   legacy only: awaiting_payment ──[Stripe / manual / publish_unpaid]──▶ published
  *
- * FODEL 1.1 changed one link in that chain: `approve` no longer publishes.
- * It writes an order and moves the listing to `awaiting_payment`, and money —
- * card or bank transfer — is what publishes it. The reason is commercial, not
- * technical: FODEL never holds a payment for a listing it then rejected, so
- * there is no refund path to build, staff, or explain in the terms.
+ * FODEL 1.3 changed the approval link again: approval still writes the exact
+ * same pending order and due date, but publication no longer waits for money.
+ * PAYMENT_GATES_PUBLISHING=true restores the 1.2 gate after a rebuild. Existing
+ * awaiting_payment rows stay under their original contract and are never
+ * bulk-published by a migration.
  *
  * Every transition is re-checked here even though RLS also constrains who may
  * UPDATE a row at all. RLS cannot express "only when moving from exactly this
@@ -22,7 +22,7 @@
 import type { APIRoute } from 'astro';
 import { deliver, localeOf, templates, adminRecipients } from '~/lib/email/send';
 import { createSupabaseAdminClient } from '~/lib/supabase-server';
-import { publishProperty, listingTitle } from '~/lib/portal/publish';
+import { publishProperty, listingTitle, publicUrl } from '~/lib/portal/publish';
 import { deleteImage } from '~/lib/media';
 import { logEvent } from '~/lib/activity';
 import {
@@ -37,6 +37,7 @@ import {
 } from '~/lib/orders';
 import { SITE_URL } from '~/config/site.mjs';
 import { eur } from '~/lib/format';
+import { paymentGatesPublishing } from '~/config/flags';
 
 export const prerender = false;
 
@@ -269,21 +270,26 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
         .eq('id', creditedReferral.id);
     }
 
+    const gated = paymentGatesPublishing();
     const { error } = await supabase
       .from('properties')
       .update({
         status: 'awaiting_payment',
+        package: selection.packageId,
         approved_at: new Date().toISOString(),
         approved_by: user!.id,
       })
       .eq('id', id);
     if (error) return json(500, { ok: false, error: error.message });
 
+    if (!gated) {
+      const published = await publishProperty(supabase, id!, { notifyOwner: false });
+      if (!published.ok) return json(500, { ok: false, error: published.error });
+    }
+
     if (owner) {
       const title = await listingTitle(supabase, property.id, locale, property.ref);
-      await deliver(
-        owner.email,
-        templates.approvedAwaitingPayment(locale, {
+      const sharedEmail = {
           ref: property.ref,
           title,
           items: linesForEmail(lines),
@@ -294,8 +300,15 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
           // it — never here, because a session minted now would have expired by
           // the time a seller who reads email on Sunday gets to it.
           payUrl: `${SITE_URL}/portal/properties/${property.id}`,
-        })
-      );
+      };
+      const email = gated
+        ? templates.approvedAwaitingPayment(locale, sharedEmail)
+        : templates.approvedPublished(locale, {
+            ...sharedEmail,
+            viewUrl: await publicUrl(property, locale),
+            dueDate: dueAt.toLocaleDateString(locale === 'hu' ? 'hu-HU' : 'nl-NL'),
+          });
+      await deliver(owner.email, email);
     }
 
     await logEvent({
@@ -357,11 +370,20 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
     return json(200, { ok: true });
   }
 
+  /* Temporary backlog tool: publish an old awaiting-payment listing without
+     falsely recording its still-pending order as paid. Remove after backlog. */
+  if (action === 'publish_unpaid') {
+    if (!isAdmin) return json(403, { ok: false });
+    if (property.status !== 'awaiting_payment') return json(409, { ok: false, error: 'not-awaiting-payment' });
+    const result = await publishProperty(supabase, id!);
+    return result.ok ? json(200, { ok: true }) : json(500, { ok: false, error: result.error });
+  }
+
   /* ── request changes ────────────────────────────────────────────────── */
 
   if (action === 'request_changes') {
     if (!isAdmin) return json(403, { ok: false });
-    if (!['submitted', 'awaiting_payment'].includes(property.status)) {
+    if (!['submitted', 'awaiting_payment', 'published'].includes(property.status)) {
       return json(409, { ok: false, error: 'not-reviewable' });
     }
     const note = String(body.note ?? '').trim();
@@ -369,7 +391,7 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
 
     const { error } = await supabase
       .from('properties')
-      .update({ status: 'changes_requested' })
+      .update({ status: 'changes_requested', published_at: null })
       .eq('id', id);
     if (error) return json(500, { ok: false, error: error.message });
 
@@ -377,7 +399,7 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
 
     // Sending a listing back after approval invalidates its order: the price
     // may change once the listing does.
-    if (property.status === 'awaiting_payment') {
+    if (['awaiting_payment', 'published'].includes(property.status)) {
       const admin = createSupabaseAdminClient();
       await admin
         .from('payments')
