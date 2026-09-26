@@ -8,6 +8,12 @@
  *
  * `data-*` attributes carry the filterable values so the properties page can
  * filter pre-rendered markup without re-rendering anything.
+ *
+ * 1.4: the photograph is uncovered from its bottom edge as it scrolls in,
+ * carries a pointer label, and is the element that morphs into the property
+ * page's hero on click (data-vt, see Base.astro). The rule above the price
+ * draws across in ink on hover. `ratio` and `sizes` let a page set a card
+ * large or tall inside an editorial grid.
  */
 import { Image } from 'astro:assets';
 import Eyebrow from './Eyebrow.astro';
@@ -22,9 +28,25 @@ interface Props {
   eager?: boolean;
   class?: string;
   rank?: number;
+  /** Image aspect ratio, e.g. "4 / 5". Defaults to 4 / 3. */
+  ratio?: string;
+  sizes?: string;
+  /** Set false where the card is revealed by its container instead, or
+   *  shouldn't animate in at all (the listing grid: a results page, read
+   *  and filtered, not scrolled through as a showcase). */
+  reveal?: boolean;
 }
 
-const { property, locale, eager = false, class: className, rank } = Astro.props;
+const {
+  property,
+  locale,
+  eager = false,
+  class: className,
+  rank,
+  ratio,
+  sizes = '(max-width: 768px) 100vw, (max-width: 1200px) 45vw, 30vw',
+  reveal = true,
+} = Astro.props;
 const d = property.data;
 const ui = UI[locale];
 
@@ -45,6 +67,7 @@ const specs = [
 
 <article
   class:list={['prop-card', className]}
+  style={ratio ? `--card-ratio:${ratio}` : undefined}
   data-property
   data-category={d.category}
   data-region={d.location.region}
@@ -58,14 +81,18 @@ const specs = [
   data-published={d.listing.publishedAt.getTime()}
 >
   <a class="card-link" href={href}>
-    <div class="card-img-wrap">
-      <div class="card-img-inner">
+    <div
+      class:list={['card-img-wrap', { reveal }]}
+      data-reveal={reveal ? 'mask' : undefined}
+      data-cursor={ui.cta.viewProperty}
+    >
+      <div class="card-img-inner" data-vt>
         {/* astro:assets' <Image> has separate local/remote overloads; a src that can be either doesn't match either cleanly — the `as any` is a type-checker limitation, not a runtime one. */}
         <Image
           src={d.media.hero as any}
           alt={heroAlt}
-          widths={[400, 600, 800]}
-          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 45vw, 30vw"
+          widths={[400, 600, 800, 1200]}
+          sizes={sizes}
           loading={eager ? 'eager' : 'lazy'}
           fetchpriority={eager ? 'high' : 'auto'}
           class="card-img"
@@ -83,15 +110,17 @@ const specs = [
     </div>
 
     <div class="card-body">
-      {rank && <span class="rank">{String(rank).padStart(2, '0')}</span>}
-      <Eyebrow space="7px">{d.location.region} — {category}</Eyebrow>
+      <div class="card-meta">
+        {rank && <span class="rank num">{String(rank).padStart(2, '0')}</span>}
+        <Eyebrow>{d.location.region} — {category}</Eyebrow>
+      </div>
       <h3 class="card-title">{title}</h3>
       <p class="card-location">
         {d.location.settlement}, {d.location.county}
         <span class="ref">· {ui.property.reference} {d.ref}</span>
       </p>
       <div class="card-foot">
-        <span class="price">{eur(d.price.eur)}</span>
+        <span class="price num">{eur(d.price.eur)}</span>
         <span class="specs">{specs}</span>
       </div>
     </div>
@@ -102,13 +131,12 @@ const specs = [
   .prop-card {
     position: relative;
   }
-  .rank { display:block; font-family:var(--serif); font-size:var(--fs-h2); font-weight:var(--fw-display); margin-bottom:10px; }
   .card-link {
     display: block;
   }
   .card-img-wrap {
     position: relative;
-    aspect-ratio: 4 / 3;
+    aspect-ratio: var(--card-ratio, 4 / 3);
     overflow: hidden;
     background: var(--mist);
   }
@@ -121,44 +149,74 @@ const specs = [
     object-fit: cover;
     display: block;
   }
+  /* A soft floor of ink so the photograph sits on the card, not on air. */
+  .card-img-wrap::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, transparent 62%, rgba(10, 29, 48, 0.22));
+    opacity: 0;
+    transition: opacity 0.9s var(--ease-out);
+    pointer-events: none;
+  }
+  .card-link:hover .card-img-wrap::after,
+  .card-link:focus-visible .card-img-wrap::after {
+    opacity: 1;
+  }
 
   .tag,
   .status {
     position: absolute;
-    top: 14px;
+    z-index: 1;
+    top: 16px;
     font-family: var(--sans);
     font-weight: var(--fw-regular);
     /* ADJUSTED: 8.5px in the prototype. */
     font-size: 10px;
     letter-spacing: 0.22em;
     text-transform: uppercase;
-    padding: 5px 11px;
+    padding: 6px 12px;
   }
   .tag {
-    left: 14px;
-    background: var(--ink);
+    left: 16px;
+    background: rgba(16, 42, 67, 0.88);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     color: var(--cream);
   }
   .status {
-    right: 14px;
+    right: 16px;
     background: var(--cream);
     color: var(--ink);
   }
 
   .card-body {
-    padding-top: 18px;
+    padding-top: 22px;
+  }
+  .card-meta {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    margin-bottom: 10px;
+  }
+  .rank {
+    font-family: var(--serif);
+    font-weight: var(--fw-medium);
+    font-size: 15px;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    padding-right: 14px;
+    border-right: 1px solid var(--border);
+    line-height: 1;
   }
   .card-title {
     font-family: var(--serif);
     font-weight: var(--fw-medium);
-    font-size: 21px;
+    font-size: clamp(20px, 1.6vw, 24px);
+    letter-spacing: var(--ls-heading);
     line-height: 1.15;
     color: var(--ink);
-    margin-bottom: 5px;
-    transition: color var(--dur-fast) ease;
-  }
-  .card-link:hover .card-title {
-    color: var(--taupe);
+    margin-bottom: 6px;
   }
   .card-location {
     font-family: var(--sans);
@@ -166,25 +224,44 @@ const specs = [
     font-size: var(--fs-small);
     line-height: 1.5;
     color: var(--taupe);
-    letter-spacing: 0.04em;
-    margin-bottom: 14px;
+    letter-spacing: 0.02em;
+    margin-bottom: 18px;
   }
   .ref {
     /* was opacity .75 → 2.83:1 */
     white-space: nowrap;
   }
   .card-foot {
+    position: relative;
     display: flex;
     justify-content: space-between;
     align-items: baseline;
     gap: 12px;
-    padding-top: 14px;
+    padding-top: 16px;
     border-top: 1px solid var(--border);
+  }
+  /* The same rule, drawn over in ink from the left on hover. */
+  .card-foot::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: var(--ink);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.9s var(--ease-out);
+  }
+  .card-link:hover .card-foot::before,
+  .card-link:focus-visible .card-foot::before {
+    transform: none;
   }
   .price {
     font-family: var(--serif);
     font-weight: var(--fw-medium);
-    font-size: 19px;
+    font-size: 21px;
+    letter-spacing: -0.01em;
     color: var(--ink);
     white-space: nowrap;
   }
@@ -193,6 +270,7 @@ const specs = [
     font-weight: var(--fw-body);
     /* ADJUSTED: 11px in the prototype. */
     font-size: var(--fs-micro);
+    letter-spacing: 0.02em;
     color: var(--taupe);
     text-align: right;
   }

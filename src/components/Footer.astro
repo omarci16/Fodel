@@ -162,17 +162,41 @@ const featuredCategories: (keyof typeof CATEGORY_FALLBACK)[] = [
     </nav>
   </div>
 
+  {/* The wordmark, at the width of the page: the logo's own wide tracking,
+      scaled until the five letters reach both margins. Decorative — the
+      name is already the first thing in this footer. */}
+  <div class="wordmark" aria-hidden="true">
+    <p class="wordmark-letters">
+      {['F', 'O', 'D', 'E', 'L'].map((l, i) => <span style={`--i:${i}`}>{l}</span>)}
+    </p>
+    <span class="wordmark-rule"></span>
+    <p class="wordmark-sub">
+      <span>{brand.name.replace('FODEL', '').trim() || 'VASTGOED'}</span>
+      <span class="num">52°04′N 4°18′E — 47°30′N 19°02′E</span>
+    </p>
+  </div>
+
   <div class="baseline">
     <p>© {COMPANY.founded}–{year} {COMPANY.names.legal} · {COMPANY.network.slice(0, 3).join(' · ')}</p>
     <p class="signature">{brand.signature}</p>
+    <a class="to-top" href="#main">
+      {locale === 'hu' ? 'Vissza az oldal tetejére' : 'Terug naar boven'}
+      <svg width="10" height="14" viewBox="0 0 10 14" fill="none" aria-hidden="true">
+        <path d="M5 14V1.5M1 5.5l4-4 4 4" stroke="currentColor" stroke-width="1.1" />
+      </svg>
+    </a>
   </div>
 </footer>
 
 <style>
   .footer {
-    background: var(--ink);
+    position: relative;
+    overflow: hidden;
+    background:
+      radial-gradient(90% 60% at 100% 100%, var(--ink-soft) 0%, transparent 60%),
+      linear-gradient(180deg, var(--ink) 0%, var(--ink-deep) 100%);
     color: var(--cream);
-    padding: 88px var(--pad-x) 52px;
+    padding: 120px var(--pad-x) 40px;
   }
 
   .grid {
@@ -208,10 +232,18 @@ const featuredCategories: (keyof typeof CATEGORY_FALLBACK)[] = [
   .col a {
     font-size: var(--fs-small);
     color: var(--on-dark-muted);
-    transition: color var(--dur-fast) ease;
+    background-image: linear-gradient(currentColor, currentColor);
+    background-size: 0% 1px;
+    background-position: 0 100%;
+    background-repeat: no-repeat;
+    padding-bottom: 2px;
+    transition:
+      color var(--dur-fast) ease,
+      background-size 0.6s var(--ease-out);
   }
   .col a:hover {
     color: var(--cream);
+    background-size: 100% 1px;
   }
 
   .contact a {
@@ -261,12 +293,69 @@ const featuredCategories: (keyof typeof CATEGORY_FALLBACK)[] = [
     color: var(--cream);
   }
 
+  /* ── Wordmark ── */
+  .wordmark {
+    padding-top: 96px;
+    user-select: none;
+  }
+  .wordmark-letters {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--serif);
+    font-weight: var(--fw-medium);
+    font-size: clamp(72px, 19vw, 340px);
+    line-height: 0.74;
+    color: var(--cream);
+    /* Nudge the outer letters onto the margins: the side bearings of F and L
+       would otherwise leave the word visibly inset from the grid. */
+    margin-inline: -0.045em -0.03em;
+  }
+  .wordmark-rule {
+    display: block;
+    height: 1px;
+    margin: 0.9vw 0 18px;
+    background: var(--on-dark-field-border);
+  }
+  .wordmark-sub {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    font-size: var(--fs-micro);
+    letter-spacing: 0.42em;
+    text-transform: uppercase;
+    color: var(--on-dark-muted);
+  }
+  .wordmark-sub .num {
+    letter-spacing: 0.16em;
+  }
+
   .baseline {
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 16px;
+    margin-top: 56px;
     padding-top: 28px;
+    border-top: 1px solid var(--on-dark-rule);
+  }
+  .to-top {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-size: var(--fs-micro);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--on-dark-muted);
+    transition: color var(--dur-fast) ease;
+  }
+  .to-top svg {
+    transition: transform 0.6s var(--ease-out);
+  }
+  .to-top:hover {
+    color: var(--cream);
+  }
+  .to-top:hover svg {
+    transform: translateY(-4px);
   }
   .baseline p {
     /* ADJUSTED: was rgba(cream,.25) — 2.0:1. */
@@ -278,6 +367,15 @@ const featuredCategories: (keyof typeof CATEGORY_FALLBACK)[] = [
     font-family: var(--serif);
   }
 
+  @media (max-width: 1100px) {
+    .baseline {
+      flex-wrap: wrap;
+    }
+    .signature {
+      order: 3;
+      width: 100%;
+    }
+  }
   @media (max-width: 900px) {
     .grid {
       grid-template-columns: 1fr 1fr;
@@ -287,14 +385,22 @@ const featuredCategories: (keyof typeof CATEGORY_FALLBACK)[] = [
       grid-column: 1 / -1;
     }
     .footer {
-      padding: 52px var(--pad-x-mob) 36px;
+      padding: 72px var(--pad-x-mob) 32px;
+    }
+    .wordmark {
+      padding-top: 64px;
+    }
+    .wordmark-sub {
+      flex-direction: column;
+      gap: 8px;
+      letter-spacing: 0.3em;
     }
   }
   @media (max-width: 560px) {
     .baseline {
       flex-direction: column;
       align-items: flex-start;
-      gap: 8px;
+      gap: 12px;
     }
   }
 </style>

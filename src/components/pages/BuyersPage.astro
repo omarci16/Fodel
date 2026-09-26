@@ -4,13 +4,19 @@
  * owner" mechanic stated concretely (it is FODEL's differentiator and the
  * prototype only gestured at it), and the free search service, which is the
  * strongest call to action on this page.
+ *
+ * 1.4: the owner mechanic is set as the page's statement, lit word by word,
+ * with the figure it earns the buyer (0% commission on a direct deal) as the
+ * counterpart of the 4% on the sellers page. Lists, FAQ and the featured row
+ * use the shared components, so every audience page reads the same way.
  */
 import Base from '~/layouts/Base.astro';
 import PageHeader from '~/components/PageHeader.astro';
-import Eyebrow from '~/components/Eyebrow.astro';
 import SectionHead from '~/components/SectionHead.astro';
 import Button from '~/components/Button.astro';
 import PropertyCard from '~/components/PropertyCard.astro';
+import PointsList from '~/components/PointsList.astro';
+import FaqAccordion from '~/components/FaqAccordion.astro';
 import ParallaxCta from '~/components/ParallaxCta.astro';
 import { UI, path, type Locale } from '~/i18n/ui';
 import { AGRI_HECTARE_LIMIT } from '~/config/company';
@@ -62,7 +68,11 @@ const wants = hu
   title={c.meta.title}
   description={c.meta.description}
   alternates={alternatesFor('buyers')}
-  schema={[faqSchema(buyerFaq.map((e) => ({ question: e.question, answer: faqAnswerText(e) })))]}
+  schema={
+    buyerFaq.length > 0
+      ? [faqSchema(buyerFaq.map((e) => ({ question: e.question, answer: faqAnswerText(e) })))]
+      : []
+  }
 >
   <PageHeader
     eyebrow={c.hero.eyebrow}
@@ -75,70 +85,70 @@ const wants = hu
     secondary={{ label: c.hero.secondary, href: path(locale, 'searchRequest') }}
   />
 
-  {/* ── Direct-from-owner explainer ── */}
+  {/* ── Direct from the owner ── */}
   <section class="direct" data-bg="dark">
-    <div class="direct-inner reveal">
-      <SectionHead
-        eyebrow={hu ? 'A FODEL-modell' : 'Het FODEL-model'}
-        title={hu
+    <p class="direct-source reveal">
+      <span class="direct-rule draw" aria-hidden="true"></span>
+      {hu ? 'A FODEL-modell' : 'Het FODEL-model'}
+    </p>
+    <h2 class="direct-statement" data-words>
+      {
+        hu
           ? 'A hirdetésben a tulajdonos neve és telefonszáma is szerepel.'
-          : 'Bij de advertentie staan ook de naam en het nummer van de eigenaar.'}
-      />
-      <p>
+          : 'Bij de advertentie staan ook de naam en het nummer van de eigenaar.'
+      }
+    </h2>
+
+    <div class="direct-foot">
+      <p class="direct-body reveal">
         {
           hu
             ? 'Ez nem szlogen, hanem a modellünk lényege. Ahol a tulajdonos hozzájárult, ott közvetlenül felveheti vele a kapcsolatot. Ha így köti meg az üzletet, sem Önnek, sem az eladónak nem kell jutalékot fizetnie — mi a hirdetésért kaptunk díjat.'
             : 'Dat is geen slogan maar de kern van ons model. Waar de eigenaar daarmee heeft ingestemd, kunt u rechtstreeks contact opnemen. Regelt u de koop zo, dan betaalt niemand courtage — wij zijn al betaald voor de advertentie.'
         }
       </p>
+      <div class="direct-figure reveal">
+        <span class="pct num">0<span class="pct-sign">%</span></span>
+        <span class="pct-note">
+          {hu ? 'jutalék közvetlen üzletkötésnél' : 'courtage bij een directe koop'}
+        </span>
+      </div>
     </div>
   </section>
 
-  {/* ── What we handle ── */}
+  {/* ── What we handle + what buyers look for ── */}
   <div class="split">
     <section class="services reveal">
-      <SectionHead eyebrow={c.services.eyebrow} title={c.services.title} />
-      <ul class="points">
-        {
-          c.services.points.map((p: string) => (
-            <li>
-              <span class="dash" aria-hidden="true" />
-              <span>{p}</span>
-            </li>
-          ))
-        }
-      </ul>
-      <Button variant="text" href={path(locale, 'services')}>
-        {hu ? 'Szolgáltatások és díjak' : 'Diensten en tarieven'}
-      </Button>
+      <SectionHead eyebrow={c.services.eyebrow} title={c.services.title} rule={false} />
+      <div>
+        <PointsList items={c.services.points} />
+        <div class="services-more">
+          <Button variant="text" href={path(locale, 'services')}>
+            {hu ? 'Szolgáltatások és díjak' : 'Diensten en tarieven'}
+          </Button>
+        </div>
+      </div>
     </section>
 
     <section class="wants reveal">
-      <SectionHead eyebrow={c.reasons.eyebrow} title={c.reasons.title} />
-      <ul class="points">
-        {
-          wants.map((w) => (
-            <li>
-              <span class="dash" aria-hidden="true" />
-              <span>{w}</span>
-            </li>
-          ))
-        }
-      </ul>
+      <SectionHead eyebrow={c.reasons.eyebrow} title={c.reasons.title} rule={false} />
+      <PointsList items={wants} />
     </section>
   </div>
 
-  {/* ── Agricultural note ── */}
-  <section class="agri reveal">
-    <div class="agri-inner">
-      <Eyebrow space="16px">{hu ? 'Agráringatlan' : 'Agrarisch vastgoed'}</Eyebrow>
-      <h2>
-        {
-          hu
-            ? `Agrárvégzettséggel ${AGRI_HECTARE_LIMIT} hektárig vásárolhat`
-            : `Met een agrarische kwalificatie tot ${AGRI_HECTARE_LIMIT} hectare`
-        }
-      </h2>
+  {/* ── Agricultural land ── */}
+  <section class="agri">
+    <div class="agri-figure reveal" aria-hidden="true">
+      <span class="ha num">{AGRI_HECTARE_LIMIT}</span>
+      <span class="ha-unit">{hu ? 'hektár' : 'hectare'}</span>
+    </div>
+    <div class="agri-copy reveal">
+      <SectionHead
+        eyebrow={hu ? 'Agráringatlan' : 'Agrarisch vastgoed'}
+        title={hu
+          ? `Agrárvégzettséggel ${AGRI_HECTARE_LIMIT} hektárig vásárolhat`
+          : `Met een agrarische kwalificatie tot ${AGRI_HECTARE_LIMIT} hectare`}
+      />
       <p>
         {
           hu
@@ -153,51 +163,46 @@ const wants = hu
   </section>
 
   {/* ── Featured ── */}
-  <section class="featured">
-    <SectionHead
-      eyebrow={hu ? 'Válogatás' : 'Selectie'}
-      title={hu ? 'Kiemelt ingatlanok' : 'Uitgelicht aanbod'}
-      class="feat-head reveal"
-    />
-    <div class="feat-grid">
-      {featured.map((p) => <PropertyCard property={p} locale={locale} class="reveal" />)}
-    </div>
-    <div class="feat-more reveal">
-      <Button variant="outline" href={path(locale, 'properties')}>{ui.cta.allProperties}</Button>
-    </div>
-  </section>
+  {
+    featured.length > 0 && (
+      <section class="featured">
+        <SectionHead
+          eyebrow={hu ? 'Válogatás' : 'Selectie'}
+          title={hu ? 'Kiemelt ingatlanok' : 'Uitgelicht aanbod'}
+          size="large"
+          class="feat-head reveal"
+        >
+          <Button variant="text" href={path(locale, 'properties')} class="feat-link">
+            {ui.cta.allProperties}
+          </Button>
+        </SectionHead>
+        <div class="feat-grid">
+          {featured.map((p) => (
+            <PropertyCard
+              property={p}
+              locale={locale}
+              ratio="4 / 5"
+              sizes="(max-width: 900px) 100vw, 30vw"
+            />
+          ))}
+        </div>
+        <div class="feat-more">
+          <Button variant="outline" href={path(locale, 'properties')} block>
+            {ui.cta.allProperties}
+          </Button>
+        </div>
+      </section>
+    )
+  }
 
-  {/* ── FAQ ── */}
-  <section class="faq">
-    <SectionHead
-      eyebrow={hu ? 'Gyakori kérdések' : 'Veelgestelde vragen'}
-      title={hu ? 'Amit a vevők kérdezni szoktak' : 'Wat kopers ons vragen'}
-      align="center"
-      class="faq-head reveal"
-    />
-    <div class="faq-list">
-      {
-        buyerFaq.map((entry) => (
-          <details class="faq-item">
-            <summary>
-              <span>{entry.question}</span>
-              <span class="chev" aria-hidden="true">+</span>
-            </summary>
-            <div class="faq-answer">
-              {entry.answer.map((para) =>
-                para.startsWith('- ') ? <p class="bullet">{para.slice(2)}</p> : <p>{para}</p>
-              )}
-            </div>
-          </details>
-        ))
-      }
-    </div>
-    <div class="faq-more reveal">
-      <Button variant="text" href={path(locale, 'faq')}>
-        {hu ? 'Összes kérdés és válasz' : 'Alle vragen en antwoorden'}
-      </Button>
-    </div>
-  </section>
+  {/* ── Buyer FAQ ── */}
+  <FaqAccordion
+    eyebrow={hu ? 'Gyakori kérdések' : 'Veelgestelde vragen'}
+    title={hu ? 'Amit a vevők kérdezni szoktak' : 'Wat kopers ons vragen'}
+    entries={buyerFaq}
+    moreHref={path(locale, 'faq')}
+    moreLabel={hu ? 'Összes kérdés és válasz' : 'Alle vragen en antwoorden'}
+  />
 
   <ParallaxCta
     eyebrow={hu ? 'Nem találta meg?' : 'Niet gevonden?'}
@@ -214,192 +219,220 @@ const wants = hu
 </Base>
 
 <style>
-  h2 {
-    font-family: var(--serif);
-    font-weight: var(--fw-display);
-    font-size: clamp(26px, 2.8vw, 42px);
-    line-height: 1.2;
-    color: var(--ink);
-    margin-bottom: 24px;
-  }
-
+  /* ── Direct from the owner ── */
   .direct {
-    background: var(--ink);
-    padding: 88px var(--pad-x);
+    padding: 152px var(--pad-x) 112px;
+    background:
+      radial-gradient(120% 80% at 85% 0%, var(--ink-soft) 0%, transparent 55%),
+      linear-gradient(180deg, var(--ink) 0%, var(--ink-deep) 100%);
   }
-  .direct-inner {
-    max-width: 72ch;
+  .direct-source {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 44px;
+    font-size: var(--fs-eyebrow);
+    letter-spacing: var(--ls-eyebrow);
+    text-transform: uppercase;
+    color: var(--on-dark-body);
   }
-  .direct h2 {
+  .direct-rule {
+    width: 48px;
+    height: 1px;
+    background: var(--cream);
+  }
+  .direct-statement {
+    max-width: 1180px;
+    font-family: var(--serif);
+    font-weight: var(--fw-light);
+    font-size: clamp(34px, 4.6vw, 74px);
+    line-height: 1.1;
+    letter-spacing: var(--ls-display);
     color: var(--cream);
+    text-wrap: balance;
   }
-  .direct p {
+  .direct-foot {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 80px;
+    align-items: end;
+    margin-top: 128px;
+    padding-top: 48px;
+    border-top: 1px solid var(--on-dark-rule);
+  }
+  .direct-body {
+    max-width: 56ch;
     font-size: var(--fs-body-lg);
     line-height: var(--lh-lead);
     color: var(--on-dark-body);
   }
+  .direct-figure {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 16px;
+  }
+  .pct {
+    display: block;
+    font-family: var(--serif);
+    font-weight: var(--fw-light);
+    font-size: clamp(112px, 13vw, 208px);
+    line-height: 0.8;
+    letter-spacing: -0.04em;
+    color: var(--cream);
+  }
+  .pct-sign {
+    font-size: 0.5em;
+    letter-spacing: 0;
+    vertical-align: 0.72em;
+    margin-left: 0.04em;
+  }
+  .pct-note {
+    font-size: var(--fs-small);
+    letter-spacing: 0.06em;
+    color: var(--on-dark-muted);
+  }
 
+  /* ── Services + wants ──
+     Subgrid, so both lists start on one line whatever the headings wrap to.
+     No gold rule under these heads: the list's own hairline is the rule. */
   .split {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    border-bottom: 1px solid var(--border);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto 1fr;
   }
   .services,
   .wants {
-    padding: 88px var(--pad-x);
+    display: grid;
+    grid-row: span 2;
+    grid-template-rows: subgrid;
+    row-gap: 0;
+    align-content: start;
+    padding: var(--section-y) var(--pad-x);
+  }
+  .split :global(.section-head-standard) {
+    align-self: start;
+    margin-bottom: 26px;
   }
   .wants {
     background: var(--linen);
-    border-left: 1px solid var(--border);
   }
-  .points {
+  .services-more {
+    margin-top: 36px;
+  }
+
+  /* ── Agricultural land ── */
+  .agri {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 80px;
+    align-items: center;
+    padding: var(--section-y) var(--pad-x);
+    border-top: 1px solid var(--border);
+  }
+  .agri-figure {
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    list-style: none;
-    margin-bottom: 28px;
+    gap: 20px;
   }
-  .points li {
-    display: flex;
-    gap: 16px;
-    align-items: flex-start;
+  /* The negative margin takes out the numeral's side bearing (~0.05em), so
+     the ink of the 3 lines up with the label under it. */
+  .ha {
+    display: block;
+    margin-left: -0.05em;
+    font-family: var(--serif);
+    font-weight: var(--fw-light);
+    font-size: clamp(120px, 16vw, 256px);
+    line-height: 0.8;
+    letter-spacing: -0.045em;
+    color: var(--ink);
+  }
+  .ha-unit {
+    font-size: var(--fs-eyebrow);
+    letter-spacing: var(--ls-eyebrow);
+    text-transform: uppercase;
+    color: var(--taupe);
+  }
+  .agri-copy p {
+    max-width: 56ch;
+    margin-bottom: 36px;
     font-size: var(--fs-body);
     line-height: var(--lh-body);
     color: var(--taupe);
   }
-  .dash {
-    width: 20px;
-    height: 1px;
-    background: var(--accent);
-    margin-top: 13px;
-    flex-shrink: 0;
-  }
 
-  .agri {
-    padding: 72px var(--pad-x);
-    border-bottom: 1px solid var(--border);
-  }
-  .agri-inner {
-    max-width: 68ch;
-  }
-  .agri p {
-    font-size: var(--fs-body);
-    line-height: var(--lh-body);
-    color: var(--taupe);
-    margin-bottom: 28px;
-  }
-
+  /* ── Featured ── */
   .featured {
     padding: var(--section-y) var(--pad-x);
+    background: var(--linen);
   }
-  .feat-head {
-    margin-bottom: 52px;
+  .featured :global(.feat-head) {
+    margin-bottom: 64px;
   }
   .feat-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 36px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 32px;
   }
   .feat-more {
-    margin-top: 40px;
+    display: none;
+    margin-top: 32px;
   }
 
-  .faq {
-    padding: 0 var(--pad-x) var(--section-y);
-  }
-  .faq-head {
-    text-align: center;
-    margin-bottom: 52px;
-  }
-  .faq-list {
-    max-width: 78ch;
-    margin-inline: auto;
-    border-top: 1px solid var(--border);
-  }
-  .faq-item {
-    border-bottom: 1px solid var(--border);
-  }
-  summary {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 24px;
-    padding: 22px 0;
-    cursor: pointer;
-    font-family: var(--serif);
-    font-weight: var(--fw-medium);
-    font-size: var(--fs-lead);
-    line-height: 1.5;
-    color: var(--ink);
-    list-style: none;
-  }
-  summary::-webkit-details-marker {
-    display: none;
-  }
-  .chev {
-    font-size: 20px;
-    line-height: 1;
-    color: var(--accent);
-    flex-shrink: 0;
-    transition: transform var(--dur-fast) ease;
-  }
-  .faq-item[open] .chev {
-    transform: rotate(45deg);
-  }
-  .faq-answer {
-    padding-bottom: 24px;
-  }
-  .faq-answer p {
-    font-size: var(--fs-body);
-    line-height: var(--lh-body);
-    color: var(--taupe);
-    margin-bottom: 12px;
-  }
-  .bullet {
-    padding-left: 18px;
-    position: relative;
-    margin-bottom: 6px;
-  }
-  .bullet::before {
-    content: '·';
-    position: absolute;
-    left: 4px;
-    color: var(--accent);
-  }
-  .faq-more {
-    text-align: center;
-    margin-top: 40px;
+  @media (max-width: 1080px) {
+    .agri {
+      gap: 48px;
+    }
   }
 
   @media (max-width: 900px) {
-    .direct,
-    .services,
-    .wants,
-    .agri {
-      padding: 44px var(--pad-x-mob);
+    .direct {
+      padding: 96px var(--pad-x-mob) 64px;
     }
+    .direct-source {
+      margin-bottom: 32px;
+    }
+    .direct-foot {
+      grid-template-columns: 1fr;
+      gap: 40px;
+      margin-top: 72px;
+      padding-top: 36px;
+    }
+    .direct-figure {
+      align-items: flex-start;
+    }
+
     .split {
       grid-template-columns: 1fr;
+      grid-template-rows: none;
     }
+    .services,
     .wants {
-      border-left: none;
-      border-top: 1px solid var(--border);
+      display: block;
+      padding: var(--section-y-mob) var(--pad-x-mob);
     }
+
+    .agri {
+      grid-template-columns: 1fr;
+      gap: 32px;
+      padding: var(--section-y-mob) var(--pad-x-mob);
+    }
+
     .featured {
       padding: var(--section-y-mob) var(--pad-x-mob);
     }
-    .feat-head {
-      margin-bottom: 28px;
+    .featured :global(.feat-head) {
+      margin-bottom: 36px;
+    }
+    .featured :global(.feat-link) {
+      display: none;
     }
     .feat-grid {
       grid-template-columns: 1fr;
-      gap: 28px;
+      gap: 40px;
     }
-    .faq {
-      padding: 0 var(--pad-x-mob) var(--section-y-mob);
-    }
-    .faq-head {
-      margin-bottom: 28px;
+    .feat-more {
+      display: block;
     }
   }
 </style>

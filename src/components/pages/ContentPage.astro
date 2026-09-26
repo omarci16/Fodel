@@ -292,6 +292,12 @@ const path = (key: RouteKey) => routePath(locale, key);
     .content {
       padding: 8px var(--pad-x-mob) var(--section-y-mob);
     }
+    /* Legal and guide headings carry long Dutch and Hungarian compounds;
+       on a phone they hyphenate (html lang drives the dictionary). */
+    h2,
+    h3 {
+      hyphens: auto;
+    }
     th {
       width: 45%;
       padding-right: 16px;

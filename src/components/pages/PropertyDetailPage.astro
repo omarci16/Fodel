@@ -118,6 +118,7 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
       }),
   ]}
 >
+  <div class="detail-top">
   <nav class="crumbs no-print" aria-label={ui.a11y.breadcrumb}>
     <ol>
       {
@@ -131,49 +132,68 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
   </nav>
 
   {/* ── Gallery hero ── */}
-  <div class="property-detail-hero" id="gallery">
+  <div class="property-detail-hero" id="gallery" tabindex="-1" aria-roledescription="carousel" aria-label={title}>
     {
       gallery.map((image, i) => (
-        <div class="property-detail-hero-media gallery-slide" data-slide={i} hidden={i !== 0}>
-          {/* astro:assets' <Image> has separate local/remote overloads; a src that can be either doesn't match either cleanly — the `as any` is a type-checker limitation, not a runtime one. */}
-          <Image
-            src={image.src as any}
-            alt={image.alt}
-            widths={HERO_WIDTHS}
-            sizes={HERO_SIZES}
-            loading={i === 0 ? 'eager' : 'lazy'}
-            fetchpriority={i === 0 ? 'high' : 'auto'}
-            inferSize={typeof image.src === 'string'}
-          />
+        <div
+          class="property-detail-hero-media gallery-slide"
+          data-slide={i}
+          data-active={i === 0 ? '' : undefined}
+          hidden={i !== 0}
+        >
+          {/* The first photograph shares its name with the card photograph a
+              visitor clicked (PropertyCard, Base.astro), so the one morphs
+              into the other across the page transition. */}
+          <div class="slide-inner" style={i === 0 ? 'view-transition-name: prop-hero' : undefined}>
+            {/* astro:assets' <Image> has separate local/remote overloads; a src that can be either doesn't match either cleanly — the `as any` is a type-checker limitation, not a runtime one. */}
+            <Image
+              src={image.src as any}
+              alt={image.alt}
+              widths={HERO_WIDTHS}
+              sizes={HERO_SIZES}
+              loading={i === 0 ? 'eager' : 'lazy'}
+              fetchpriority={i === 0 ? 'high' : 'auto'}
+              inferSize={typeof image.src === 'string'}
+            />
+          </div>
         </div>
       ))
     }
     <div class="property-detail-hero-overlay"></div>
 
-    {tag && <span class="hero-tag">{tag}</span>}
-
     <div class="hero-foot">
       <div class="hero-title">
-        <span class="hero-kicker">{category}</span>
+        {tag && <span class="hero-tag">{tag}</span>}
+        <span class="hero-kicker">{d.location.region} — {category}</span>
         <span class="hero-name">{title}</span>
       </div>
 
       {
         gallery.length > 1 && (
-          <div class="property-detail-gallery-controls no-print">
-            <button class="property-detail-nav" type="button" id="gal-prev" aria-label={ui.property.prevImage} aria-controls="gallery">
-              <span class="property-detail-nav-arrow" aria-hidden="true">←</span>
-            </button>
-            <p class="property-detail-gallery-count" id="gal-count" role="status">
-              01 / {String(gallery.length).padStart(2, '0')}
-            </p>
-            <button class="property-detail-nav" type="button" id="gal-next" aria-label={ui.property.nextImage} aria-controls="gallery">
-              <span class="property-detail-nav-arrow" aria-hidden="true">→</span>
-            </button>
+          <div class="hero-gallery no-print">
+            <div class="property-detail-gallery-controls">
+              <button class="property-detail-nav" type="button" id="gal-prev" aria-label={ui.property.prevImage} aria-controls="gallery">
+                <svg width="18" height="10" viewBox="0 0 18 10" fill="none" aria-hidden="true">
+                  <path d="M18 5H1.5M5.5 1l-4 4 4 4" stroke="currentColor" stroke-width="1.1" />
+                </svg>
+              </button>
+              <p class="property-detail-gallery-count num" id="gal-count" role="status">
+                01 / {String(gallery.length).padStart(2, '0')}
+              </p>
+              <button class="property-detail-nav" type="button" id="gal-next" aria-label={ui.property.nextImage} aria-controls="gallery">
+                <svg width="18" height="10" viewBox="0 0 18 10" fill="none" aria-hidden="true">
+                  <path d="M0 5h16.5M12.5 1l4 4-4 4" stroke="currentColor" stroke-width="1.1" />
+                </svg>
+              </button>
+            </div>
+            <div class="gal-bar" aria-hidden="true">
+              {gallery.map((_, i) => <span data-seg={i} data-on={i === 0 ? '' : undefined} />)}
+            </div>
           </div>
         )
       }
     </div>
+  </div>
   </div>
 
   {/* ── Body ── */}
@@ -337,15 +357,54 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
 
 <script>
   // Gallery: click, keyboard arrows and swipe. The prototype had click only.
+  // 1.4: the incoming photograph fades in over the outgoing one, which is
+  // only hidden once the fade has finished — so there is never a blank frame
+  // and never more than two slides rendered (the rest stay `hidden`, so
+  // their lazy images don't load until they are asked for).
   const root = document.getElementById('gallery');
   if (root) {
     const slides = Array.from(root.querySelectorAll<HTMLElement>('.gallery-slide'));
+    const segments = Array.from(root.querySelectorAll<HTMLElement>('[data-seg]'));
     const counter = document.getElementById('gal-count');
     let index = 0;
+    // Each change gets a number; a settle from an earlier, overtaken change
+    // does nothing, so rapid clicking never hides a slide mid-fade.
+    let generation = 0;
 
     const show = (next: number) => {
-      index = (next + slides.length) % slides.length;
-      slides.forEach((slide, i) => slide.toggleAttribute('hidden', i !== index));
+      const target = (next + slides.length) % slides.length;
+      if (target === index) return;
+      const outgoing = slides[index];
+      const incoming = slides[target];
+      index = target;
+      const current = ++generation;
+      root.setAttribute('data-moved', '');
+
+      slides.forEach((slide) => slide.removeAttribute('data-leaving'));
+      outgoing.removeAttribute('data-active');
+      outgoing.setAttribute('data-leaving', '');
+      incoming.hidden = false;
+      incoming.setAttribute('data-active', '');
+
+      const settle = () => {
+        if (current !== generation) return;
+        slides.forEach((slide, i) => {
+          if (i !== index) {
+            slide.hidden = true;
+            slide.removeAttribute('data-leaving');
+          }
+        });
+      };
+      const onEnd = (e: AnimationEvent) => {
+        if (e.target !== incoming) return;
+        incoming.removeEventListener('animationend', onEnd);
+        settle();
+      };
+      incoming.addEventListener('animationend', onEnd);
+      // Reduced motion (no animation) or an interrupted fade still settles.
+      window.setTimeout(settle, 1400);
+
+      segments.forEach((seg, i) => seg.toggleAttribute('data-on', i <= index));
       if (counter) {
         counter.textContent = `${String(index + 1).padStart(2, '0')} / ${String(slides.length).padStart(2, '0')}`;
       }
@@ -371,168 +430,293 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
 </script>
 
 <style>
+  /* ── Breadcrumb, laid over the top of the photograph ── */
+  .detail-top {
+    position: relative;
+  }
   .crumbs {
-    padding: 18px var(--pad-x);
-    border-bottom: 1px solid var(--border);
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 4;
+    padding: 28px var(--pad-x);
+    animation: fx-fade-up 1.2s var(--ease-out) 0.5s both;
   }
   .crumbs ol {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    align-items: center;
+    gap: 6px 12px;
     list-style: none;
     font-size: var(--fs-micro);
-    color: var(--taupe);
+    letter-spacing: 0.06em;
+    line-height: 1.5;
+    color: var(--on-dark-body);
+  }
+  .crumbs li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
   }
   .crumbs li + li::before {
-    content: '/';
-    margin-right: 8px;
-    color: var(--border);
+    content: '';
+    width: 16px;
+    height: 1px;
+    background: rgba(244, 244, 242, 0.45);
+  }
+  .crumbs a {
+    transition: color var(--dur-fast) ease;
+  }
+  .crumbs a:hover {
+    color: var(--cream);
   }
   .crumbs [aria-current] {
-    color: var(--ink);
+    color: var(--cream);
+  }
+  .crumbs :focus-visible {
+    outline-color: var(--cream);
   }
 
+  /* ── Gallery hero ──
+     Exactly the visible viewport under the nav, within sane bounds. */
   .property-detail-hero {
-    height: 74vh;
-    min-height: 560px;
+    height: clamp(560px, calc(100svh - var(--nav-h)), 1040px);
   }
   .gallery-slide[hidden] {
     display: none;
   }
-  .hero-tag {
+  .gallery-slide[data-leaving] {
+    z-index: 0;
+  }
+  .gallery-slide[data-active] {
+    z-index: 1;
+  }
+  .slide-inner {
     position: absolute;
-    top: 36px;
-    left: var(--pad-x);
-    z-index: 2;
-    background: rgba(16, 42, 67, 0.86);
+    inset: 0;
+  }
+  /* Only slides reached by the controls fade in (data-moved is set on the
+     first change). The first photograph is on screen from the start, and may
+     be arriving mid-morph from a card photograph — it must not also fade. */
+  #gallery[data-moved] .gallery-slide[data-active] {
+    animation: slide-in 0.9s var(--ease-out) both;
+  }
+  #gallery[data-moved] .gallery-slide[data-active] :global(img) {
+    animation: slide-settle 1.8s var(--ease-out) both;
+  }
+  @keyframes slide-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes slide-settle {
+    from {
+      transform: scale(1.06);
+    }
+  }
+  #gallery:focus-visible {
+    outline-offset: -4px;
+  }
+
+  .hero-tag {
+    align-self: flex-start;
+    background: rgba(10, 29, 48, 0.5);
+    border: 1px solid rgba(244, 244, 242, 0.22);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     color: var(--cream);
     font-family: var(--sans);
     font-size: var(--fs-eyebrow);
     letter-spacing: 0.22em;
     text-transform: uppercase;
-    padding: 6px 14px;
+    padding: 8px 16px;
+    margin-bottom: 8px;
   }
   .hero-foot {
     position: absolute;
-    left: 32px;
-    right: 32px;
-    bottom: 28px;
-    z-index: 2;
+    left: var(--pad-x);
+    right: var(--pad-x);
+    bottom: 48px;
+    z-index: 3;
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
-    gap: 16px;
+    gap: 48px;
   }
   .hero-title {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 16px;
+    min-width: 0;
     color: var(--cream);
-    max-width: 30ch;
+    animation: fx-fade-up 1.4s var(--ease-out) 0.45s both;
   }
   .hero-kicker {
     font-size: var(--fs-eyebrow);
     letter-spacing: var(--ls-eyebrow);
+    line-height: 1.4;
     text-transform: uppercase;
-    opacity: 0.85;
+    color: var(--on-dark-strong);
   }
   .hero-name {
     font-family: var(--serif);
-    font-weight: var(--fw-regular);
-    font-size: clamp(22px, 2.2vw, 30px);
-    line-height: 1.05;
+    font-weight: var(--fw-hero);
+    font-size: clamp(34px, 5.4vw, 92px);
+    letter-spacing: var(--ls-display);
+    line-height: 0.98;
+    max-width: 14ch;
+    text-wrap: balance;
+    text-shadow: 0 2px 30px rgba(10, 29, 48, 0.25);
+  }
+  .hero-gallery {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 14px;
+    flex-shrink: 0;
+    animation: fx-fade-up 1.2s var(--ease-out) 0.7s both;
+  }
+  /* One segment per photograph, filled up to the one on screen. */
+  .gal-bar {
+    display: flex;
+    gap: 4px;
+    width: 100%;
+    max-width: 260px;
+  }
+  .gal-bar span {
+    flex: 1;
+    height: 2px;
+    background: rgba(244, 244, 242, 0.28);
+    position: relative;
+    overflow: hidden;
+  }
+  .gal-bar span::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--cream);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.6s var(--ease-out);
+  }
+  .gal-bar span[data-on]::after {
+    transform: none;
   }
 
+  /* ── Body ── */
   .body {
     display: grid;
-    grid-template-columns: 1fr 420px;
-    gap: 88px;
-    padding: 80px var(--pad-x);
+    grid-template-columns: minmax(0, 1fr) 440px;
+    gap: 104px;
+    padding: 104px var(--pad-x) 120px;
     align-items: start;
   }
 
   h1 {
     font-family: var(--serif);
-    font-weight: var(--fw-display);
-    font-size: clamp(34px, 3.5vw, 58px);
-    line-height: 1.08;
+    font-weight: var(--fw-hero);
+    font-size: clamp(38px, 4.4vw, 72px);
+    letter-spacing: var(--ls-display);
+    line-height: 1.02;
     color: var(--ink);
-    margin-bottom: 8px;
+    margin-bottom: 16px;
   }
   .subtitle {
     font-size: var(--fs-lead);
+    line-height: 1.5;
     color: var(--taupe);
-    margin-bottom: 12px;
+    margin-bottom: 14px;
   }
   .location {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px 16px;
     font-size: var(--fs-body);
     color: var(--taupe);
-    margin-bottom: 16px;
-  }
-  .detail-map {
-    height: 280px;
-    margin-bottom: 36px;
-    border: 1px solid var(--border);
+    margin-bottom: 40px;
   }
   .map-link {
-    margin-left: 12px;
     font-size: var(--fs-micro);
     letter-spacing: 0.16em;
     text-transform: uppercase;
-    text-decoration: underline;
-    text-underline-offset: 4px;
+    color: var(--ink);
+    background-image: linear-gradient(currentColor, currentColor);
+    background-size: 100% 1px;
+    background-position: 0 100%;
+    background-repeat: no-repeat;
+    padding-bottom: 3px;
+    transition: background-size 0.6s var(--ease-out);
+  }
+  .map-link:hover {
+    background-size: 0% 1px;
+    background-position: 100% 100%;
   }
 
   .price-row {
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: 8px 24px;
-    padding: 20px 0;
-    border-top: 1px solid var(--border);
+    gap: 10px 28px;
+    padding: 28px 0;
+    border-top: 1px solid var(--ink);
     border-bottom: 1px solid var(--border);
-    margin-bottom: 44px;
+    margin-bottom: 0;
   }
   .price {
     font-family: var(--serif);
     font-weight: var(--fw-medium);
-    font-size: 38px;
+    font-size: clamp(38px, 3.4vw, 56px);
+    letter-spacing: -0.015em;
+    line-height: 1;
     color: var(--ink);
+    font-variant-numeric: tabular-nums lining-nums;
   }
   .price-huf {
     font-size: var(--fs-body);
     color: var(--taupe);
+    font-variant-numeric: tabular-nums;
   }
   .price-asof {
     font-size: var(--fs-micro);
+    letter-spacing: 0.04em;
     color: var(--taupe);
-    /* was opacity .85 → 3.9:1 */
     margin-left: auto;
   }
 
+  /* Hairline grid: rules between, not boxes around. */
   .specs {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    border: 1px solid var(--border);
-    margin-bottom: 24px;
+    margin-bottom: 28px;
   }
   .spec {
-    padding: 22px 20px;
-    text-align: center;
-    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column-reverse;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 26px 24px 26px 0;
     border-bottom: 1px solid var(--border);
+  }
+  .spec:not(:nth-child(3n + 1)) {
+    padding-left: 24px;
+    border-left: 1px solid var(--border);
   }
   .spec dd {
     font-family: var(--serif);
-    font-weight: var(--fw-medium);
-    font-size: 24px;
+    font-weight: var(--fw-regular);
+    font-size: clamp(24px, 2vw, 32px);
+    letter-spacing: -0.02em;
+    line-height: 1;
     color: var(--ink);
-    margin-bottom: 4px;
+    font-variant-numeric: tabular-nums lining-nums;
   }
   .spec dt {
     font-family: var(--sans);
     font-size: var(--fs-eyebrow);
     letter-spacing: 0.16em;
+    line-height: 1.4;
     text-transform: uppercase;
     color: var(--taupe);
   }
@@ -544,15 +728,25 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
     gap: 16px;
     font-size: var(--fs-small);
     color: var(--taupe);
-    margin-bottom: 36px;
+    margin-bottom: 56px;
+  }
+  .ref-row strong {
+    color: var(--ink);
+    font-weight: var(--fw-medium);
+    font-variant-numeric: tabular-nums;
   }
   .print-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
     font-size: var(--fs-micro);
     letter-spacing: 0.18em;
     text-transform: uppercase;
     color: var(--taupe);
-    text-decoration: underline;
-    text-underline-offset: 4px;
+    transition: color var(--dur-fast) ease;
+  }
+  .print-btn:hover {
+    color: var(--ink);
   }
 
   .sr-heading {
@@ -563,11 +757,17 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
     clip: rect(0 0 0 0);
     white-space: nowrap;
   }
+  .prose {
+    max-width: 68ch;
+  }
   .prose .lead {
-    font-size: var(--fs-lead);
-    line-height: var(--lh-lead);
-    color: var(--taupe);
-    margin-bottom: 28px;
+    font-family: var(--serif);
+    font-weight: var(--fw-regular);
+    font-size: clamp(21px, 1.7vw, 26px);
+    line-height: 1.5;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+    margin-bottom: 32px;
   }
   .prose :global(p) {
     font-size: var(--fs-body);
@@ -576,30 +776,38 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
     margin-bottom: 18px;
   }
   .prose :global(blockquote) {
-    border-left: 2px solid var(--accent);
-    padding: 4px 0 4px 20px;
-    margin: 24px 0;
+    border-left: 1px solid var(--ink);
+    padding: 4px 0 4px 24px;
+    margin: 32px 0;
+    font-family: var(--serif);
     font-style: italic;
+    font-size: var(--fs-lead);
     color: var(--ink);
   }
   :global(.prose-rule) {
-    margin: 36px 0;
+    margin: 48px 0;
   }
 
   .features {
-    margin-bottom: 36px;
+    margin-top: 40px;
+    margin-bottom: 40px;
   }
   .features ul {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px 10px;
+    gap: 8px;
     list-style: none;
   }
   .features li {
     font-size: var(--fs-small);
+    line-height: 1.3;
     color: var(--ink);
     border: 1px solid var(--border);
-    padding: 7px 14px;
+    background: rgba(255, 255, 255, 0.4);
+    padding: 9px 16px;
+  }
+  .video {
+    margin-bottom: 40px;
   }
   .video a {
     font-size: var(--fs-small);
@@ -607,41 +815,58 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
     text-underline-offset: 3px;
   }
 
-  .owner {
+  .detail-map {
+    height: 340px;
+    margin-bottom: 40px;
+    border: 1px solid var(--border);
+  }
+
+  .owner,
+  .guarantee {
+    position: relative;
     background: var(--linen);
-    border-left: 2px solid var(--accent);
-    padding: 26px 28px;
-    margin-bottom: 24px;
+    padding: 32px 36px;
+  }
+  .owner::before,
+  .guarantee::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 48px;
+    height: 2px;
+    background: var(--ink);
+  }
+  .owner {
+    margin-bottom: 16px;
   }
   .owner-note {
     font-size: var(--fs-small);
     line-height: var(--lh-body);
     color: var(--taupe);
-    margin-bottom: 16px;
+    margin-bottom: 18px;
   }
   .owner-name {
     font-family: var(--serif);
     font-weight: var(--fw-medium);
-    font-size: 19px;
+    font-size: 22px;
+    letter-spacing: var(--ls-heading);
     color: var(--ink);
+    margin-bottom: 4px;
   }
   .owner-phone a {
     font-size: var(--fs-lead);
     color: var(--ink);
+    font-variant-numeric: tabular-nums;
     text-decoration: underline;
-    text-underline-offset: 4px;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 5px;
   }
   .owner-speaks {
     font-size: var(--fs-micro);
     letter-spacing: 0.1em;
     color: var(--taupe);
-    margin-top: 8px;
-  }
-
-  .guarantee {
-    background: var(--linen);
-    border-left: 2px solid var(--accent);
-    padding: 24px 28px;
+    margin-top: 10px;
   }
   .guarantee p {
     font-size: var(--fs-small);
@@ -649,56 +874,77 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
     color: var(--taupe);
   }
 
+  /* ── Enquiry ── */
   .enquiry {
     position: sticky;
-    top: calc(var(--nav-h) + 20px);
-    background: var(--ink);
-    padding: 44px;
+    top: calc(var(--nav-h) + 24px);
+    background:
+      radial-gradient(90% 70% at 100% 0%, var(--ink-soft) 0%, transparent 65%),
+      var(--ink);
+    padding: 48px 44px 40px;
+    box-shadow: var(--shadow-lg);
   }
   .enq-title {
     font-family: var(--serif);
-    font-weight: var(--fw-regular);
-    font-size: 24px;
-    line-height: 1.35;
+    font-weight: var(--fw-medium);
+    font-size: 28px;
+    letter-spacing: var(--ls-heading);
+    line-height: 1.2;
     color: var(--cream);
-    margin-bottom: 28px;
+    margin-bottom: 32px;
   }
   .enq-alt {
     font-size: var(--fs-small);
-    line-height: var(--lh-body);
+    line-height: 1.9;
     color: var(--on-dark-muted);
     text-align: center;
-    margin-top: 20px;
+    margin-top: 28px;
+    padding-top: 24px;
+    border-top: 1px solid var(--on-dark-rule);
   }
   .enq-alt a {
     color: var(--cream);
     display: inline-block;
-    margin: 0 6px;
+    margin: 0 8px;
+    font-variant-numeric: tabular-nums;
     text-decoration: underline;
-    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 4px;
   }
 
+  /* ── Similar ── */
   .similar {
-    padding: 80px var(--pad-x) 108px;
+    padding: 120px var(--pad-x) 136px;
     border-top: 1px solid var(--border);
   }
   .similar h2 {
     font-family: var(--serif);
-    font-weight: var(--fw-display);
-    font-size: clamp(28px, 3vw, 44px);
+    font-weight: var(--fw-hero);
+    font-size: clamp(34px, 4vw, 64px);
+    letter-spacing: var(--ls-display);
+    line-height: 1.04;
     color: var(--ink);
-    margin-bottom: 52px;
+    margin-bottom: 64px;
   }
   .sim-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 36px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 40px 32px;
   }
 
+  @media (max-width: 1200px) {
+    .body {
+      grid-template-columns: minmax(0, 1fr) 380px;
+      gap: 64px;
+    }
+    .enquiry {
+      padding: 40px 32px 32px;
+    }
+  }
   @media (max-width: 1100px) {
     .body {
       grid-template-columns: 1fr;
-      gap: 48px;
+      gap: 56px;
     }
     .enquiry {
       position: static;
@@ -706,47 +952,77 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
   }
   @media (max-width: 768px) {
     .crumbs {
-      padding: 12px var(--pad-x-mob);
+      padding: 16px var(--pad-x-mob);
     }
-    .property-detail-hero {
-      height: 58vw;
-      min-height: 260px;
-    }
-    .hero-tag {
-      top: 16px;
-      left: var(--pad-x-mob);
-    }
-    .hero-foot {
-      left: 16px;
-      right: 16px;
-      bottom: 18px;
-    }
-    .hero-title {
+    .crumbs li:not(:last-child):not(:first-child) {
       display: none;
     }
+    .property-detail-hero {
+      height: clamp(380px, 68svh, 580px);
+    }
+    .hero-foot {
+      left: var(--pad-x-mob);
+      right: var(--pad-x-mob);
+      bottom: 20px;
+      gap: 16px;
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .hero-name,
+    .hero-kicker {
+      display: none;
+    }
+    .hero-foot:not(:has(.hero-gallery)):not(:has(.hero-tag)) {
+      display: none;
+    }
+    .hero-gallery {
+      width: 100%;
+      flex-direction: row-reverse;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .gal-bar {
+      max-width: 40%;
+    }
+    .property-detail-gallery-controls {
+      height: 50px;
+    }
     .body {
-      padding: 32px var(--pad-x-mob) 48px;
+      padding: 40px var(--pad-x-mob) 64px;
     }
     .specs {
       grid-template-columns: repeat(2, 1fr);
+    }
+    .spec:not(:nth-child(3n + 1)) {
+      padding-left: 0;
+      border-left: 0;
+    }
+    .spec:nth-child(even) {
+      padding-left: 20px;
+      border-left: 1px solid var(--border);
     }
     .price-asof {
       margin-left: 0;
       width: 100%;
     }
-    .enquiry {
+    .owner,
+    .guarantee {
       padding: 28px 24px;
+    }
+    .enquiry {
+      padding: 36px var(--pad-x-mob) 32px;
       margin-inline: calc(var(--pad-x-mob) * -1);
+      box-shadow: none;
     }
     .similar {
-      padding: 40px var(--pad-x-mob) 60px;
+      padding: 64px var(--pad-x-mob) 72px;
     }
     .similar h2 {
-      margin-bottom: 28px;
+      margin-bottom: 36px;
     }
     .sim-grid {
       grid-template-columns: 1fr;
-      gap: 28px;
+      gap: 48px;
     }
   }
 </style>

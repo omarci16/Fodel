@@ -1,0 +1,150 @@
+---
+/**
+ * Three (or more) numbered columns — FODEL's three-step model, the About
+ * page's values. One treatment everywhere these appear.
+ *
+ * A single rule runs across the top of the row and draws itself from left to
+ * right as the row scrolls in, with a node where each column begins: the
+ * steps read as one sequence, not three boxes.
+ */
+interface Item {
+  num: string;
+  title: string;
+  body: string;
+}
+
+interface Props {
+  items: Item[];
+  class?: string;
+}
+
+const { items, class: className } = Astro.props;
+---
+
+<div class:list={['ncols', 'reveal', className]} style={`--n:${items.length}`}>
+  <span class="ncols-line draw" aria-hidden="true"></span>
+  <ol>
+    {
+      items.map((item, i) => (
+        <li style={`--i:${i}`}>
+          <span class="node" aria-hidden="true" />
+          <span class="num num-fig">{item.num}</span>
+          <h3>{item.title}</h3>
+          <p>{item.body}</p>
+        </li>
+      ))
+    }
+  </ol>
+</div>
+
+<style>
+  .ncols {
+    position: relative;
+  }
+  /* The rule is its own element so it can draw; the nodes sit on it. */
+  .ncols-line {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: var(--ink);
+  }
+  ol {
+    display: grid;
+    grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+    gap: 56px;
+    list-style: none;
+  }
+  li {
+    position: relative;
+    padding-top: 44px;
+  }
+  .node {
+    position: absolute;
+    top: -4px;
+    left: 0;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--cream);
+    border: 1px solid var(--ink);
+  }
+  /* -0.05em takes out the numeral's side bearing, so the ink of the figure
+     lines up with the title under it. */
+  .num {
+    display: block;
+    margin-left: -0.05em;
+    font-family: var(--serif);
+    font-weight: var(--fw-light);
+    font-size: clamp(56px, 5.4vw, 88px);
+    line-height: 0.9;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--ink);
+    margin-bottom: 36px;
+  }
+  h3 {
+    font-family: var(--serif);
+    font-weight: var(--fw-medium);
+    font-size: clamp(22px, 1.8vw, 28px);
+    letter-spacing: var(--ls-heading);
+    line-height: 1.2;
+    color: var(--ink);
+    margin-bottom: 14px;
+  }
+  p {
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    color: var(--taupe);
+    max-width: 38ch;
+  }
+
+  /* Staggered entrance under the drawing rule. */
+  :global([data-reveal-ready]) li {
+    opacity: 0;
+    transform: translateY(28px);
+    transition:
+      opacity 1.2s var(--ease-out),
+      transform 1.2s var(--ease-out);
+    transition-delay: calc(0.3s + var(--i, 0) * 0.14s);
+  }
+  :global([data-reveal-ready][data-visible]) li {
+    opacity: 1;
+    transform: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :global([data-reveal-ready]) li {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @media (max-width: 900px) {
+    .ncols-line {
+      display: none;
+    }
+    ol {
+      grid-template-columns: 1fr;
+      gap: 0;
+    }
+    li {
+      display: grid;
+      grid-template-columns: 64px 1fr;
+      column-gap: 8px;
+      padding: 28px 0;
+      border-top: 1px solid var(--border);
+    }
+    .node {
+      display: none;
+    }
+    .num {
+      grid-row: span 2;
+      font-size: 40px;
+      margin-bottom: 0;
+    }
+    h3 {
+      margin-bottom: 8px;
+    }
+  }
+</style>

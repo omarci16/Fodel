@@ -68,7 +68,7 @@ export const COPY: Record<Locale, any> = {
       ],
       featured: { eyebrow: 'Válogatás', title: 'Kiemelt Ingatlanok' },
       // Verbatim FODEL, from their own editorial copy.
-      quote: '„A hollandok gyakran nem hisznek a szemüknek, amikor megtudják, hogy Magyarországon mit és milyen áron vásárolhatnak."',
+      quote: '„A hollandok gyakran nem hisznek a szemüknek, amikor megtudják, hogy Magyarországon mit és milyen áron vásárolhatnak.”',
       quoteSource: 'FODEL INGATLAN — fodel.nl',
       how: { eyebrow: 'Egyedülálló modell', title: 'Így működik a FODEL' },
       cta: {
@@ -225,7 +225,7 @@ export const COPY: Record<Locale, any> = {
       origin: {
         eyebrow: 'A kezdetek — Almere-Buiten, 2013',
         quote:
-          '„Almere-Buitenben élve láttuk, hogy a hollandok mennyire vágynak autentikus európai életmódra — míg Magyarországon a legjobb ingatlanok ismeretlenül várnak gazdára."',
+          '„Almere-Buitenben élve láttuk, hogy a hollandok mennyire vágynak autentikus európai életmódra — míg Magyarországon a legjobb ingatlanok ismeretlenül várnak gazdára.”',
       },
       values: {
         eyebrow: 'Értékeink',

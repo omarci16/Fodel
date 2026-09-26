@@ -1,5 +1,12 @@
 ---
-/** One structural treatment for section eyebrow, heading and separator. */
+/**
+ * One structural treatment for section eyebrow, heading and separator.
+ *
+ * 1.4: each line of the title sits in its own mask (.line, global.css), so
+ * whenever this head is inside a .reveal — its own class or an ancestor's —
+ * the title rises out of the mask line by line and the rule draws itself on.
+ * Titles written with "\n" get one mask per line; a slotted title gets one.
+ */
 import Eyebrow from './Eyebrow.astro';
 import GoldRule from './GoldRule.astro';
 
@@ -8,6 +15,7 @@ interface Props {
   title?: string;
   align?: 'left' | 'center';
   rule?: boolean;
+  size?: 'default' | 'large';
   class?: string;
 }
 
@@ -16,15 +24,33 @@ const {
   title,
   align = 'left',
   rule = true,
+  size = 'default',
   class: className,
 } = Astro.props;
 const centered = align === 'center';
+const lines = title ? title.split('\n') : [];
 ---
 
-<div class:list={['section-head-standard', { centered }, className]}>
+<div class:list={['section-head-standard', { centered, large: size === 'large' }, className]}>
   <div class="copy">
-    <Eyebrow center={centered} space="12px">{eyebrow}</Eyebrow>
-    <h2>{title ?? <slot name="title" />}</h2>
+    <Eyebrow center={centered} space="16px">{eyebrow}</Eyebrow>
+    <h2>
+      {
+        lines.length > 0 ? (
+          lines.map((line, i) => (
+            <span class="line" style={`--i:${i}`}>
+              <span>{line}</span>
+            </span>
+          ))
+        ) : (
+          <span class="line">
+            <span>
+              <slot name="title" />
+            </span>
+          </span>
+        )
+      }
+    </h2>
     {rule && <GoldRule center={centered} space="24px" />}
   </div>
   <slot />
@@ -37,17 +63,42 @@ const centered = align === 'center';
     justify-content: space-between;
     gap: 24px;
   }
-  .copy { min-width: 0; }
+  .copy {
+    min-width: 0;
+  }
+  /* A text link set beside the heading sits on the line of the rule:
+     the rule's 24px space below it, plus half the rule, less half the link. */
+  .section-head-standard > :global(.btn-text) {
+    flex-shrink: 0;
+    margin-bottom: calc(24px + 0.5px - 16px);
+  }
   h2 {
-    margin: 0 0 18px;
+    margin: 0 0 22px;
     color: var(--section-head-color, var(--ink));
     font-family: var(--serif);
-    font-size: clamp(26px, 2.8vw, 42px);
+    font-size: clamp(28px, 3vw, 46px);
     font-weight: var(--fw-display);
-    line-height: 1.2;
-    white-space: pre-line;
+    letter-spacing: var(--ls-heading);
+    line-height: 1.12;
   }
-  .centered { display: block; text-align: center; }
-  .centered .copy { max-width: 850px; margin-inline: auto; }
-  :global([data-bg='dark']) .section-head-standard { --section-head-color: var(--cream); }
+  .large h2 {
+    font-weight: var(--fw-hero);
+    font-size: clamp(38px, 5vw, 80px);
+    letter-spacing: var(--ls-display);
+    line-height: 1.02;
+  }
+  h2 :global(em) {
+    font-weight: var(--fw-light);
+  }
+  .centered {
+    display: block;
+    text-align: center;
+  }
+  .centered .copy {
+    max-width: 850px;
+    margin-inline: auto;
+  }
+  :global([data-bg='dark']) .section-head-standard {
+    --section-head-color: var(--cream);
+  }
 </style>

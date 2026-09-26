@@ -37,7 +37,7 @@ export const FAQ: Record<Locale, FaqEntry[]> = {
       id: 'miert-jo-kulfoldi-vasarlo',
       question: 'Miért jó egy külföldi ingatlanvásárló?',
       answer: [
-        'Külföldi érdeklődő esetén rendszerint „komoly partnerre és nem egy valós vételi szándék nélkül bámészkodóra, ún. ingatlanturistára" számíthat. Egy magyarországi ingatlan megtekintése legalább két napjába és 200–300 eurójába kerül az idelátogatónak — ezt az összeget senki nem költi el felelőtlenül.',
+        'Külföldi érdeklődő esetén rendszerint „komoly partnerre és nem egy valós vételi szándék nélkül bámészkodóra, ún. ingatlanturistára” számíthat. Egy magyarországi ingatlan megtekintése legalább két napjába és 200–300 eurójába kerül az idelátogatónak — ezt az összeget senki nem költi el felelőtlenül.',
         'A külföldi vevő nem vesz fel banki hitelt és nem vár állami támogatásra (például CSOK-ra), hanem egy összegben, banki átutalással fizet. Nem kell arra sem várnia, hogy előbb eladja a jelenlegi otthonát.',
       ],
       audience: 'seller',
@@ -47,7 +47,7 @@ export const FAQ: Record<Locale, FaqEntry[]> = {
       id: 'miert-fizetek-hirdetesert',
       question: 'Miért fizetek a hirdetésemért?',
       answer: [
-        `„A FODEL egyedülálló hirdetési és kizárólagosság nélküli értékesítési modelljében minden hirdetés ${COMPANY.reach.languages} nyelven jelenik meg ${COMPANY.reach.countries} országban."`,
+        `„A FODEL egyedülálló hirdetési és kizárólagosság nélküli értékesítési modelljében minden hirdetés ${COMPANY.reach.languages} nyelven jelenik meg ${COMPANY.reach.countries} országban.”`,
         'A hirdetési díj tartalmazza a szöveg szerkesztését, a fordítást, a képfeldolgozást, a címalkotást és a hirdetés összeállítását. Munkatársaink egy-egy anyag adminisztrációjával 1–4 órát töltenek el.',
       ],
       audience: 'seller',
@@ -55,9 +55,9 @@ export const FAQ: Record<Locale, FaqEntry[]> = {
     },
     {
       id: 'kiemelt-hirdetes',
-      question: 'Mit jelent a „kiemelt hirdetés"?',
+      question: 'Mit jelent a „kiemelt hirdetés”?',
       answer: [
-        '„Egy kategórián belüli kiemeléssel az adott kategóriaoldalra látogató minden érdeklődő az első hirdetmények egyikeként találkozik az Ön ingatlanával."',
+        '„Egy kategórián belüli kiemeléssel az adott kategóriaoldalra látogató minden érdeklődő az első hirdetmények egyikeként találkozik az Ön ingatlanával.”',
         'Felára havi 15 €, legalább három hónapra kérhető.',
       ],
       audience: 'seller',
@@ -65,9 +65,9 @@ export const FAQ: Record<Locale, FaqEntry[]> = {
     },
     {
       id: 'fooldali-kiemeles',
-      question: 'Mit jelent a „főoldali kiemelés"?',
+      question: 'Mit jelent a „főoldali kiemelés”?',
       answer: [
-        '„A főoldali kiemelés aktiválásával jelentősen nő a meghirdetett ingatlan eladásának esélye." Az ingatlan fotója megjelenik a főoldali képbemutatóban.',
+        '„A főoldali kiemelés aktiválásával jelentősen nő a meghirdetett ingatlan eladásának esélye.” Az ingatlan fotója megjelenik a főoldali képbemutatóban.',
         'Felára havi 25 €, legalább három hónapra kérhető.',
       ],
       audience: 'seller',
@@ -87,7 +87,7 @@ export const FAQ: Record<Locale, FaqEntry[]> = {
       id: 'idegen-nyelvu-leiras',
       question: 'Mit jelent az ingatlan szöveges leírásának idegen nyelvű megjelenítése?',
       answer: [
-        '„Egy szakszerűen és lényegretörően megfogalmazott ingatlanhirdetési szöveg növeli az eladás esélyét."',
+        '„Egy szakszerűen és lényegretörően megfogalmazott ingatlanhirdetési szöveg növeli az eladás esélyét.”',
         'A magyar szöveget először szerkesztjük, majd anyanyelvi szinten fordítjuk. Díja nyelvenként 25 €.',
       ],
       audience: 'seller',
@@ -108,7 +108,7 @@ export const FAQ: Record<Locale, FaqEntry[]> = {
       question: 'Mikor nem érdemes fordítást kérni?',
       answer: [
         'Kis értékű ingatlanok, telkek vagy egyszerű, klasszikus épületek esetén.',
-        '„Ha nincs hirdetési szöveg, különösen törekedjen arra, hogy a napsütéses időben, kívül-belül egyaránt világos körülmények között, kizárólag vízszintes tájolással készült éles, nagyfelbontású képek jól bemutassák az ingatlanban rejlő értékeket!"',
+        '„Ha nincs hirdetési szöveg, különösen törekedjen arra, hogy a napsütéses időben, kívül-belül egyaránt világos körülmények között, kizárólag vízszintes tájolással készült éles, nagyfelbontású képek jól bemutassák az ingatlanban rejlő értékeket!”',
       ],
       audience: 'seller',
       sourced: true,
@@ -127,8 +127,8 @@ export const FAQ: Record<Locale, FaqEntry[]> = {
       id: 'nyelvi-kommunikacio',
       question: 'Hogyan tudnak a külföldi érdeklődők kommunikálni velem, ha nem beszélünk azonos nyelvet?',
       answer: [
-        '„Hirdetéseinkben feltüntetésre kerül, így minden külföldi érdeklődő előre látja, hogy Ön milyen idegen nyelven tud kommunikálni."',
-        'Ha kéri a segítségünket, e-mailben és telefonon egyaránt támogatjuk az eladást fordítással, áralkuval és a szerződés előkészítésével. Ha közvetlenül egyeztet a vevővel, „sem Önnek, sem a külföldi partnerének nem kell jutalékot fizetnie".',
+        '„Hirdetéseinkben feltüntetésre kerül, így minden külföldi érdeklődő előre látja, hogy Ön milyen idegen nyelven tud kommunikálni.”',
+        'Ha kéri a segítségünket, e-mailben és telefonon egyaránt támogatjuk az eladást fordítással, áralkuval és a szerződés előkészítésével. Ha közvetlenül egyeztet a vevővel, „sem Önnek, sem a külföldi partnerének nem kell jutalékot fizetnie”.',
       ],
       audience: 'seller',
       sourced: true,
@@ -137,7 +137,7 @@ export const FAQ: Record<Locale, FaqEntry[]> = {
       id: 'egyedulallo-modell',
       question: 'Mit takar a FODEL egyedülálló hirdetési és értékesítési modellje?',
       answer: [
-        '„A többnyelvű weboldalunkon megjelentetett hirdetésekben nemcsak az ingatlan pontos címe látható kiemelten, de — a FODEL elérhetősége mellett — feltüntetésre kerül az ingatlan tulajdonosának a neve, telefonszáma és e-mail címe is."',
+        '„A többnyelvű weboldalunkon megjelentetett hirdetésekben nemcsak az ingatlan pontos címe látható kiemelten, de — a FODEL elérhetősége mellett — feltüntetésre kerül az ingatlan tulajdonosának a neve, telefonszáma és e-mail címe is.”',
         'Ez teszi lehetővé, hogy a külföldi érdeklődő közvetlenül Önnel vegye fel a kapcsolatot.',
       ],
       audience: 'both',
@@ -147,7 +147,7 @@ export const FAQ: Record<Locale, FaqEntry[]> = {
       id: 'jutalek-nelkul',
       question: 'Jutalékfizetés nélkül is eladhatom az ingatlanomat a weboldalukon keresztül?',
       answer: [
-        'Igen. „Amennyiben sem Ön, sem az ingatlant megvásárló külföldi személy nem kéri segítségünket az adásvétel lebonyolításában", akkor „a FODEL a már korábban befizetett hirdetési költségen felül semmilyen egyéb jutalékra nem tart igényt".',
+        'Igen. „Amennyiben sem Ön, sem az ingatlant megvásárló külföldi személy nem kéri segítségünket az adásvétel lebonyolításában”, akkor „a FODEL a már korábban befizetett hirdetési költségen felül semmilyen egyéb jutalékra nem tart igényt”.',
       ],
       audience: 'seller',
       sourced: true,
@@ -173,7 +173,7 @@ export const FAQ: Record<Locale, FaqEntry[]> = {
       id: 'terhelt-ingatlan',
       question: 'Eladhatom-e banki vagy más teherrel bíró ingatlanomat a FODEL-en keresztül?',
       answer: [
-        'Igen. „Egy terhelt ingatlan eladása rendszerint nem okoz gondot."',
+        'Igen. „Egy terhelt ingatlan eladása rendszerint nem okoz gondot.”',
         'Az adásvételi szerződésben kell rendezni, hogy a vételár első része az ingatlant érintő teher rendezésére fordítódjon, a maradék része pedig az eladót illesse meg.',
       ],
       audience: 'seller',
@@ -193,8 +193,8 @@ export const FAQ: Record<Locale, FaqEntry[]> = {
       id: 'milyen-gyorsan',
       question: 'Milyen gyorsan tudom értékesíteni az ingatlanomat Önökön keresztül?',
       answer: [
-        '„Az eladás gyorsasága az ingatlan valós piaci árának és a hirdetésben megjelenő eladási árnak a viszonyától függ."',
-        'Kérje ingatlanszakértő véleményét. „Még a külföldi vevők sem vesznek túlárazott ingatlanokat Magyarországon." Ha rövid a határidő, adjon meg piaci érték alatti árat.',
+        '„Az eladás gyorsasága az ingatlan valós piaci árának és a hirdetésben megjelenő eladási árnak a viszonyától függ.”',
+        'Kérje ingatlanszakértő véleményét. „Még a külföldi vevők sem vesznek túlárazott ingatlanokat Magyarországon.” Ha rövid a határidő, adjon meg piaci érték alatti árat.',
       ],
       audience: 'seller',
       sourced: true,
@@ -204,7 +204,7 @@ export const FAQ: Record<Locale, FaqEntry[]> = {
       question: 'Mennyiért kínáljam az ingatlanomat?',
       answer: [
         'Tájékozódjon az azonos régióban lévő, hasonló ingatlanok árairól, és kérje hivatalos ingatlan-értékbecslő felmérését.',
-        'Ne feledje: ha valaki néhány hét alatt eladott egy hasonló ingatlant, az valószínűleg áron alul történt. Túlárazás esetén „a hirdetések akár évekig is futhatnak érdemi érdeklődés nélkül". Minden platformon azonos áron kínálja az ingatlant.',
+        'Ne feledje: ha valaki néhány hét alatt eladott egy hasonló ingatlant, az valószínűleg áron alul történt. Túlárazás esetén „a hirdetések akár évekig is futhatnak érdemi érdeklődés nélkül”. Minden platformon azonos áron kínálja az ingatlant.',
       ],
       audience: 'seller',
       sourced: true,
@@ -216,9 +216,9 @@ export const FAQ: Record<Locale, FaqEntry[]> = {
         '- Olcsóbbak az ingatlanok és alacsonyabbak a megélhetési költségek',
         '- Magyarországon rendszerint nem kell ingatlanadót fizetni',
         '- Jobb az időjárás, több a napsütés',
-        '- „Mert a tengerszint felett és a kontinens közepén vagyunk, így nálunk nem fenyeget a tengerszintek globális emelkedése"',
+        '- „Mert a tengerszint felett és a kontinens közepén vagyunk, így nálunk nem fenyeget a tengerszintek globális emelkedése”',
         '- Magyarország uniós tagország',
-        '- „Mert a magyar ingatlanok csaknem 100%-ban saját tulajdonú területen találhatóak"',
+        '- „Mert a magyar ingatlanok csaknem 100%-ban saját tulajdonú területen találhatóak”',
       ],
       audience: 'both',
       sourced: true,

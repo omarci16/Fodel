@@ -2,10 +2,22 @@
 /**
  * Shared page header — the split hero used on Sellers, Buyers, About and the
  * revenue pages in the prototype, generalised.
+ *
+ * 1.4 — two layouts, one entrance:
+ *
+ *   image    Copy on the left, photograph on the right. The headline is
+ *            sized from its longest word, so it fills its column without a
+ *            single word ever being broken; the photograph opens from its
+ *            left edge and settles from a slight zoom.
+ *   compact  Editorial: a very large title across seven columns, the intro
+ *            and actions set against its baseline on the right, and a rule
+ *            drawn across the full measure beneath.
+ *
+ * Both enter on load (they are always the first thing on screen) with the
+ * shared fx-* keyframes: eyebrow rule drawn, title lines lifted out of their
+ * masks, body and actions following.
  */
 import { Image } from 'astro:assets';
-import Eyebrow from './Eyebrow.astro';
-import GoldRule from './GoldRule.astro';
 import Button from './Button.astro';
 import type { ImageMetadata } from 'astro';
 
@@ -33,129 +45,257 @@ const {
   secondary,
   compact = false,
 } = Astro.props;
+
+/** Longest unbreakable run in the title — a hyphenated compound counts as
+ *  one word, so "Nyugat-Európában" is never split at its hyphen. */
+const longestWord = Math.max(
+  8,
+  ...[title, titleEm ?? ''].flatMap((line) => line.split(/\s+/)).map((word) => word.length)
+);
+const hasActions = !!(primary || secondary);
 ---
 
-<header class:list={['page-header', { compact, 'has-image': !!image }]}>
+<header
+  class:list={['page-header', compact ? 'is-compact' : image ? 'is-image' : 'is-plain']}
+  style={`--chars:${longestWord}`}
+>
   <div class="copy">
-    <Eyebrow space="16px">{eyebrow}</Eyebrow>
+    <p class="ph-eyebrow">
+      <span class="ph-eyebrow-rule" aria-hidden="true"></span>
+      <span>{eyebrow}</span>
+    </p>
+
     <h1>
-      {title}{titleEm && <><br /><em>{titleEm}</em></>}
+      <span class="line" style="--i:0"><span>{title}</span></span>
+      {titleEm && <span class="line" style="--i:1"><span><em>{titleEm}</em></span></span>}
     </h1>
-    <GoldRule space="28px" />
-    {body && <p class="ph-body">{body}</p>}
 
     {
-      (primary || secondary) && (
-        <div class="ph-actions">
-          {primary && <Button variant="dark" href={primary.href}>{primary.label}</Button>}
-          {secondary && <Button variant="outline" href={secondary.href}>{secondary.label}</Button>}
+      (body || hasActions) && (
+        <div class="ph-side">
+          {body && <p class="ph-body">{body}</p>}
+          {hasActions && (
+            <div class="ph-actions">
+              {primary && <Button variant="dark" href={primary.href}>{primary.label}</Button>}
+              {secondary && <Button variant="text" href={secondary.href}>{secondary.label}</Button>}
+            </div>
+          )}
         </div>
       )
     }
   </div>
 
   {
-    image && (
+    image && !compact && (
       <div class="media">
-        <Image
-          src={image}
-          alt={imageAlt}
-          widths={[600, 900, 1200]}
-          sizes="(max-width: 900px) 100vw, 50vw"
-          loading="eager"
-          fetchpriority="high"
-        />
+        <div class="media-inner" data-parallax="0.08">
+          <Image
+            src={image}
+            alt={imageAlt}
+            widths={[700, 1000, 1400, 1800]}
+            sizes="(max-width: 900px) 100vw, 50vw"
+            loading="eager"
+            fetchpriority="high"
+          />
+        </div>
       </div>
     )
   }
+
+  {compact && <span class="ph-baseline" aria-hidden="true"></span>}
 </header>
 
 <style>
   .page-header {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    min-height: 80vh;
-  }
-  .page-header:not(.has-image) {
-    grid-template-columns: 1fr;
-    min-height: 0;
-  }
-  .compact {
-    min-height: 0;
+    position: relative;
   }
 
-  .copy {
+  /* ── Shared type ── */
+  .ph-eyebrow {
     display: flex;
-    flex-direction: column;
-    justify-content: center;
-    padding: 100px 72px 80px var(--pad-x);
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 36px;
+    font-size: var(--fs-eyebrow);
+    letter-spacing: 0.24em;
+    line-height: 1.4;
+    text-transform: uppercase;
+    color: var(--ink);
+    animation: fx-fade-up 1.2s var(--ease-out) 0.3s both;
   }
-  .compact .copy {
-    padding: 72px var(--pad-x) 44px;
-    max-width: 78ch;
+  .ph-eyebrow-rule {
+    flex-shrink: 0;
+    width: 40px;
+    height: 1px;
+    background: var(--ink);
+    transform-origin: left;
+    animation: fx-draw 1.2s var(--ease-out) 0.4s both;
   }
-
   h1 {
     font-family: var(--serif);
-    font-weight: var(--fw-display);
-    font-size: clamp(38px, 4.8vw, 76px);
-    line-height: 1.04;
+    font-weight: var(--fw-hero);
+    letter-spacing: var(--ls-display);
+    line-height: 1;
     color: var(--ink);
-    margin-bottom: 28px;
   }
-  .compact h1 {
-    font-size: clamp(34px, 4vw, 60px);
+  h1 .line > span {
+    animation: fx-rise 1.4s var(--ease-out) both;
+    animation-delay: calc(0.35s + var(--i, 0) * 0.11s);
   }
   h1 em {
-    font-style: italic;
+    font-weight: var(--fw-light);
+    letter-spacing: -0.02em;
+  }
+  .ph-side {
+    animation: fx-fade-up 1.3s var(--ease-out) 0.75s both;
   }
   .ph-body {
     font-size: var(--fs-body-lg);
-    line-height: var(--lh-lead);
+    line-height: 1.65;
     color: var(--taupe);
-    max-width: 52ch;
-    margin-bottom: 44px;
+    max-width: 50ch;
   }
   .ph-actions {
     display: flex;
-    gap: 16px;
+    align-items: center;
+    gap: 16px 36px;
     flex-wrap: wrap;
   }
+  .ph-body + .ph-actions {
+    margin-top: 40px;
+  }
 
+  /* ── Image layout ── */
+  .is-image {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    min-height: min(max(620px, calc(100svh - var(--nav-h))), 960px);
+    container-type: inline-size;
+  }
+  .is-image .copy {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 96px 64px 96px var(--pad-x);
+  }
+  .is-image h1 {
+    /* Fits the longest word into the copy column (half the header, less its
+       padding), capped so short titles don't turn into posters. */
+    font-size: clamp(40px, min(6vw, calc((50cqw - var(--pad-x) - 64px) / (var(--chars) * 0.56))), 104px);
+    margin-bottom: 36px;
+  }
   .media {
     position: relative;
     overflow: hidden;
-    background: var(--mist);
+    background: var(--ink);
+    animation: fx-wipe 1.6s var(--ease-in-out) both;
+  }
+  .media-inner {
+    position: absolute;
+    inset: -6% 0;
+    transform: translate3d(0, var(--py, 0px), 0);
   }
   .media :global(img) {
-    position: absolute;
-    inset: 0;
     width: 100%;
     height: 100%;
     object-fit: cover;
+    display: block;
+    animation: fx-settle 2.8s var(--ease-out) both;
+  }
+
+  /* ── Compact layout ── */
+  .is-compact,
+  .is-plain {
+    padding: 104px var(--pad-x) 0;
+    container-type: inline-size;
+  }
+  .is-compact .copy,
+  .is-plain .copy {
+    display: grid;
+    grid-template-columns: 7fr 5fr;
+    column-gap: 64px;
+    align-items: end;
+  }
+  .is-compact .ph-eyebrow,
+  .is-plain .ph-eyebrow {
+    grid-column: 1 / -1;
+  }
+  /* Fits the longest word into the 7fr column (100cqw is the header's
+     content box; 64px the column gap), as the image layout does. */
+  .is-compact h1,
+  .is-plain h1 {
+    font-size: clamp(34px, min(6.2vw, calc((100cqw - 64px) * 7 / 12 / (var(--chars) * 0.56))), 108px);
+  }
+  .is-compact .ph-side,
+  .is-plain .ph-side {
+    padding-bottom: 0.5em;
+  }
+  .is-compact .ph-body,
+  .is-plain .ph-body {
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+  }
+  .ph-baseline {
+    display: block;
+    height: 1px;
+    margin-top: 72px;
+    background: var(--ink);
+    transform-origin: left;
+    animation: fx-draw 1.8s var(--ease-in-out) 0.5s both;
+  }
+
+  @media (max-width: 1100px) {
+    .is-compact .copy,
+    .is-plain .copy {
+      grid-template-columns: 1fr;
+    }
+    .is-compact .ph-side,
+    .is-plain .ph-side {
+      margin-top: 32px;
+      padding-bottom: 0;
+    }
+    .is-compact h1,
+    .is-plain h1 {
+      font-size: clamp(34px, min(6.2vw, calc(100cqw / (var(--chars) * 0.56))), 108px);
+    }
   }
 
   @media (max-width: 900px) {
-    .page-header {
+    .is-image {
       grid-template-columns: 1fr;
       min-height: 0;
+      container-type: normal;
     }
     .media {
       order: -1;
-      aspect-ratio: 16 / 10;
+      aspect-ratio: 16 / 11;
     }
-    .copy,
-    .compact .copy {
-      padding: 36px var(--pad-x-mob) 32px;
+    .is-image .copy {
+      padding: 40px var(--pad-x-mob) 48px;
     }
-    h1 {
-      margin-bottom: 18px;
+    .is-image h1 {
+      font-size: clamp(28px, calc((100vw - 2 * var(--pad-x-mob)) / (var(--chars) * 0.56)), 72px);
+      margin-bottom: 24px;
     }
-    .ph-body {
-      margin-bottom: 28px;
+    .ph-eyebrow {
+      margin-bottom: 24px;
+    }
+    .is-compact,
+    .is-plain {
+      padding: 56px var(--pad-x-mob) 0;
+    }
+    .is-compact h1,
+    .is-plain h1 {
+      font-size: clamp(28px, calc(100cqw / (var(--chars) * 0.56)), 64px);
+    }
+    .ph-baseline {
+      margin-top: 44px;
+    }
+    .ph-body + .ph-actions {
+      margin-top: 28px;
     }
     .ph-actions {
-      flex-direction: column;
+      gap: 20px 28px;
     }
   }
 </style>

@@ -1,0 +1,95 @@
+---
+/**
+ * The four figures FODEL's model rests on (founded, countries, languages,
+ * commission). Light numerals over their labels, hairlines between; figures
+ * that are counts roll up from zero once, the founding year is left alone.
+ * One treatment for the home page (on ink) and the About page (on linen).
+ */
+interface Stat {
+  value: string;
+  label: string;
+}
+
+interface Props {
+  stats: Stat[];
+  class?: string;
+}
+
+const { stats, class: className } = Astro.props;
+const isYear = (value: string) => /^\d{4}$/.test(value);
+---
+
+<dl class:list={['stats', className]}>
+  {
+    stats.map((s, i) => (
+      <div class="stat reveal" style={`--reveal-delay:${(i * 0.08).toFixed(2)}s`}>
+        <dt>{s.label}</dt>
+        <dd data-count={isYear(s.value) ? undefined : s.value}>{s.value}</dd>
+      </div>
+    ))
+  }
+</dl>
+
+<style>
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    border-top: 1px solid var(--stats-rule, var(--border));
+  }
+  :global([data-bg='dark']) .stats {
+    --stats-rule: var(--on-dark-rule);
+    --stats-value: var(--cream);
+    --stats-label: var(--on-dark-muted);
+  }
+  .stat {
+    display: flex;
+    flex-direction: column-reverse;
+    justify-content: flex-end;
+    gap: 16px;
+    padding: 36px 32px 4px;
+  }
+  .stat:first-child {
+    padding-left: 0;
+  }
+  .stat + .stat {
+    border-left: 1px solid var(--stats-rule, var(--border));
+  }
+  dt {
+    font-size: var(--fs-eyebrow);
+    letter-spacing: var(--ls-eyebrow);
+    line-height: 1.4;
+    text-transform: uppercase;
+    color: var(--stats-label, var(--taupe));
+  }
+  /* -0.05em takes out the numeral's side bearing (see NumberedColumns). */
+  dd {
+    margin-left: -0.05em;
+    font-family: var(--serif);
+    font-weight: var(--fw-light);
+    font-size: clamp(56px, 6.4vw, 104px);
+    line-height: 0.9;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--stats-value, var(--ink));
+  }
+
+  @media (max-width: 900px) {
+    .stats {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .stat,
+    .stat:first-child {
+      padding: 28px 20px 28px 0;
+    }
+    .stat + .stat {
+      border-left: 0;
+    }
+    .stat:nth-child(even) {
+      padding-left: 20px;
+      border-left: 1px solid var(--stats-rule, var(--border));
+    }
+    .stat:nth-child(n + 3) {
+      border-top: 1px solid var(--stats-rule, var(--border));
+    }
+  }
+</style>

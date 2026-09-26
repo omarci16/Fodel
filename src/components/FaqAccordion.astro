@@ -1,0 +1,205 @@
+---
+/**
+ * The questions sellers and buyers ask, as an accordion. One treatment for
+ * every page that shows a slice of the FAQ.
+ *
+ * Editorial layout: the heading and the way to the full FAQ on the left, the
+ * questions on the right. Each answer opens with a height animation where the
+ * browser supports animating to `auto` (::details-content + interpolate-size)
+ * and simply opens everywhere else. Native <details>, so it works without JS
+ * and the browser's find-in-page opens the answer that matches. Renders
+ * nothing when a locale has no questions for the audience.
+ */
+import SectionHead from './SectionHead.astro';
+import Button from './Button.astro';
+import type { FaqEntry } from '~/data/faq';
+
+interface Props {
+  eyebrow: string;
+  title: string;
+  entries: FaqEntry[];
+  moreHref: string;
+  moreLabel: string;
+}
+
+const { eyebrow, title, entries, moreHref, moreLabel } = Astro.props;
+---
+
+{
+  entries.length > 0 && (
+    <section class="faq">
+      <div class="faq-aside">
+        <SectionHead eyebrow={eyebrow} title={title} class="reveal" />
+        <div class="faq-more">
+          <Button variant="text" href={moreHref}>{moreLabel}</Button>
+        </div>
+      </div>
+
+      <div class="faq-list reveal">
+        {
+          entries.map((entry, i) => (
+            <details class="faq-item">
+              <summary>
+                <span class="q-num num" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
+                <span class="q">{entry.question}</span>
+                <span class="icon" aria-hidden="true" />
+              </summary>
+              <div class="answer">
+                {entry.answer.map((para) =>
+                  para.startsWith('- ') ? <p class="bullet">{para.slice(2)}</p> : <p>{para}</p>
+                )}
+              </div>
+            </details>
+          ))
+        }
+      </div>
+    </section>
+  )
+}
+
+<style>
+  .faq {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 80px;
+    align-items: start;
+    padding: var(--section-y) var(--pad-x);
+  }
+  .faq-aside {
+    position: sticky;
+    top: 112px;
+  }
+  .faq-more {
+    margin-top: 8px;
+  }
+
+  .faq-list {
+    border-top: 1px solid var(--ink);
+  }
+  .faq-item {
+    border-bottom: 1px solid var(--border);
+    interpolate-size: allow-keywords;
+  }
+  .faq-item::details-content {
+    block-size: 0;
+    overflow: hidden;
+    transition:
+      block-size 0.6s var(--ease-out),
+      content-visibility 0.6s allow-discrete;
+  }
+  .faq-item[open]::details-content {
+    block-size: auto;
+  }
+
+  summary {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) 20px;
+    align-items: baseline;
+    gap: 12px;
+    padding: 26px 0;
+    cursor: pointer;
+    list-style: none;
+  }
+  summary::-webkit-details-marker {
+    display: none;
+  }
+  summary:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: 4px;
+  }
+  .q-num {
+    font-size: var(--fs-micro);
+    letter-spacing: 0.08em;
+    color: var(--taupe);
+  }
+  .q {
+    font-family: var(--serif);
+    font-weight: var(--fw-medium);
+    font-size: clamp(18px, 1.5vw, 22px);
+    letter-spacing: var(--ls-heading);
+    line-height: 1.35;
+    color: var(--ink);
+    transition: color 0.3s ease;
+  }
+  summary:hover .q {
+    color: var(--taupe);
+  }
+
+  /* A plus drawn in two rules; the upright one turns flat when open. */
+  .icon {
+    position: relative;
+    align-self: center;
+    width: 14px;
+    height: 14px;
+    justify-self: end;
+  }
+  .icon::before,
+  .icon::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 1px;
+    margin-top: -0.5px;
+    background: var(--ink);
+    transition: transform 0.5s var(--ease-out);
+  }
+  .icon::after {
+    transform: rotate(90deg);
+  }
+  .faq-item[open] .icon::after {
+    transform: rotate(0deg);
+  }
+
+  .answer {
+    padding: 0 32px 30px 56px;
+  }
+  .answer p {
+    max-width: 62ch;
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    color: var(--taupe);
+    margin-bottom: 12px;
+  }
+  .answer p:last-child {
+    margin-bottom: 0;
+  }
+  .bullet {
+    position: relative;
+    padding-left: 22px;
+  }
+  .bullet::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.85em;
+    width: 10px;
+    height: 1px;
+    background: var(--ink);
+  }
+
+  @media (max-width: 900px) {
+    .faq {
+      grid-template-columns: 1fr;
+      gap: 32px;
+      padding: var(--section-y-mob) var(--pad-x-mob);
+    }
+    /* The heading, the questions, then the way to the full FAQ. */
+    .faq-aside {
+      display: contents;
+    }
+    .faq-more {
+      order: 3;
+      margin-top: 0;
+    }
+    summary {
+      grid-template-columns: 32px minmax(0, 1fr) 16px;
+      gap: 10px;
+      padding: 22px 0;
+    }
+    .answer {
+      padding: 0 0 24px 42px;
+    }
+  }
+</style>

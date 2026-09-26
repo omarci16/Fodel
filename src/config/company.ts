@@ -205,7 +205,8 @@ export function formatHours(locale: 'hu' | 'nl'): string {
  */
 const HU_CITY_EXONYMS: Record<string, string> = { 'Den Haag': 'Hága' };
 export function foundedInLabel(locale: 'hu' | 'nl'): string {
-  if (locale === 'nl') return `${COMPANY.foundedIn}, Nederland`;
+  // Display-only (eyebrows): a no-break space keeps "Den Haag" on one line.
+  if (locale === 'nl') return `${COMPANY.foundedIn.replace(/ /g, '\u00a0')}, Nederland`;
   return `${HU_CITY_EXONYMS[COMPANY.foundedIn] ?? COMPANY.foundedIn}, Hollandia`;
 }
 

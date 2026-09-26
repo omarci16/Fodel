@@ -1,0 +1,56 @@
+---
+/**
+ * A list of short statements, each led by the site's rule. Used for the
+ * seller benefits, the buyer services and wishes, and FODEL's approach.
+ * Hairlines between items; each lead rule draws on as the list reveals.
+ */
+interface Props {
+  items: string[];
+  class?: string;
+}
+
+const { items, class: className } = Astro.props;
+---
+
+<ul class:list={['points', className]}>
+  {
+    items.map((item, i) => (
+      <li style={`--reveal-delay:${(0.15 + i * 0.07).toFixed(2)}s`}>
+        <span class="dash draw" aria-hidden="true" />
+        <span>{item}</span>
+      </li>
+    ))
+  }
+</ul>
+
+<style>
+  .points {
+    list-style: none;
+    border-top: 1px solid var(--points-rule, var(--border));
+  }
+  :global([data-bg='dark']) .points {
+    --points-rule: var(--on-dark-rule);
+  }
+  li {
+    display: grid;
+    grid-template-columns: 40px 1fr;
+    align-items: start;
+    padding: 18px 0;
+    border-bottom: 1px solid var(--points-rule, var(--border));
+    font-size: var(--fs-body);
+    line-height: 1.6;
+    color: var(--taupe);
+  }
+  /* Centred on the first line: half its line-height (1.6em / 2). The
+     draw-on itself comes from the shared .draw rule in global.css. */
+  .dash {
+    display: block;
+    width: 22px;
+    height: 1px;
+    margin-top: 0.8em;
+    background: var(--ink);
+  }
+  :global([data-bg='dark']) .dash {
+    background: var(--cream);
+  }
+</style>

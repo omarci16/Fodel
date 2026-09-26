@@ -258,7 +258,7 @@ export const CONTENT: Record<Locale, Record<string, ContentPageData>> = {
         {
           type: 'callout',
           title: 'Energetikai tanúsítvány',
-          body: 'Magyarországon kötelező az energetikai tanúsítvány, és az uniós előírás szerint a hirdetésben is fel kell tüntetni. Hirdetéseinknél a besorolás a jellemzők között szerepel; a „folyamatban" azt jelenti, hogy a tanúsítvány készítés alatt áll.',
+          body: 'Magyarországon kötelező az energetikai tanúsítvány, és az uniós előírás szerint a hirdetésben is fel kell tüntetni. Hirdetéseinknél a besorolás a jellemzők között szerepel; a „folyamatban” azt jelenti, hogy a tanúsítvány készítés alatt áll.',
         },
         {
           type: 'cta',

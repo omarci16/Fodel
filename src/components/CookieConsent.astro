@@ -7,6 +7,9 @@
  * ePrivacy requires prior consent, and retrofitting a compliant banner is
  * how sites end up with dark patterns. Accept and reject are the same size,
  * the same weight, and the same distance from the user's thumb.
+ *
+ * 1.4: a card in the corner rather than a bar across the page, so it never
+ * sits on the content it is asking about; both answers are the same button.
  */
 import Button from './Button.astro';
 import { path, type Locale } from '~/i18n/ui';
@@ -43,18 +46,17 @@ const copy = {
   aria-describedby="cookie-body"
   hidden
 >
-  <div class="inner">
-    <div class="text">
-      <h2 id="cookie-title">{copy.title}</h2>
-      <p id="cookie-body">
-        {copy.body}
-        <a href={path(locale, 'cookies')}>{copy.more}</a>
-      </p>
-    </div>
-    <div class="actions">
-      <Button variant="outline" light id="cookie-reject">{copy.reject}</Button>
-      <Button variant="dark" light id="cookie-accept">{copy.accept}</Button>
-    </div>
+  <h2 id="cookie-title">
+    <span class="rule" aria-hidden="true"></span>
+    {copy.title}
+  </h2>
+  <p id="cookie-body">
+    {copy.body}
+    <a href={path(locale, 'cookies')}>{copy.more}</a>
+  </p>
+  <div class="actions">
+    <Button variant="outline" light id="cookie-reject">{copy.reject}</Button>
+    <Button variant="outline" light id="cookie-accept">{copy.accept}</Button>
   </div>
 </aside>
 
@@ -80,67 +82,72 @@ const copy = {
 </script>
 
 <style>
+  /* Above the nav, below the pointer label. */
   .cookie-consent {
     position: fixed;
-    inset: auto 0 0;
-    z-index: 1200;
-    background: var(--ink);
+    left: 24px;
+    bottom: 24px;
+    z-index: calc(var(--z-cursor) - 50);
+    width: min(420px, calc(100vw - 48px));
+    padding: 28px 28px 24px;
+    background:
+      radial-gradient(120% 90% at 100% 0%, var(--ink-soft) 0%, transparent 60%),
+      var(--ink);
     color: var(--cream);
-    border-top: 1px solid var(--on-dark-rule);
+    border: 1px solid var(--on-dark-rule);
+    box-shadow: var(--shadow-lg);
+    animation: fx-fade-up 0.9s var(--ease-out) both;
   }
   .cookie-consent[hidden] {
     display: none;
   }
-  .inner {
+  h2 {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 32px;
-    padding: 22px var(--pad-x);
-    max-width: 1400px;
-    margin-inline: auto;
+    gap: 14px;
+    margin-bottom: 14px;
+    font-family: var(--sans);
+    font-weight: var(--fw-regular);
+    font-size: var(--fs-eyebrow);
+    letter-spacing: var(--ls-eyebrow);
+    text-transform: uppercase;
+    color: var(--cream);
   }
-  h2 {
-    font-family: var(--serif);
-    font-size: var(--fs-body-lg);
-    font-weight: var(--fw-display);
-    margin-bottom: 4px;
+  .rule {
+    width: 28px;
+    height: 1px;
+    background: var(--cream);
   }
   p {
     font-size: var(--fs-small);
     line-height: 1.7;
     color: var(--on-dark-body);
-    max-width: 78ch;
   }
   p a {
     color: var(--cream);
+    white-space: nowrap;
     text-decoration: underline;
+    text-decoration-thickness: 1px;
     text-underline-offset: 3px;
   }
-  .actions {
-    display: flex;
-    gap: 12px;
-    flex-shrink: 0;
-  }
   /* Equal weight by design — no visual nudge toward accepting. */
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 22px;
+  }
   .actions :global(.btn) {
-    min-width: 148px;
-    padding-inline: 24px;
+    padding-inline: 12px;
   }
 
-  @media (max-width: 860px) {
-    .inner {
-      flex-direction: column;
-      align-items: stretch;
-      gap: 18px;
-      padding: 20px var(--pad-x-mob);
-    }
-    .actions {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-    }
-    .actions :global(.btn) {
-      min-width: 0;
+  @media (max-width: 600px) {
+    .cookie-consent {
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+      width: auto;
+      padding: 22px 20px 20px;
     }
   }
 </style>

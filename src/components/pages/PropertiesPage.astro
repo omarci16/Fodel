@@ -13,8 +13,6 @@
  * link, exactly as before.
  */
 import Base from '~/layouts/Base.astro';
-import Eyebrow from '~/components/Eyebrow.astro';
-import GoldRule from '~/components/GoldRule.astro';
 import Button from '~/components/Button.astro';
 import PropertyCard from '~/components/PropertyCard.astro';
 import { UI, path, type Locale } from '~/i18n/ui';
@@ -105,33 +103,97 @@ const { properties, total, perPage } = await searchProperties({
   page,
 });
 const totalPages = Math.max(1, Math.ceil(total / perPage));
+const hu = locale === 'hu';
+
+/** Where this listing lives: a category page (/hu/ingatlanok/haz/) or the
+ *  general list. Pagination and filter removal stay on it. */
+const currentPath = Astro.url.pathname;
+const listPath = path(locale, 'properties');
 
 /** Carries the current search onto the map, so switching view keeps the filters. */
 const mapHref = (() => {
   const next = new URLSearchParams(params);
   next.delete('page');
   next.delete('bbox'); // the map sets its own bounds
+  if (fixedCategory) next.set('type', fixedCategory);
   const query = next.toString();
   return query ? `${path(locale, 'map')}?${query}` : path(locale, 'map');
 })();
 
-const title = heading ?? (locale === 'hu' ? 'Ingatlanok' : 'Ons aanbod');
-const defaultDescription =
-  locale === 'hu'
-    ? `${total} magyar ingatlan eladó — házak, tanyák, kúriák, nyaralók és birtokok. Szűrjön típus, régió és ár szerint.`
-    : `${total} woningen in Hongarije — huizen, boerderijen, landhuizen en vakantiehuizen. Filter op type, regio en prijs.`;
+const title = heading ?? (hu ? 'Ingatlanok' : 'Ons aanbod');
+const defaultDescription = hu
+  ? `${total} magyar ingatlan eladó — házak, tanyák, kúriák, nyaralók és birtokok. Szűrjön típus, régió és ár szerint.`
+  : `${total} woningen in Hongarije — huizen, boerderijen, landhuizen en vakantiehuizen. Filter op type, regio en prijs.`;
 
-const trail = crumbs(locale, [{ name: title, url: path(locale, 'properties') }]);
+const trail = crumbs(locale, [{ name: title, url: currentPath }]);
 
-/** Rebuilds the current query string with one field overridden — used by pagination links. */
+/** Rebuilds the current query string with one field overridden — used by
+ *  pagination and by the removable filter chips. Removing the category of a
+ *  category page leads to the general list; everything else stays put. */
 function withParam(key: string, value: string): string {
   const next = new URLSearchParams(params);
   if (value) next.set(key, value);
   else next.delete(key);
   if (key !== 'page') next.delete('page');
+  const base = fixedCategory && key === 'type' ? listPath : currentPath;
   const query = next.toString();
-  return query ? `${path(locale, 'properties')}?${query}` : path(locale, 'properties');
+  return query ? `${base}?${query}` : base;
 }
+
+/** The filters in force, each with a link that removes just that one. */
+const active = [
+  q && { key: 'q', label: `„${q}”` },
+  type && { key: 'type', label: categoryLabel(type) },
+  country && { key: 'country', label: labelCountry(country, locale) },
+  region && { key: 'region', label: region },
+  county && { key: 'county', label: county },
+  settlement && { key: 'settlement', label: settlement },
+  priceBand && { key: 'price', label: priceBandLabel(priceBand) },
+  beds && { key: 'beds', label: `${beds}+ ${hu ? 'szoba' : 'slaapkamers'}` },
+  floorMin && { key: 'floor_min', label: `${ui.filters.area} ≥ ${floorMin} m²` },
+  floorMax && { key: 'floor_max', label: `${ui.filters.area} ≤ ${floorMax} m²` },
+  plotMin && { key: 'plot_min', label: `${ui.filters.land} ≥ ${plotMin} m²` },
+  plotMax && { key: 'plot_max', label: `${ui.filters.land} ≤ ${plotMax} m²` },
+  bargain && { key: 'bargain', label: ui.filters.bargain },
+  bbox && { key: 'bbox', label: hu ? 'Térképterület' : 'Kaartgebied' },
+].filter(Boolean) as { key: string; label: string }[];
+
+/** A category page's own category is where the visitor is, not a filter
+ *  they chose — it isn't counted, and isn't offered for removal. */
+const chips = fixedCategory ? active.filter((f) => f.key !== 'type') : active;
+const clearHref = currentPath;
+
+// Collapsible groups open when they hold a value, so nothing in force is hidden.
+const locationOpen = !!(country || region || county || settlement);
+const floorOpen = !!(floorMin || floorMax);
+const plotOpen = !!(plotMin || plotMax);
+
+/** Numbered pagination: first, last, and a window around the current page. */
+const pageItems = (() => {
+  const set = new Set([1, totalPages, page - 1, page, page + 1].filter((n) => n >= 1 && n <= totalPages));
+  const sorted = [...set].sort((a, b) => a - b);
+  const out: (number | 'gap')[] = [];
+  sorted.forEach((n, i) => {
+    if (i > 0 && n - sorted[i - 1] > 1) out.push('gap');
+    out.push(n);
+  });
+  return out;
+})();
+
+const countWord = ui.filters.results(total).replace(String(total), '').trim();
+const labels = {
+  filters: hu ? 'Szűrés' : 'Filters',
+  openFilters: hu ? 'Szűrők' : 'Filters',
+  location: hu ? 'Elhelyezkedés' : 'Locatie',
+  keyword: hu ? 'Szabad szavas keresés' : 'Vrij zoeken',
+  min: 'min.',
+  max: 'max.',
+  prev: hu ? 'Előző oldal' : 'Vorige pagina',
+  next: hu ? 'Következő oldal' : 'Volgende pagina',
+  pages: hu ? 'Lapozás' : 'Paginering',
+  remove: hu ? 'Szűrő eltávolítása' : 'Filter verwijderen',
+  apply: ui.filters.search,
+};
 ---
 
 <Base
@@ -141,296 +203,1045 @@ function withParam(key: string, value: string): string {
   alternates={alternates ?? alternatesFor('properties')}
   schema={[breadcrumbSchema(trail)]}
 >
-  <nav class="crumbs" aria-label={ui.a11y.breadcrumb}>
-    <ol>
-      {
-        trail.map((c, i) => (
-          <li>
-            {i < trail.length - 1 ? <a href={c.url}>{c.name}</a> : <span aria-current="page">{c.name}</span>}
-          </li>
-        ))
-      }
-    </ol>
-  </nav>
-
   <header class="head">
-    <Eyebrow space="12px">{ui.filters.title}</Eyebrow>
-    <h1>{title}</h1>
-    <GoldRule space="24px" />
-    {intro && <p class="intro">{intro}</p>}
+    <nav class="crumbs" aria-label={ui.a11y.breadcrumb}>
+      <ol>
+        {
+          trail.map((c, i) => (
+            <li>
+              {i < trail.length - 1 ? <a href={c.url}>{c.name}</a> : <span aria-current="page">{c.name}</span>}
+            </li>
+          ))
+        }
+      </ol>
+    </nav>
+    <div class="head-row">
+      <h1>
+        <span class="line"><span>{title}</span></span>
+      </h1>
+      {intro && <p class="intro">{intro}</p>}
+    </div>
   </header>
 
-  <form class="filters" id="filters" method="GET" action={path(locale, 'properties')}>
-    <div class="search-row">
-      <input
-        type="search"
-        name="q"
-        value={q}
-        placeholder={locale === 'hu' ? 'Keresés — pl. Balaton, présház, panoráma…' : 'Zoeken — bijv. Balaton, wijnkelder, uitzicht…'}
-        aria-label={locale === 'hu' ? 'Szabad szavas keresés' : 'Vrij zoeken'}
-      />
-    </div>
+  <div class="layout" id="listing">
+    {/* ── Sidebar: the whole filter form. On narrow screens the same element
+        becomes a full-height drawer. ── */}
+    <aside class="sidebar" id="filter-panel" aria-labelledby="filter-title">
+      <form
+        class="filters"
+        id="filters"
+        method="GET"
+        action={listPath}
+        data-fixed-type={fixedCategory}
+        data-fixed-path={fixedCategory ? currentPath : undefined}
+      >
+        <div class="side-head">
+          <h2 class="side-title" id="filter-title">
+            {labels.filters}
+            {chips.length > 0 && <span class="side-badge num">{chips.length}</span>}
+          </h2>
+          {chips.length > 0 && <a class="side-reset" href={clearHref}>{ui.filters.reset}</a>}
+          <button type="button" class="side-close" data-filters-close aria-label={ui.close}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M2 2l12 12M14 2L2 14" stroke="currentColor" stroke-width="1.2" />
+            </svg>
+          </button>
+        </div>
 
-    <div class="filter-row">
-      {!fixedCategory && <div class="fcell">
-        <label for="f-type">{ui.filters.type}</label>
-        <select id="f-type" name="type">
-          <option value="">{ui.filters.all}</option>
-          {categories.map((k) => <option value={k} selected={k === type}>{categoryLabel(k)}</option>)}
-        </select>
-      </div>}
+        <div class="side-body" id="filter-body">
+          {/* Keyword */}
+          <div class="field-search">
+            <svg class="search-icon" width="18" height="18" viewBox="0 0 22 22" fill="none" aria-hidden="true">
+              <circle cx="9.5" cy="9.5" r="7.25" stroke="currentColor" stroke-width="1.3" />
+              <path d="M15 15l5.5 5.5" stroke="currentColor" stroke-width="1.3" />
+            </svg>
+            <input
+              type="search"
+              name="q"
+              value={q}
+              placeholder={hu ? 'Település, jellemző, azonosító…' : 'Plaats, kenmerk, referentie…'}
+              aria-label={labels.keyword}
+              enterkeyhint="search"
+            />
+          </div>
 
-      {countries.length > 1 && <div class="fcell">
-        <label for="f-country">{ui.filters.country}</label>
-        <select id="f-country" name="country">
-          <option value="">{locale === 'hu' ? 'Minden ország' : 'Alle landen'}</option>
-          {countries.map((code) => <option value={code} selected={code === country}>{labelCountry(code, locale)}</option>)}
-        </select>
-      </div>}
+          {/* Type */}
+          <fieldset class="group">
+            <legend class="group-title">{ui.filters.type}</legend>
+            <div class="chips">
+              <label class="opt">
+                <input type="radio" name="type" value="" checked={!type} data-auto />
+                <span>{ui.filters.all}</span>
+              </label>
+              {
+                categories.map((k) => (
+                  <label class="opt">
+                    <input type="radio" name="type" value={k} checked={k === type} data-auto />
+                    <span>{categoryLabel(k)}</span>
+                  </label>
+                ))
+              }
+            </div>
+          </fieldset>
 
-      <div class="fcell">
-        <label for="f-region">{ui.filters.region}</label>
-        <select id="f-region" name="region">
-          <option value="">{ui.filters.entireCountry}</option>
-          {regions.map((r) => <option value={r} selected={r === region}>{r}</option>)}
-        </select>
-      </div>
+          {/* Price */}
+          <fieldset class="group">
+            <legend class="group-title">{ui.filters.price}</legend>
+            <div class="chips">
+              <label class="opt">
+                <input type="radio" name="price" value="" checked={!priceBandId} data-auto />
+                <span>{ui.filters.all}</span>
+              </label>
+              {
+                PRICE_BANDS.map((b) => (
+                  <label class="opt">
+                    <input type="radio" name="price" value={b.id} checked={b.id === priceBandId} data-auto />
+                    <span class="num">{priceBandLabel(b)}</span>
+                  </label>
+                ))
+              }
+            </div>
+          </fieldset>
 
-      <div class="fcell">
-        <label for="f-settlement">{ui.filters.settlement}</label>
-        <input id="f-settlement" name="settlement" value={settlement} />
-      </div>
+          {/* Bedrooms — one row, one choice */}
+          <fieldset class="group">
+            <legend class="group-title">{ui.filters.beds}</legend>
+            <div class="segmented">
+              <label class="seg">
+                <input type="radio" name="beds" value="" checked={!beds} data-auto />
+                <span>{ui.filters.all}</span>
+              </label>
+              {
+                [2, 3, 4, 5].map((n) => (
+                  <label class="seg">
+                    <input type="radio" name="beds" value={String(n)} checked={String(n) === beds} data-auto />
+                    <span class="num">{n}+</span>
+                  </label>
+                ))
+              }
+            </div>
+          </fieldset>
 
-      <div class="fcell">
-        <label for="f-county">{ui.filters.county}</label>
-        <select id="f-county" name="county">
-          <option value="">{ui.filters.all}</option>
-          {counties.map((c) => <option value={c} selected={c === county}>{c}</option>)}
-        </select>
-      </div>
+          {/* Location */}
+          <details class="group group-fold" open={locationOpen}>
+            <summary class="group-title">
+              <span>{labels.location}</span>
+              <span class="fold-icon" aria-hidden="true"></span>
+            </summary>
+            <div class="fold-body">
+              {
+                countries.length > 1 && (
+                  <div class="field">
+                    <label for="f-country">{ui.filters.country}</label>
+                    <select id="f-country" name="country" data-auto>
+                      <option value="">{hu ? 'Minden ország' : 'Alle landen'}</option>
+                      {countries.map((code) => (
+                        <option value={code} selected={code === country}>{labelCountry(code, locale)}</option>
+                      ))}
+                    </select>
+                  </div>
+                )
+              }
+              <div class="field">
+                <label for="f-region">{ui.filters.region}</label>
+                <select id="f-region" name="region" data-auto>
+                  <option value="">{ui.filters.entireCountry}</option>
+                  {regions.map((r) => <option value={r} selected={r === region}>{r}</option>)}
+                </select>
+              </div>
+              <div class="field">
+                <label for="f-county">{ui.filters.county}</label>
+                <select id="f-county" name="county" data-auto>
+                  <option value="">{ui.filters.all}</option>
+                  {counties.map((c) => <option value={c} selected={c === county}>{c}</option>)}
+                </select>
+              </div>
+              <div class="field">
+                <label for="f-settlement">{ui.filters.settlement}</label>
+                <input id="f-settlement" name="settlement" value={settlement} autocomplete="off" />
+              </div>
+            </div>
+          </details>
 
-      <div class="fcell">
-        <label for="f-price">{ui.filters.price}</label>
-        <select id="f-price" name="price">
-          <option value="">{ui.filters.all}</option>
-          {PRICE_BANDS.map((b) => <option value={b.id} selected={b.id === priceBandId}>{priceBandLabel(b)}</option>)}
-        </select>
-      </div>
+          {/* Floor area */}
+          <details class="group group-fold" open={floorOpen}>
+            <summary class="group-title">
+              <span>{ui.filters.area}</span>
+              <span class="fold-icon" aria-hidden="true"></span>
+            </summary>
+            <div class="fold-body">
+              <div class="range">
+                <label class="range-field">
+                  <span class="sr-only">{ui.filters.areaFrom}</span>
+                  <input type="number" inputmode="numeric" min="0" step="10" name="floor_min" value={floorMin} placeholder={labels.min} />
+                  <span class="unit" aria-hidden="true">m²</span>
+                </label>
+                <span class="range-dash" aria-hidden="true"></span>
+                <label class="range-field">
+                  <span class="sr-only">{ui.filters.areaTo}</span>
+                  <input type="number" inputmode="numeric" min="0" step="10" name="floor_max" value={floorMax} placeholder={labels.max} />
+                  <span class="unit" aria-hidden="true">m²</span>
+                </label>
+              </div>
+            </div>
+          </details>
 
-      <div class="fcell">
-        <label for="f-beds">{ui.filters.beds}</label>
-        <select id="f-beds" name="beds">
-          <option value="">{ui.filters.any}</option>
-          {[2, 3, 4, 5].map((n) => <option value={String(n)} selected={String(n) === beds}>{n}+</option>)}
-        </select>
-      </div>
+          {/* Plot */}
+          <details class="group group-fold" open={plotOpen}>
+            <summary class="group-title">
+              <span>{ui.filters.land}</span>
+              <span class="fold-icon" aria-hidden="true"></span>
+            </summary>
+            <div class="fold-body">
+              <div class="range">
+                <label class="range-field">
+                  <span class="sr-only">{ui.filters.landFrom}</span>
+                  <input type="number" inputmode="numeric" min="0" step="100" name="plot_min" value={plotMin} placeholder={labels.min} />
+                  <span class="unit" aria-hidden="true">m²</span>
+                </label>
+                <span class="range-dash" aria-hidden="true"></span>
+                <label class="range-field">
+                  <span class="sr-only">{ui.filters.landTo}</span>
+                  <input type="number" inputmode="numeric" min="0" step="100" name="plot_max" value={plotMax} placeholder={labels.max} />
+                  <span class="unit" aria-hidden="true">m²</span>
+                </label>
+              </div>
+            </div>
+          </details>
 
-      <div class="fcell">
-        <label for="f-floor-min">{ui.filters.areaFrom}</label>
-        <input id="f-floor-min" type="number" min="0" name="floor_min" value={floorMin} placeholder="m²" />
-      </div>
-      <div class="fcell">
-        <label for="f-floor-max">{ui.filters.areaTo}</label>
-        <input id="f-floor-max" type="number" min="0" name="floor_max" value={floorMax} placeholder="m²" />
-      </div>
-      <div class="fcell">
-        <label for="f-plot-min">{ui.filters.landFrom}</label>
-        <input id="f-plot-min" type="number" min="0" name="plot_min" value={plotMin} placeholder="m²" />
-      </div>
-      <div class="fcell">
-        <label for="f-plot-max">{ui.filters.landTo}</label>
-        <input id="f-plot-max" type="number" min="0" name="plot_max" value={plotMax} placeholder="m²" />
-      </div>
+          {/* Bargains */}
+          <label class="switch-row">
+            <span>{ui.filters.bargain}</span>
+            <input type="checkbox" role="switch" name="bargain" value="1" checked={bargain} data-auto />
+            <span class="switch" aria-hidden="true"></span>
+          </label>
 
-      <div class="fcell">
-        <label for="f-sort">{ui.filters.sort}</label>
-        <select id="f-sort" name="sort">
-          <option value="featured" selected={sort === 'featured'}>{ui.filters.sortFeatured}</option>
-          <option value="price-asc" selected={sort === 'price-asc'}>{ui.filters.sortPriceAsc}</option>
-          <option value="price-desc" selected={sort === 'price-desc'}>{ui.filters.sortPriceDesc}</option>
-          <option value="area-desc" selected={sort === 'area-desc'}>{ui.filters.sortAreaDesc}</option>
-          <option value="bargain" selected={sort === 'bargain'}>{ui.filters.bargain}</option>
-        </select>
-      </div>
-    </div>
+          {
+            bbox && (
+              <>
+                {/* Preserved across a filter change: without this the hidden bbox is
+                    dropped the moment someone touches a filter, and "search this
+                    area" silently stops applying. */}
+                <input type="hidden" name="bbox" value={bboxParam} />
+                <p class="area-note">
+                  {ui.filters.areaFiltered} ·{' '}
+                  <a href={withParam('bbox', '')}>{hu ? 'Szűrés törlése' : 'Filter wissen'}</a>
+                </p>
+              </>
+            )
+          }
+        </div>
 
-    <label class="chip"><input type="checkbox" name="bargain" value="1" checked={bargain} /> {ui.filters.bargain}</label>
+        <div class="side-foot">
+          <button type="submit" class="apply">
+            <span>{labels.apply}</span>
+            <svg width="18" height="10" viewBox="0 0 18 10" fill="none" aria-hidden="true">
+              <path d="M0 5h16.5M12.5 1l4 4-4 4" stroke="currentColor" stroke-width="1.1" />
+            </svg>
+          </button>
+        </div>
+      </form>
+    </aside>
+    <div class="scrim" data-filters-close aria-hidden="true"></div>
 
-    {
-      bbox && (
-        <>
-          {/* Preserved across a filter change: without this the hidden bbox is
-              dropped the moment someone touches a select, and "search this
-              area" silently stops applying. */}
-          <input type="hidden" name="bbox" value={bboxParam} />
-          <p class="area-note">
-            {ui.filters.areaFiltered} ·{' '}
-            <a href={withParam('bbox', '')}>{locale === 'hu' ? 'Szűrés törlése' : 'Filter wissen'}</a>
+    {/* ── Results ── */}
+    <section class="results" aria-labelledby="result-count">
+      <div class="toolbar">
+        <div class="toolbar-top">
+          <p class="count" id="result-count" role="status">
+            <span class="count-n num">{total}</span>
+            <span class="count-word">{countWord}</span>
           </p>
-        </>
-      )
-    }
 
-    <div class="filter-foot">
-      <p class="count" role="status">{ui.filters.results(total)}</p>
-      <div class="filter-actions">
-        <a href={mapHref} class="reset map-link">{ui.filters.viewMap}</a>
-        <a href={path(locale, 'properties')} class="reset">{ui.filters.reset}</a>
-        <button type="submit" class="reset submit-btn">{ui.filters.search}</button>
-      </div>
-    </div>
-  </form>
+          <div class="toolbar-end">
+            <button type="button" class="filters-toggle" data-filters-open aria-controls="filter-panel" aria-expanded="false">
+              <svg width="16" height="12" viewBox="0 0 16 12" fill="none" aria-hidden="true">
+                <path d="M0 2h16M0 6h16M0 10h16" stroke="currentColor" stroke-width="1.1" />
+                <circle cx="5" cy="2" r="1.6" fill="var(--cream)" stroke="currentColor" stroke-width="1.1" />
+                <circle cx="11" cy="6" r="1.6" fill="var(--cream)" stroke="currentColor" stroke-width="1.1" />
+                <circle cx="7" cy="10" r="1.6" fill="var(--cream)" stroke="currentColor" stroke-width="1.1" />
+              </svg>
+              <span>{labels.openFilters}</span>
+              {chips.length > 0 && <span class="toggle-badge num">{chips.length}</span>}
+            </button>
 
-  {
-    properties.length > 0 ? (
-      <div class="grid">
-        {properties.map((p, i) => <PropertyCard property={p} locale={locale} eager={i < 3} />)}
-      </div>
-    ) : (
-      <div class="empty">
-        <GoldRule center space="28px" />
-        <p class="empty-title">{ui.filters.noResults}</p>
-        <p class="empty-hint">{ui.filters.noResultsHint}</p>
-        <Button variant="dark" href={path(locale, 'searchRequest')}>{ui.cta.searchRequest}</Button>
-      </div>
-    )
-  }
+            <label class="sort">
+              <span class="sort-label">{ui.filters.sort}</span>
+              <select name="sort" form="filters" data-auto>
+                <option value="featured" selected={sort === 'featured'}>{ui.filters.sortFeatured}</option>
+                <option value="price-asc" selected={sort === 'price-asc'}>{ui.filters.sortPriceAsc}</option>
+                <option value="price-desc" selected={sort === 'price-desc'}>{ui.filters.sortPriceDesc}</option>
+                <option value="area-desc" selected={sort === 'area-desc'}>{ui.filters.sortAreaDesc}</option>
+                <option value="bargain" selected={sort === 'bargain'}>{ui.filters.bargain}</option>
+              </select>
+            </label>
 
-  {
-    totalPages > 1 && (
-      <nav class="pagination" aria-label={locale === 'hu' ? 'Lapozás' : 'Paginering'}>
-        {page > 1 && <a href={withParam('page', String(page - 1))}>&larr; {locale === 'hu' ? 'Előző' : 'Vorige'}</a>}
-        <span class="page-of">
-          {locale === 'hu' ? `${page}. oldal / ${totalPages}` : `Pagina ${page} van ${totalPages}`}
-        </span>
-        {page < totalPages && <a href={withParam('page', String(page + 1))}>{locale === 'hu' ? 'Következő' : 'Volgende'} &rarr;</a>}
-      </nav>
-    )
-  }
+            <a href={mapHref} class="map-link" aria-label={ui.filters.viewMap}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M1 3.5l4.5-2 5 2 4.5-2v11l-4.5 2-5-2-4.5 2z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round" />
+                <path d="M5.5 1.5v11M10.5 3.5v11" stroke="currentColor" stroke-width="1.1" />
+              </svg>
+              <span>{ui.filters.viewMap}</span>
+            </a>
+          </div>
+        </div>
+
+        {
+          chips.length > 0 && (
+            <ul class="active" aria-label={hu ? 'Aktív szűrők' : 'Actieve filters'}>
+              {chips.map((f) => (
+                <li>
+                  <a href={withParam(f.key, '')} aria-label={`${labels.remove}: ${f.label}`}>
+                    <span>{f.label}</span>
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+                      <path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.1" />
+                    </svg>
+                  </a>
+                </li>
+              ))}
+              {chips.length > 1 && (
+                <li class="active-clear">
+                  <a href={clearHref}>{ui.filters.reset}</a>
+                </li>
+              )}
+            </ul>
+          )
+        }
+        <span class="loading-bar" aria-hidden="true"></span>
+      </div>
+
+      {
+        properties.length > 0 ? (
+          <div class="grid">
+            {properties.map((p, i) => (
+              <PropertyCard
+                property={p}
+                locale={locale}
+                eager={i < 2}
+                reveal={false}
+                sizes="(max-width: 700px) 100vw, (max-width: 1100px) 45vw, (max-width: 1600px) 34vw, 26vw"
+              />
+            ))}
+          </div>
+        ) : (
+          <div class="empty">
+            <span class="empty-rule" aria-hidden="true"></span>
+            <p class="empty-title">{ui.filters.noResults}</p>
+            <p class="empty-hint">{ui.filters.noResultsHint}</p>
+            <div class="empty-actions">
+              <Button variant="dark" href={path(locale, 'searchRequest')}>{ui.cta.searchRequest}</Button>
+              {chips.length > 0 && <Button variant="text" href={clearHref}>{ui.filters.reset}</Button>}
+            </div>
+          </div>
+        )
+      }
+
+      {
+        totalPages > 1 && (
+          <nav class="pagination" aria-label={labels.pages}>
+            {page > 1 ? (
+              <a class="page-step" href={withParam('page', String(page - 1))} aria-label={labels.prev}>
+                <svg width="18" height="10" viewBox="0 0 18 10" fill="none" aria-hidden="true">
+                  <path d="M18 5H1.5M5.5 1l-4 4 4 4" stroke="currentColor" stroke-width="1.1" />
+                </svg>
+              </a>
+            ) : (
+              <span class="page-step" aria-hidden="true" data-disabled />
+            )}
+            <ol>
+              {pageItems.map((item) =>
+                item === 'gap' ? (
+                  <li class="page-gap" aria-hidden="true">…</li>
+                ) : (
+                  <li>
+                    {item === page ? (
+                      <span class="page-num num" aria-current="page">{item}</span>
+                    ) : (
+                      <a class="page-num num" href={withParam('page', String(item))}>{item}</a>
+                    )}
+                  </li>
+                )
+              )}
+            </ol>
+            {page < totalPages ? (
+              <a class="page-step" href={withParam('page', String(page + 1))} aria-label={labels.next}>
+                <svg width="18" height="10" viewBox="0 0 18 10" fill="none" aria-hidden="true">
+                  <path d="M0 5h16.5M12.5 1l4 4-4 4" stroke="currentColor" stroke-width="1.1" />
+                </svg>
+              </a>
+            ) : (
+              <span class="page-step" aria-hidden="true" data-disabled />
+            )}
+          </nav>
+        )
+      }
+    </section>
+  </div>
 </Base>
 
 <script>
-  // Filters now drive a real server-side search, so a change is a real
-  // navigation — this just removes the extra click on "Keresés" for anyone
-  // with JS, while the <noscript>-safe submit button covers everyone else.
-  const form = document.getElementById('filters');
-  if (form instanceof HTMLFormElement) {
-    form.querySelectorAll('select').forEach((select) => {
-      select.addEventListener('change', () => form.submit());
+  const form = document.getElementById('filters') as HTMLFormElement | null;
+  const panel = document.getElementById('filter-panel');
+  const body = document.getElementById('filter-body');
+  const listing = document.getElementById('listing');
+  const toggle = document.querySelector<HTMLButtonElement>('[data-filters-open]');
+  const drawer = window.matchMedia('(max-width: 1100px)');
+  const KEY = 'fodel:listing';
+
+  if (form && panel && listing) {
+    const fixedType = form.dataset.fixedType;
+    const fixedPath = form.dataset.fixedPath;
+    let filterNavigation = false;
+
+    /* ── Leaving: remember where the visitor was ──
+       Every filter change is a real navigation (the URL is the source of
+       truth). Remember whether they were already down among the results and
+       how far the panel was scrolled, so the next page picks up there
+       instead of throwing them back to the top. */
+    const remember = () => {
+      filterNavigation = true;
+      const pastHead = window.scrollY > listing.offsetTop - 140;
+      try {
+        sessionStorage.setItem(KEY, JSON.stringify({ results: pastHead, panel: body?.scrollTop ?? 0 }));
+      } catch {
+        /* storage unavailable — the page simply opens at the top */
+      }
+      listing.setAttribute('data-loading', '');
+    };
+
+    // Same listing, new results: skip the page-level slide transition.
+    window.addEventListener('pageswap', (e: Event) => {
+      const transition = (e as Event & { viewTransition?: { skipTransition(): void } }).viewTransition;
+      if (filterNavigation && transition) transition.skipTransition();
+    });
+
+    /* ── Arriving ── */
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(KEY) ?? 'null');
+      sessionStorage.removeItem(KEY);
+      if (saved) {
+        if (saved.results) {
+          const nav = document.getElementById('site-nav')?.offsetHeight ?? 0;
+          window.scrollTo({ top: listing.offsetTop - nav - 24, behavior: 'instant' as ScrollBehavior });
+        }
+        if (body && saved.panel) body.scrollTop = saved.panel;
+      }
+    } catch {
+      /* nothing saved, or storage unavailable */
+    }
+
+    /* ── Clean, shareable URLs ──
+       Empty fields and the default sort are left out of the query. On a
+       category page, keeping its own category keeps the visitor on that
+       page, rather than sending them to the general list with ?type=. */
+    let stayOnCategory = false;
+    form.addEventListener('submit', () => {
+      const chosen = form.querySelector<HTMLInputElement>('input[name="type"]:checked')?.value ?? '';
+      stayOnCategory = !!(fixedType && fixedPath && chosen === fixedType);
+      form.action = stayOnCategory && fixedPath ? fixedPath : form.getAttribute('action') ?? '';
+      remember();
+    });
+    form.addEventListener('formdata', (e) => {
+      const data = e.formData;
+      for (const [name, value] of [...data.entries()]) {
+        if (value === '') data.delete(name);
+      }
+      if (data.get('sort') === 'featured') data.delete('sort');
+      if (stayOnCategory) data.delete('type');
+    });
+
+    /* ── Applying ──
+       Beside the results, a chosen chip, switch or menu applies at once.
+       Typed values (keyword, settlement, areas) apply on Enter or with the
+       button, which fills in to say something is waiting. In the drawer
+       nothing applies until the visitor asks. The sort menu sits in the
+       toolbar, outside the drawer, and always applies at once. */
+    const apply = () => form.requestSubmit();
+    form.addEventListener('change', (e) => {
+      const target = e.target as HTMLElement;
+      if (target.matches('[data-auto]') && !drawer.matches) apply();
+      else form.setAttribute('data-dirty', '');
+    });
+    form.addEventListener('input', (e) => {
+      if ((e.target as HTMLElement).matches('input[type="search"], input[type="number"], input:not([type])')) {
+        form.setAttribute('data-dirty', '');
+      }
+    });
+    document.querySelector<HTMLSelectElement>('select[form="filters"]')?.addEventListener('change', apply);
+
+    // Links that re-query the same listing (chips, paging, reset) keep the place too.
+    listing.addEventListener('click', (e) => {
+      const link = (e.target as HTMLElement).closest(
+        '.active a, .pagination a, .side-reset, .empty-actions a, .area-note a'
+      );
+      if (link) remember();
+    });
+
+    /* ── Drawer (narrow screens) ── */
+    const focusables = () =>
+      Array.from(panel.querySelectorAll<HTMLElement>('a[href], button, input, select, summary')).filter(
+        (el) => !el.hasAttribute('disabled') && el.getClientRects().length > 0 && !(el as HTMLInputElement).type?.match(/^(radio|checkbox)$/)
+      );
+    const setOpen = (open: boolean) => {
+      panel.toggleAttribute('data-open', open);
+      toggle?.setAttribute('aria-expanded', String(open));
+      panel.inert = drawer.matches && !open;
+      document.body.style.overflow = open ? 'hidden' : '';
+      if (open) panel.querySelector<HTMLElement>('.side-close')?.focus();
+      else if (drawer.matches) toggle?.focus();
+    };
+    const sync = () => {
+      panel.removeAttribute('data-open');
+      toggle?.setAttribute('aria-expanded', 'false');
+      document.body.style.overflow = '';
+      panel.inert = drawer.matches;
+      if (drawer.matches) {
+        panel.setAttribute('role', 'dialog');
+        panel.setAttribute('aria-modal', 'true');
+      } else {
+        panel.removeAttribute('role');
+        panel.removeAttribute('aria-modal');
+      }
+    };
+    sync();
+    drawer.addEventListener('change', sync);
+    toggle?.addEventListener('click', () => setOpen(true));
+    document.querySelectorAll('[data-filters-close]').forEach((el) => el.addEventListener('click', () => setOpen(false)));
+    document.addEventListener('keydown', (e) => {
+      if (!panel.hasAttribute('data-open')) return;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setOpen(false);
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const items = focusables();
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    });
+
+    // Back from a property page out of the back/forward cache: undo the
+    // loading state and any open drawer.
+    window.addEventListener('pageshow', (e) => {
+      if (!e.persisted) return;
+      filterNavigation = false;
+      listing.removeAttribute('data-loading');
+      form.removeAttribute('data-dirty');
+      sync();
     });
   }
 </script>
 
 <style>
-  .crumbs {
-    padding: 18px var(--pad-x);
-    border-bottom: 1px solid var(--border);
+  /* ══ Head ═════════════════════════════════════════════════════════════ */
+  .head {
+    padding: 36px var(--pad-x) 44px;
   }
   .crumbs ol {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    align-items: center;
+    gap: 6px 12px;
     list-style: none;
+    margin-bottom: 40px;
     font-size: var(--fs-micro);
+    letter-spacing: 0.06em;
+    line-height: 1.5;
     color: var(--taupe);
+    animation: fx-fade-up 1s var(--ease-out) 0.2s both;
+  }
+  .crumbs li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
   }
   .crumbs li + li::before {
-    content: '/';
-    margin-right: 8px;
-    color: var(--border);
+    content: '';
+    width: 16px;
+    height: 1px;
+    background: var(--border);
   }
+  .crumbs a {
+    transition: color var(--dur-fast) ease;
+  }
+  .crumbs a:hover,
   .crumbs [aria-current] {
     color: var(--ink);
   }
-
-  .head {
-    padding: 64px var(--pad-x) 36px;
+  .head-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 48px;
   }
   h1 {
     font-family: var(--serif);
-    font-weight: var(--fw-display);
-    font-size: clamp(38px, 4.4vw, 68px);
-    line-height: 1.06;
+    font-weight: var(--fw-hero);
+    font-size: clamp(44px, 5.4vw, 88px);
+    letter-spacing: var(--ls-display);
+    line-height: 1;
     color: var(--ink);
-    margin-bottom: 24px;
+  }
+  h1 .line > span {
+    animation: fx-rise 1.3s var(--ease-out) 0.25s both;
   }
   .intro {
-    font-size: var(--fs-body-lg);
-    line-height: var(--lh-lead);
+    max-width: 48ch;
+    padding-bottom: 0.4em;
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
     color: var(--taupe);
-    max-width: 62ch;
+    animation: fx-fade-up 1.2s var(--ease-out) 0.5s both;
   }
 
+  /* ══ Layout ═══════════════════════════════════════════════════════════ */
+  .layout {
+    display: grid;
+    grid-template-columns: 320px minmax(0, 1fr);
+    gap: 56px;
+    align-items: start;
+    padding: 0 var(--pad-x) var(--section-y);
+  }
+
+  /* ══ Sidebar ══════════════════════════════════════════════════════════ */
+  /* It only sticks once the page has scrolled, by which point the nav has
+     settled at its compact 72px — hence 72 + 20, not --nav-h. */
+  .sidebar {
+    position: sticky;
+    top: 92px;
+    animation: fx-fade-up 1.2s var(--ease-out) 0.35s both;
+  }
   .filters {
-    padding: 0 var(--pad-x) 36px;
-  }
-  .search-row {
-    margin-bottom: 14px;
-  }
-  .search-row input {
-    width: 100%;
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100svh - 112px);
+    background: #fff;
     border: 1px solid var(--border);
-    background: transparent;
-    padding: 14px 16px;
-    font-size: var(--fs-body);
-    font-weight: var(--fw-body);
+  }
+
+  .side-head {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  .side-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-right: auto;
+    font-family: var(--serif);
+    font-weight: var(--fw-medium);
+    font-size: 20px;
+    letter-spacing: var(--ls-heading);
+    line-height: 1.2;
     color: var(--ink);
   }
-  .search-row input:focus-visible {
+  .side-badge {
+    display: inline-grid;
+    place-items: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    background: var(--ink);
+    color: var(--cream);
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: var(--fw-medium);
+    letter-spacing: 0;
+  }
+  .side-reset {
+    font-size: var(--fs-micro);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--taupe);
+    background-image: linear-gradient(currentColor, currentColor);
+    background-size: 100% 1px;
+    background-position: 0 100%;
+    background-repeat: no-repeat;
+    padding-bottom: 2px;
+    transition: color var(--dur-fast) ease;
+  }
+  .side-reset:hover {
+    color: var(--ink);
+  }
+  .side-close {
+    display: none;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    margin: -10px -12px -10px 0;
+    color: var(--ink);
+  }
+
+  .side-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0 24px 4px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .side-body::-webkit-scrollbar {
+    width: 4px;
+  }
+  .side-body::-webkit-scrollbar-thumb {
+    background: var(--border);
+  }
+
+  /* Keyword */
+  .field-search {
+    position: relative;
+    margin: 20px 0 2px;
+  }
+  .search-icon {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--taupe);
+    pointer-events: none;
+  }
+  .field-search input {
+    display: block;
+    width: 100%;
+    height: 48px;
+    padding: 0 12px 0 42px;
+    border: 1px solid var(--border);
+    background: var(--cream);
+    font-size: var(--fs-small);
+    color: var(--ink);
+    transition:
+      border-color 0.3s ease,
+      background 0.3s ease;
+  }
+  .field-search input::placeholder {
+    color: var(--taupe);
+    opacity: 0.8;
+  }
+  .field-search input:hover {
+    border-color: var(--taupe);
+  }
+  .field-search input:focus {
+    background: #fff;
+    border-color: var(--ink);
+  }
+  .field-search input:focus-visible {
     outline: var(--focus-ring);
     outline-offset: 2px;
   }
-  /* Seven cells since 1.1 (type, region, county, price, beds, area, sort), so
-     the dividers are drawn by a 1px grid gap over a border-coloured ground
-     rather than per-cell borders. That was fine at a fixed five across; with a
-     count that wraps, `:last-child { border-right: none }` starts erasing the
-     wrong edges. This version doesn't care how many cells there are. */
-  .filter-row {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 1px;
-    background: var(--border);
-    border: 1px solid var(--border);
-  }
-  .fcell {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 18px 22px;
-    background: var(--cream);
+
+  /* Groups */
+  .group {
     min-width: 0;
+    margin: 0;
+    padding: 22px 0;
+    border: 0;
+    border-bottom: 1px solid var(--border);
   }
-  .fcell label {
+  /* A floated legend behaves like an ordinary block; without it a legend
+     keeps its special fieldset placement and ignores the spacing here. */
+  .group-title {
+    float: left;
+    width: 100%;
+    margin-bottom: 14px;
+    padding: 0;
     font-family: var(--sans);
     font-size: var(--fs-eyebrow);
+    font-weight: var(--fw-medium);
     letter-spacing: var(--ls-label);
+    line-height: 1.4;
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+  .group-title + * {
+    clear: both;
+  }
+
+  /* Chips — one tap chooses; the chosen one is filled. */
+  .chips {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .opt,
+  .seg {
+    position: relative;
+    display: block;
+    cursor: pointer;
+  }
+  .opt input,
+  .seg input,
+  .switch-row input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    pointer-events: none;
+  }
+  .opt span {
+    display: flex;
+    align-items: center;
+    min-height: 42px;
+    height: 100%;
+    padding: 9px 12px;
+    border: 1px solid var(--border);
+    background: #fff;
+    font-size: 14.5px;
+    line-height: 1.25;
+    color: var(--ink);
+    transition:
+      background 0.35s var(--ease-out),
+      border-color 0.35s var(--ease-out),
+      color 0.35s var(--ease-out);
+  }
+  .opt:hover span {
+    border-color: var(--ink);
+  }
+  .opt input:checked + span {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--cream);
+  }
+  .opt input:focus-visible + span,
+  .seg input:focus-visible + span {
+    outline: var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  /* Bedrooms — one segmented row. */
+  .segmented {
+    display: grid;
+    grid-template-columns: 1.3fr repeat(4, 1fr);
+    border: 1px solid var(--border);
+    background: #fff;
+  }
+  .seg + .seg {
+    border-left: 1px solid var(--border);
+  }
+  .seg span {
+    display: grid;
+    place-items: center;
+    height: 42px;
+    font-size: 14.5px;
+    color: var(--ink);
+    transition:
+      background 0.35s var(--ease-out),
+      color 0.35s var(--ease-out);
+  }
+  .seg:hover span {
+    background: var(--linen);
+  }
+  .seg input:checked + span {
+    background: var(--ink);
+    color: var(--cream);
+  }
+
+  /* Collapsible groups */
+  .group-fold summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    float: none;
+    margin: 0;
+    cursor: pointer;
+    list-style: none;
+  }
+  .group-fold summary::-webkit-details-marker {
+    display: none;
+  }
+  .group-fold summary:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: 4px;
+  }
+  .fold-icon {
+    position: relative;
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+  }
+  .fold-icon::before,
+  .fold-icon::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 1px;
+    margin-top: -0.5px;
+    background: var(--ink);
+    transition: transform 0.4s var(--ease-out);
+  }
+  .fold-icon::after {
+    transform: rotate(90deg);
+  }
+  .group-fold[open] .fold-icon::after {
+    transform: rotate(0deg);
+  }
+  .fold-body {
+    padding-top: 18px;
+  }
+
+  /* Labelled fields inside the folds */
+  .field + .field {
+    margin-top: 14px;
+  }
+  .field label {
+    display: block;
+    margin-bottom: 7px;
+    font-size: var(--fs-eyebrow);
+    letter-spacing: 0.1em;
+    line-height: 1.4;
     text-transform: uppercase;
     color: var(--taupe);
   }
-  .fcell select, .fcell input {
+  .field select,
+  .field input,
+  .range input {
+    display: block;
     width: 100%;
-    appearance: none;
-    border: none;
-    background: transparent;
-    font-size: var(--fs-body);
-    font-weight: var(--fw-body);
+    height: 44px;
+    padding: 0 14px;
+    border: 1px solid var(--border);
+    background-color: #fff;
+    font-size: var(--fs-small);
     color: var(--ink);
+    transition: border-color 0.3s ease;
+  }
+  .field select {
+    appearance: none;
+    padding-right: 36px;
     cursor: pointer;
-    padding-right: 22px;
-    /* A single crisp SVG chevron instead of a two-gradient hack — the
-       gradient version rendered as only half a mark at this field size. */
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%233a464a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-    background-position: right 2px center;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23102a43' stroke-width='1.3'/%3E%3C/svg%3E");
+    background-position: right 14px center;
     background-size: 10px 6px;
     background-repeat: no-repeat;
   }
-  .fcell input { background-image:none; padding:0; cursor:text; }
-  .chip { display:inline-flex; align-items:center; gap:8px; margin-top:14px; padding:9px 14px; border:1px solid var(--border); font-size:var(--fs-small); }
+  .field select:hover,
+  .field input:hover,
+  .range input:hover {
+    border-color: var(--taupe);
+  }
+  .field select:focus,
+  .field input:focus,
+  .range input:focus {
+    border-color: var(--ink);
+  }
+  .field select:focus-visible,
+  .field input:focus-visible,
+  .range input:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  /* Min — max */
+  .range {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 14px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+  }
+  .range-field {
+    position: relative;
+    display: block;
+  }
+  .range input {
+    padding-right: 38px;
+    font-variant-numeric: tabular-nums;
+    appearance: textfield;
+    -moz-appearance: textfield;
+  }
+  .range input::-webkit-outer-spin-button,
+  .range input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .range input::placeholder {
+    color: var(--taupe);
+    opacity: 0.75;
+  }
+  .unit {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 13px;
+    color: var(--taupe);
+    pointer-events: none;
+  }
+  .range-dash {
+    height: 1px;
+    background: var(--taupe);
+  }
+
+  /* Bargains — a square switch, like everything else on the site. */
+  .switch-row {
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 22px 0;
+    font-size: var(--fs-small);
+    line-height: 1.4;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .switch {
+    position: relative;
+    flex-shrink: 0;
+    width: 42px;
+    height: 24px;
+    border: 1px solid var(--border);
+    background: var(--cream);
+    transition:
+      background 0.4s var(--ease-out),
+      border-color 0.4s var(--ease-out);
+  }
+  .switch::after {
+    content: '';
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: 14px;
+    height: 14px;
+    background: var(--taupe);
+    transition:
+      transform 0.45s var(--ease-out),
+      background 0.4s var(--ease-out);
+  }
+  .switch-row:hover .switch {
+    border-color: var(--ink);
+  }
+  .switch-row input:checked + .switch {
+    background: var(--ink);
+    border-color: var(--ink);
+  }
+  .switch-row input:checked + .switch::after {
+    background: var(--cream);
+    transform: translateX(18px);
+  }
+  .switch-row input:focus-visible + .switch {
+    outline: var(--focus-ring);
+    outline-offset: 2px;
+  }
 
   .area-note {
+    padding: 0 0 20px;
     font-size: var(--fs-small);
+    line-height: 1.5;
     color: var(--taupe);
-    padding-top: 14px;
   }
   .area-note a {
     color: var(--ink);
@@ -438,110 +1249,469 @@ function withParam(key: string, value: string): string {
     text-underline-offset: 3px;
   }
 
-  .filter-foot {
+  /* Apply — outlined while nothing is waiting, filled once something is. */
+  .side-foot {
+    padding: 16px 24px 20px;
+    border-top: 1px solid var(--border);
+  }
+  .apply {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 16px;
-    padding-top: 18px;
+    width: 100%;
+    height: 50px;
+    padding: 0 20px;
+    border: 1px solid var(--ink);
+    background: transparent;
+    color: var(--ink);
+    font-size: var(--fs-micro);
+    letter-spacing: var(--ls-button);
+    text-transform: uppercase;
+    transition:
+      background 0.4s var(--ease-out),
+      color 0.4s var(--ease-out);
   }
-  .map-link {
-    text-decoration: none;
-    border: 1px solid var(--border);
-    padding: 9px 16px;
+  .apply svg {
+    transition: transform 0.5s var(--ease-out);
   }
-  .map-link:hover {
-    border-color: var(--ink);
+  .apply:hover svg {
+    transform: translateX(5px);
+  }
+  .apply:hover,
+  .filters[data-dirty] .apply {
+    background: var(--ink);
+    color: var(--cream);
+  }
+  .apply:active {
+    transform: translateY(1px);
+  }
+
+  /* ══ Results ══════════════════════════════════════════════════════════ */
+  .results {
+    min-width: 0;
+  }
+  .toolbar {
+    position: relative;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .toolbar-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 24px;
+    flex-wrap: wrap;
   }
   .count {
-    font-size: var(--fs-small);
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
     color: var(--taupe);
-    letter-spacing: 0.04em;
   }
-  .filter-actions {
+  .count-n {
+    font-family: var(--serif);
+    font-weight: var(--fw-light);
+    font-size: 48px;
+    line-height: 0.9;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+  .count-word {
+    font-size: var(--fs-small);
+  }
+  .toolbar-end {
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 28px;
   }
-  .reset {
+  .filters-toggle {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    height: 44px;
+    padding: 0 16px;
+    border: 1px solid var(--ink);
     font-size: var(--fs-micro);
-    letter-spacing: 0.18em;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink);
+    transition:
+      background 0.35s var(--ease-out),
+      color 0.35s var(--ease-out);
+  }
+  .filters-toggle:hover {
+    background: var(--ink);
+    color: var(--cream);
+  }
+  .filters-toggle:hover svg circle {
+    fill: var(--ink);
+  }
+  .toggle-badge {
+    display: inline-grid;
+    place-items: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    background: var(--ink);
+    color: var(--cream);
+    font-size: 11.5px;
+    letter-spacing: 0;
+  }
+  .filters-toggle:hover .toggle-badge {
+    background: var(--cream);
+    color: var(--ink);
+  }
+  .sort {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .sort-label {
+    font-size: var(--fs-micro);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--taupe);
+  }
+  .sort select {
+    appearance: none;
+    border: 0;
+    border-bottom: 1px solid var(--ink);
+    background: transparent;
+    padding: 4px 22px 4px 0;
+    font-size: var(--fs-small);
+    color: var(--ink);
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23102a43' stroke-width='1.3'/%3E%3C/svg%3E");
+    background-position: right 2px center;
+    background-size: 10px 6px;
+    background-repeat: no-repeat;
+  }
+  .sort select:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: 4px;
+  }
+  .map-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    font-size: var(--fs-micro);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink);
+    background-image: linear-gradient(currentColor, currentColor);
+    background-size: 0% 1px;
+    background-position: 0 100%;
+    background-repeat: no-repeat;
+    transition: background-size 0.6s var(--ease-out);
+  }
+  .map-link:hover {
+    background-size: 100% 1px;
+  }
+
+  /* Filters in force, each removable on its own. */
+  .active {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 20px;
+    list-style: none;
+  }
+  .active a {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 10px 7px 12px;
+    background: var(--linen);
+    font-size: 13.5px;
+    line-height: 1.3;
+    color: var(--ink);
+    transition:
+      background 0.3s ease,
+      color 0.3s ease;
+  }
+  .active a:hover {
+    background: var(--ink);
+    color: var(--cream);
+  }
+  .active-clear a {
+    padding-inline: 6px;
+    background: none;
+    font-size: var(--fs-micro);
+    letter-spacing: 0.14em;
     text-transform: uppercase;
     color: var(--taupe);
     text-decoration: underline;
     text-underline-offset: 4px;
-    background: none;
-    border: none;
-    cursor: pointer;
   }
-  .reset:hover {
+  .active-clear a:hover {
+    background: none;
     color: var(--ink);
+  }
+
+  /* While the next results load, a line runs along the toolbar's rule. */
+  .loading-bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 1px;
+    background: var(--ink);
+    transform: scaleX(0);
+    transform-origin: left;
+    opacity: 0;
+  }
+  :global([data-loading]) .loading-bar {
+    opacity: 1;
+    animation: loading 2.4s var(--ease-out) forwards;
+  }
+  @keyframes loading {
+    to {
+      transform: scaleX(0.85);
+    }
   }
 
   .grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 44px 36px;
-    padding: 12px var(--pad-x) 60px;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 64px 32px;
+    padding-top: 44px;
+    transition: opacity 0.4s ease;
+  }
+  :global([data-loading]) .grid {
+    opacity: 0.35;
+    pointer-events: none;
   }
 
   .empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 96px 24px 40px;
     text-align: center;
-    padding: 80px var(--pad-x) var(--section-y);
+  }
+  .empty-rule {
+    width: 48px;
+    height: 1px;
+    margin-bottom: 32px;
+    background: var(--ink);
   }
   .empty-title {
+    max-width: 26ch;
+    margin-bottom: 12px;
     font-family: var(--serif);
-    font-size: 26px;
+    font-weight: var(--fw-medium);
+    font-size: clamp(24px, 2.2vw, 32px);
+    letter-spacing: var(--ls-heading);
+    line-height: 1.2;
     color: var(--ink);
-    margin-bottom: 10px;
+    text-wrap: balance;
   }
   .empty-hint {
+    max-width: 44ch;
+    margin-bottom: 36px;
     font-size: var(--fs-body);
+    line-height: var(--lh-body);
     color: var(--taupe);
-    margin-bottom: 28px;
+  }
+  .empty-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 16px 32px;
   }
 
+  /* Numbered pages */
   .pagination {
     display: flex;
-    align-items: center;
     justify-content: center;
-    gap: 32px;
-    padding: 0 var(--pad-x) var(--section-y);
+    align-items: center;
+    gap: 8px;
+    margin-top: 96px;
+  }
+  .pagination ol {
+    display: flex;
+    gap: 8px;
+    list-style: none;
+  }
+  .page-step,
+  .page-num {
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    border: 1px solid var(--border);
     font-size: var(--fs-small);
-  }
-  .pagination a {
     color: var(--ink);
-    text-decoration: underline;
-    text-underline-offset: 3px;
+    transition:
+      border-color 0.3s ease,
+      background 0.3s ease,
+      color 0.3s ease;
   }
-  .page-of {
+  a.page-step:hover,
+  a.page-num:hover {
+    border-color: var(--ink);
+  }
+  .page-num[aria-current] {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--cream);
+  }
+  .page-step[data-disabled] {
+    border-color: transparent;
+  }
+  .page-gap {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 48px;
     color: var(--taupe);
   }
 
-  @media (max-width: 1000px) {
-    .filter-row {
-      grid-template-columns: 1fr 1fr;
-    }
-    .grid {
-      grid-template-columns: 1fr 1fr;
-      gap: 32px 24px;
-    }
+  /* ══ Drawer (narrow screens) ══════════════════════════════════════════ */
+  .scrim {
+    display: none;
   }
-  @media (max-width: 700px) {
-    .head {
-      padding: 36px var(--pad-x-mob) 24px;
+
+  @media (max-width: 1100px) {
+    .layout {
+      display: block;
+    }
+    .sidebar {
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      z-index: calc(var(--z-nav) + 20);
+      width: min(420px, 100%);
+      transform: translateX(-100%);
+      visibility: hidden;
+      animation: none;
+      transition:
+        transform 0.6s var(--ease-in-out),
+        visibility 0s linear 0.6s;
+    }
+    .sidebar[data-open] {
+      transform: none;
+      visibility: visible;
+      box-shadow: 0 0 80px rgba(10, 29, 48, 0.3);
+      transition:
+        transform 0.6s var(--ease-in-out),
+        visibility 0s;
     }
     .filters {
-      padding: 0 var(--pad-x-mob) 28px;
+      height: 100%;
+      max-height: none;
+      border: 0;
+    }
+    .side-head {
+      padding: 14px 20px 14px 24px;
+    }
+    .side-close {
+      display: grid;
+    }
+    .side-foot {
+      padding: 16px 24px calc(16px + env(safe-area-inset-bottom));
+    }
+    .apply {
+      background: var(--ink);
+      color: var(--cream);
+    }
+    .scrim {
+      display: block;
+      position: fixed;
+      inset: 0;
+      z-index: calc(var(--z-nav) + 10);
+      background: rgba(10, 29, 48, 0.45);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.6s var(--ease-in-out);
+    }
+    .sidebar[data-open] + .scrim {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .filters-toggle {
+      display: inline-flex;
+    }
+    .toolbar-end {
+      gap: 20px;
+    }
+  }
+
+  @media (max-width: 700px) {
+    .head {
+      padding: 24px var(--pad-x-mob) 28px;
+    }
+    .crumbs ol {
+      margin-bottom: 24px;
+    }
+    .head-row {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 16px;
+    }
+    .layout {
+      padding: 0 var(--pad-x-mob) var(--section-y-mob);
+    }
+    /* Two rows. The count with the sort menu (sized to its longest option,
+       so no choice is ever cut off); then a full-width filters button with
+       the map beside it. */
+    .toolbar-top {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 18px 10px;
+    }
+    .toolbar-end {
+      display: contents;
+    }
+    .count {
+      order: 1;
+      flex: 1 1 auto;
+    }
+    .sort {
+      order: 2;
+    }
+    .sort-label {
+      display: none;
+    }
+    .filters-toggle {
+      order: 3;
+      flex: 1 1 calc(100% - 54px);
+      justify-content: center;
+    }
+    .map-link {
+      order: 4;
+      flex: 0 0 44px;
+      justify-content: center;
+      width: 44px;
+      height: 44px;
+      padding: 0;
+      border: 1px solid var(--border);
+      background: none;
+    }
+    .map-link span {
+      display: none;
     }
     .grid {
       grid-template-columns: 1fr;
-      gap: 28px;
-      padding: 12px var(--pad-x-mob) var(--section-y-mob);
+      gap: 48px;
+      padding-top: 32px;
     }
-    .filter-foot {
-      flex-direction: column;
-      align-items: flex-start;
+    .pagination {
+      gap: 6px;
+      margin-top: 64px;
+    }
+    .pagination ol {
+      gap: 6px;
+    }
+    .page-step,
+    .page-num {
+      width: 42px;
+      height: 42px;
     }
   }
 </style>

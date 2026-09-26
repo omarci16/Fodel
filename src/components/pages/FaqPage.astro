@@ -244,4 +244,14 @@ const grouped = t.groups
       flex-direction: column;
     }
   }
+  /* Phones: the panel runs to the screen edges, so its buttons get the full
+     width a button has everywhere else and their labels stay on one line. */
+  @media (max-width: 600px) {
+    .still {
+      margin-inline: calc(-1 * var(--pad-x-mob));
+      padding: 32px var(--pad-x-mob);
+      border-left: none;
+      border-top: 2px solid var(--accent);
+    }
+  }
 </style>

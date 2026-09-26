@@ -1,10 +1,15 @@
 ---
 /**
- * Full-bleed parallax CTA band, ported from the prototype including its
- * touch fallback (background-attachment: fixed is unsupported on iOS, so
- * touch devices get a translated <img> layer instead).
+ * Full-bleed closing CTA.
+ *
+ * 1.4: the photograph opens like a window. It starts as an inset frame on
+ * the ink ground and widens to the full bleed as the section scrolls up,
+ * while drifting slower than the page. This replaces background-attachment:
+ * fixed, which iOS never supported (the old touch fallback is no longer
+ * needed: one <img> layer serves every device). Without JS, or with reduced
+ * motion, the frame is simply full-bleed and still.
  */
-import { getImage } from 'astro:assets';
+import { Image } from 'astro:assets';
 import Button from './Button.astro';
 import Eyebrow from './Eyebrow.astro';
 import ctaImage from '~/assets/site/cta.png';
@@ -20,24 +25,24 @@ interface Props {
 }
 
 const { eyebrow, title, titleEm, body, primary, secondary, alt = '' } = Astro.props;
-
-const bg = await getImage({ src: ctaImage, format: 'avif', width: 1920, quality: 62 });
-const bgMobile = await getImage({ src: ctaImage, format: 'avif', width: 900, quality: 60 });
 ---
 
-<section class="parallax-cta" data-bg="dark" style={`--cta-bg:url(${bg.src});--cta-bg-mob:url(${bgMobile.src})`}>
-  <div class="parallax-cta-media" aria-hidden="true">
-    <img src={bgMobile.src} alt={alt} loading="lazy" decoding="async" width="900" height="506" />
+<section class="parallax-cta" data-bg="dark" data-cta>
+  <div class="frame" aria-hidden={alt ? undefined : 'true'}>
+    <div class="media" data-parallax="0.12">
+      <Image src={ctaImage} alt={alt} widths={[900, 1400, 1920, 2560]} sizes="100vw" loading="lazy" quality={70} />
+    </div>
+    <div class="shade"></div>
   </div>
-  <div class="parallax-cta-overlay"></div>
 
-  <div class="parallax-cta-content">
-    <Eyebrow center space="20px" class="cta-eyebrow reveal">{eyebrow}</Eyebrow>
-    <h2 class="reveal">
-      {title}{titleEm && <><br /><em>{titleEm}</em></>}
+  <div class="content reveal">
+    <Eyebrow center space="28px" class="cta-eyebrow">{eyebrow}</Eyebrow>
+    <h2>
+      <span class="line"><span>{title}</span></span>
+      {titleEm && <span class="line" style="--i:1"><span><em>{titleEm}</em></span></span>}
     </h2>
-    {body && <p class="reveal">{body}</p>}
-    <div class="actions reveal">
+    {body && <p>{body}</p>}
+    <div class="actions">
       <Button variant="dark" light href={primary.href}>{primary.label}</Button>
       {secondary && <Button variant="outline" light href={secondary.href}>{secondary.label}</Button>}
     </div>
@@ -45,69 +50,107 @@ const bgMobile = await getImage({ src: ctaImage, format: 'avif', width: 900, qua
 </section>
 
 <script>
-  // Devices that cannot do background-attachment: fixed get the <img> layer,
-  // shifted on scroll. Same behaviour as the prototype.
-  const band = document.querySelector<HTMLElement>('.parallax-cta');
-  if (band) {
-    const touch = window.matchMedia('(hover: none), (max-width: 1024px)').matches;
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    if (touch) band.classList.add('touch-parallax');
-
-    if (touch && !reduced) {
-      let ticking = false;
-      const update = () => {
-        const rect = band.getBoundingClientRect();
-        const progress = (rect.top + rect.height / 2 - window.innerHeight / 2) / window.innerHeight;
-        band.style.setProperty('--parallax-shift', `${(-progress * 42).toFixed(1)}px`);
-        ticking = false;
-      };
-      const request = () => {
-        if (ticking) return;
-        ticking = true;
-        requestAnimationFrame(update);
-      };
-      window.addEventListener('scroll', request, { passive: true });
-      window.addEventListener('resize', request, { passive: true });
-      update();
-    }
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const bands = document.querySelectorAll<HTMLElement>('[data-cta]');
+  if (!reduced && bands.length) {
+    let ticking = false;
+    const update = () => {
+      ticking = false;
+      const vh = window.innerHeight;
+      bands.forEach((band) => {
+        const r = band.getBoundingClientRect();
+        if (r.bottom < 0 || r.top > vh) return;
+        // 0 as the band's top enters the viewport, 1 once it has risen to
+        // a fifth of the way down.
+        const p = Math.min(1, Math.max(0, (vh - r.top) / (vh * 0.8)));
+        band.style.setProperty('--p', p.toFixed(3));
+      });
+    };
+    const request = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(update);
+    };
+    bands.forEach((band) => band.style.setProperty('--p', '0'));
+    window.addEventListener('scroll', request, { passive: true });
+    window.addEventListener('resize', request, { passive: true });
+    update();
   }
 </script>
 
 <style>
   .parallax-cta {
-    background-image: var(--cta-bg);
+    position: relative;
+    display: grid;
+    place-items: center;
+    min-height: max(640px, 100svh);
+    overflow: hidden;
+    background: var(--ink);
   }
-  /* The <img> layer is only used on touch; on desktop the fixed background wins. */
-  .parallax-cta:not(.touch-parallax) .parallax-cta-media {
-    display: none;
+
+  .frame {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    clip-path: inset(calc((1 - var(--p, 1)) * 16%) calc((1 - var(--p, 1)) * 12%));
+    will-change: clip-path;
+  }
+  .media {
+    position: absolute;
+    inset: -12% 0;
+    transform: translate3d(0, var(--py, 0px), 0) scale(calc(1.18 - var(--p, 1) * 0.12));
+  }
+  .media :global(img) {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .shade {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(70% 60% at 50% 50%, rgba(10, 29, 48, 0.55) 0%, rgba(10, 29, 48, 0.25) 100%),
+      linear-gradient(180deg, rgba(10, 29, 48, 0.25) 0%, rgba(10, 29, 48, 0.5) 100%);
+  }
+
+  .content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 1100px;
+    padding: 120px 24px;
+    text-align: center;
   }
 
   :global(.cta-eyebrow) {
-    color: var(--on-dark-body);
+    color: var(--on-dark-strong);
     letter-spacing: 0.38em;
   }
 
   h2 {
     font-family: var(--serif);
-    font-weight: var(--fw-display);
-    font-size: clamp(30px, 3.8vw, 60px);
-    line-height: 1.08;
+    font-weight: var(--fw-hero);
+    font-size: clamp(44px, 7.4vw, 132px);
+    line-height: 0.96;
+    letter-spacing: var(--ls-display);
     color: #f4f4f2;
-    margin-bottom: 18px;
+    margin-bottom: 32px;
   }
   h2 em {
-    font-style: italic;
-    opacity: 0.85;
+    font-weight: var(--fw-light);
   }
 
   p {
-    font-size: var(--fs-body);
+    font-size: var(--fs-body-lg);
     /* ADJUSTED: was rgba(cream,.65) over a photograph. */
-    color: rgba(244, 244, 242, 0.86);
-    letter-spacing: 0.04em;
-    margin-bottom: 44px;
-    text-shadow: 0 1px 12px rgba(7, 21, 34, 0.4);
+    color: rgba(244, 244, 242, 0.9);
+    letter-spacing: 0.02em;
+    margin-bottom: 48px;
+    text-shadow: 0 1px 14px rgba(7, 21, 34, 0.45);
   }
 
   .actions {
@@ -119,14 +162,20 @@ const bgMobile = await getImage({ src: ctaImage, format: 'avif', width: 900, qua
 
   @media (max-width: 768px) {
     .parallax-cta {
-      background-image: var(--cta-bg-mob);
+      min-height: 560px;
+    }
+    .frame {
+      clip-path: inset(calc((1 - var(--p, 1)) * 8%) calc((1 - var(--p, 1)) * 6%));
+    }
+    .content {
+      padding: 88px var(--pad-x-mob);
     }
     .actions {
       flex-direction: column;
       width: 100%;
     }
     p {
-      margin-bottom: 32px;
+      margin-bottom: 36px;
     }
   }
 </style>
