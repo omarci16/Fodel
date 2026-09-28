@@ -10,6 +10,9 @@ import { findComparables, bandFromComparables, aiAdjustment } from '~/lib/ai/val
 import { deliver, templates } from '~/lib/email/send';
 import { eur } from '~/lib/format';
 import { logEvent } from '~/lib/activity';
+import { SITE_URL } from '~/config/site.mjs';
+import { path } from '~/i18n/ui';
+import { friendlyError } from '~/lib/portal/labels';
 
 export const prerender = false;
 
@@ -26,7 +29,36 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
   const action = String(body.action ?? '');
 
   const { data: valuation } = await admin.from('valuations').select('*').eq('id', id).maybeSingle();
-  if (!valuation) return json(404, { ok: false, error: 'not-found' });
+  if (!valuation) return json(404, { ok: false, error: 'A becslés nem található.' });
+
+  // The lead's own language, from the form they filled in (migration 0014).
+  // Rows from before 0014 have no locale and were Hungarian-form leads.
+  const leadLocale = valuation.locale === 'nl' ? 'nl' : 'hu';
+  const isLead = valuation.source === 'public_lead' && Boolean(valuation.contact_email);
+
+  if (action === 'request_info') {
+    const note = typeof body.note === 'string' ? body.note.trim().slice(0, 2000) : '';
+    if (!note) return json(422, { ok: false, error: 'Írja le, milyen adatot vagy képet kér az ügyféltől.' });
+    if (!isLead) return json(422, { ok: false, error: 'Ennek a becslésnek nincs ügyfél e-mail címe — hiánypótlás nem kérhető.' });
+
+    const { error } = await admin
+      .from('valuations')
+      .update({ status: 'needs_info', info_request: note, reviewed_by: user?.id ?? null, reviewed_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) return json(500, { ok: false, error: friendlyError(error.message) });
+
+    await deliver(valuation.contact_email, templates.valuationNeedsInfo(leadLocale, { note }));
+    await logEvent({
+      kind: 'valuation.info_requested',
+      actorId: user?.id ?? null,
+      actorEmail: profile?.email ?? null,
+      subjectType: 'valuation',
+      subjectId: id,
+      locale: leadLocale,
+      source: 'portal',
+    }).catch(() => {});
+    return json(200, { ok: true, status: 'needs_info' });
+  }
 
   if (action === 'compute') {
     const subject = {
@@ -69,7 +101,7 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
         ai_factors: adjustment?.factors ?? null,
       })
       .eq('id', id);
-    if (error) return json(500, { ok: false, error: error.message });
+    if (error) return json(500, { ok: false, error: friendlyError(error.message) });
 
     return json(200, { ok: true, status: 'needs_review' });
   }
@@ -79,6 +111,14 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
     const midEur = typeof body.midEur === 'number' ? body.midEur : valuation.mid_eur;
     const highEur = typeof body.highEur === 'number' ? body.highEur : valuation.high_eur;
     const note = typeof body.note === 'string' ? body.note : valuation.admin_note;
+
+    // Nothing goes out without a price band a person has looked at.
+    if (action === 'approve') {
+      const valid = [lowEur, midEur, highEur].every((n) => typeof n === 'number' && Number.isFinite(n) && n > 0);
+      if (!valid || lowEur > midEur || midEur > highEur) {
+        return json(422, { ok: false, error: 'Jóváhagyás előtt adjon meg érvényes ár-sávot (alsó ≤ közép ≤ felső, mind nagyobb nullánál).' });
+      }
+    }
 
     const { error } = await admin
       .from('valuations')
@@ -92,7 +132,7 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
         reviewed_at: new Date().toISOString(),
       })
       .eq('id', id);
-    if (error) return json(500, { ok: false, error: error.message });
+    if (error) return json(500, { ok: false, error: friendlyError(error.message) });
 
     await logEvent({
       kind: action === 'approve' ? 'valuation.approved' : 'valuation.rejected',
@@ -107,24 +147,23 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
     // Only the public-lead surface has a contact to email — an admin-review
     // valuation on an existing listing is for the admin's own pricing
     // decision, not a message to the seller.
-    if (valuation.source === 'public_lead' && valuation.contact_email) {
-      const locale = 'hu' as const; // the public form has no locale field to read back; hu is FODEL's own default
+    if (isLead) {
       if (action === 'approve') {
         await deliver(
           valuation.contact_email,
-          templates.valuationReady(locale, {
+          templates.valuationReady(leadLocale, {
             range: `${eur(lowEur)} – ${eur(highEur)}`,
-            compCount: valuation.comp_count,
-            submitAdUrl: `https://fodel.hu/hu/hirdetes-feladasa/`,
+            compCount: valuation.comp_count ?? 0,
+            submitAdUrl: `${SITE_URL}${path(leadLocale, 'submitAd')}`,
           })
         );
       } else {
-        await deliver(valuation.contact_email, templates.valuationDeclined(locale));
+        await deliver(valuation.contact_email, templates.valuationDeclined(leadLocale));
       }
     }
 
     return json(200, { ok: true });
   }
 
-  return json(400, { ok: false, error: 'unknown-action' });
+  return json(400, { ok: false, error: 'Ismeretlen művelet.' });
 };

@@ -34,12 +34,44 @@ export type TaxonomyTerm = {
 };
 
 export type Taxonomy = Record<TaxonomyGroup, TaxonomyTerm[]>;
+
+/**
+ * Switches an admin sets in /portal/settings/services (migration 0014).
+ *
+ * Every default is the conservative one, and it is what applies whenever the
+ * column is missing (code deployed before 0014 ran) or the database cannot be
+ * read: a service that may not be staffed is not advertised, and nothing is
+ * sent automatically.
+ */
+export type Services = {
+  /** The homepage and footer entry points to the valuation form. */
+  valuationEntry: boolean;
+  /** Whether the launch valuation is confirmed free of charge. Gates the word "free". */
+  valuationFreeConfirmed: boolean;
+  /** Approved wording of the accuracy notice under the valuation form, per language. */
+  valuationNotice?: Partial<Record<'hu' | 'nl', string>>;
+};
+
+export type Automation = {
+  /** Reminder emails after an abandoned registration. Prepared, not yet allowed on. */
+  registrationReminder: boolean;
+  /** Automatic invite/approval of new sellers. Never covers listing approval. */
+  inviteAutomation: boolean;
+};
+
+export const SERVICES_DEFAULT: Services = { valuationEntry: false, valuationFreeConfirmed: false };
+export const AUTOMATION_DEFAULT: Automation = { registrationReminder: false, inviteAutomation: false };
+
 export type Company = Omit<typeof COMPANY, 'phones'> & {
   // `note` is optional here even though every static COMPANY.phones entry has
   // one: site_settings.phones is admin-editable from 1.3 on, and an admin
   // adding a phone through /portal/settings/company has no reason to be
   // forced into typing supplementary note text for it.
   phones: ReadonlyArray<Omit<(typeof COMPANY.phones)[number], 'note'> & { public: boolean; note?: Record<string, string> }>;
+  /** International format without spaces (+36…), or null — null hides every WhatsApp button. */
+  whatsapp: string | null;
+  services: Services;
+  automation: Automation;
 };
 
 const groups: TaxonomyGroup[] = [
@@ -78,6 +110,9 @@ export const TAXONOMY_FALLBACK: Taxonomy = (() => {
 export const COMPANY_FALLBACK: Company = {
   ...COMPANY,
   phones: COMPANY.phones.map((phone, index) => ({ ...phone, public: index !== 2 })),
+  whatsapp: null,
+  services: SERVICES_DEFAULT,
+  automation: AUTOMATION_DEFAULT,
 };
 
 type Cache<T> = { value?: T; expiresAt: number; pending?: Promise<T> };
@@ -149,6 +184,9 @@ export async function getCompany(): Promise<Company> {
       founded: data.founded,
       foundedIn: data.founded_in,
       principal: data.principal,
+      whatsapp: typeof data.whatsapp === 'string' && data.whatsapp ? data.whatsapp : null,
+      services: { ...SERVICES_DEFAULT, ...(data.services ?? {}) },
+      automation: { ...AUTOMATION_DEFAULT, ...(data.automation ?? {}) },
     } as Company;
   }, COMPANY_FALLBACK);
 }

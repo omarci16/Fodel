@@ -21,6 +21,7 @@
 import { Resend } from 'resend';
 import type { BuiltEmail } from './templates';
 import type { EmailLocale } from './layout';
+import { senderAddress, officeInbox, replyToAddress } from './routing';
 
 export type { EmailLocale } from './layout';
 export { templates } from './templates';
@@ -47,7 +48,7 @@ export async function sendEmail(opts: {
   replyTo?: string;
 }): Promise<void> {
   const apiKey = import.meta.env.RESEND_API_KEY;
-  const from = import.meta.env.FODEL_FROM ?? 'FODEL Portál <portal@fodel.nl>';
+  const from = senderAddress('portal');
 
   if (!apiKey) {
     console.warn(`[email] RESEND_API_KEY unset — would send "${opts.subject}" to ${opts.to}`);
@@ -64,7 +65,7 @@ export async function sendEmail(opts: {
         subject: opts.subject,
         html: opts.html,
         text: opts.text,
-        replyTo: opts.replyTo,
+        replyTo: opts.replyTo ?? replyToAddress(),
       });
       if (!error) return;
       if (!isRetryable(error) || attempt === MAX_ATTEMPTS) {
@@ -110,12 +111,13 @@ export function localeOf(profile: { locale?: string | null } | null | undefined)
  * Uses the admin (service-role) client because the person triggering it is an
  * *owner* — RLS would correctly stop them reading the admin roster, and the
  * alternative (a single hardcoded inbox) silently breaks the moment FODEL adds
- * a second reviewer. Falls back to FODEL_INBOX if no admin profile exists yet.
+ * a second reviewer. Falls back to the office inbox (src/lib/email/routing.ts)
+ * if no admin profile exists yet.
  */
 export async function adminRecipients(adminClient: {
   from: (table: string) => any;
 }): Promise<string[]> {
-  const fallback = import.meta.env.FODEL_INBOX ?? 'info@fodel.nl';
+  const fallback = officeInbox();
   try {
     const { data } = await adminClient.from('profiles').select('email').eq('role', 'admin');
     const emails = (data ?? []).map((row: { email: string }) => row.email).filter(Boolean);

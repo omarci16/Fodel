@@ -31,7 +31,15 @@ const { locale } = Astro.props;
 const ui = UI[locale];
 const hu = locale === 'hu';
 
-const posts = await publishedPosts(locale);
+// Articles and case studies are listed separately (brief §5): the default view
+// is articles, `?type=case-study` the case studies. The switch only appears
+// once a case study exists in this language.
+const showCases = Astro.url.searchParams.get('type') === 'case-study';
+const [articles, cases] = await Promise.all([
+  publishedPosts(locale, { kind: 'article' }),
+  publishedPosts(locale, { kind: 'case_study' }),
+]);
+const posts = showCases ? cases : articles;
 
 const [lead, ...rest] = posts;
 
@@ -67,6 +75,14 @@ const t = hu
   <PageHeader eyebrow={t.eyebrow} title={t.title} titleEm={t.titleEm} body={t.intro} compact />
 
   <div class="blog">
+    {cases.length > 0 && (
+      <nav class="kinds" aria-label={hu ? 'Tartalomtípus' : 'Soort inhoud'}>
+        <a href={path(locale, 'blog')} aria-current={!showCases ? 'page' : undefined}>{hu ? 'Cikkek' : 'Artikelen'}</a>
+        <a href={`${path(locale, 'blog')}?type=case-study`} aria-current={showCases ? 'page' : undefined}>
+          {hu ? 'Esettanulmányok' : 'Casestudies'}
+        </a>
+      </nav>
+    )}
     {posts.length === 0 && <p class="empty">{t.empty}</p>}
 
     {
@@ -143,6 +159,32 @@ const t = hu
 <style>
   .blog {
     padding: 48px var(--pad-x) var(--section-y);
+  }
+  .kinds {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 32px;
+  }
+  .kinds a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 20px;
+    border-radius: var(--r-pill);
+    border: 1px solid rgba(16, 42, 67, 0.16);
+    font-size: 15px;
+    font-weight: var(--fw-medium);
+    color: var(--ink);
+    transition: background-color 0.3s var(--ease-out), color 0.3s var(--ease-out);
+  }
+  .kinds a:hover {
+    border-color: var(--ink);
+  }
+  .kinds a[aria-current='page'] {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--cream);
   }
   .empty {
     font-size: var(--fs-body);

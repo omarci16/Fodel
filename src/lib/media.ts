@@ -13,8 +13,16 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
-const MAX_EDGE = 2400;
+/**
+ * The technical limits, exported so the upload screens describe exactly what
+ * this function enforces rather than a copy of it that can drift.
+ */
+export const MAX_UPLOAD_MB = 12;
+const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024;
+/** Longer edge an upload is scaled down to before storage. */
+export const MAX_EDGE = 2400;
+/** Below this longer edge a photo is accepted but the uploader is warned it will look soft. */
+export const LOW_RESOLUTION_EDGE = 1200;
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const BUCKET = 'property-media';
 
@@ -30,7 +38,7 @@ export async function processAndUploadImage(
   propertyId: string,
   file: File,
   bucket: string = BUCKET
-): Promise<{ url: string; width: number; height: number }> {
+): Promise<{ url: string; path: string; width: number; height: number; originalWidth: number; originalHeight: number }> {
   if (!ALLOWED_TYPES.has(file.type)) {
     throw new MediaUploadError('unsupported-type', `${file.type} is not an accepted image type`);
   }
@@ -71,7 +79,16 @@ export async function processAndUploadImage(
   if (error) throw new MediaUploadError('storage-failed', error.message);
 
   const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-  return { url: data.publicUrl, width: outMeta.width!, height: outMeta.height! };
+  return {
+    // For a private bucket (valuation-media) the public URL does not open;
+    // callers there keep `path` and sign it when an admin views the file.
+    url: data.publicUrl,
+    path,
+    width: outMeta.width!,
+    height: outMeta.height!,
+    originalWidth: meta.width,
+    originalHeight: meta.height,
+  };
 }
 
 export async function deleteImage(supabase: SupabaseClient, storagePath: string, bucket: string = BUCKET): Promise<void> {

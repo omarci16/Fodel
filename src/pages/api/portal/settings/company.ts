@@ -1,11 +1,23 @@
 import type { APIRoute } from 'astro';
+import { friendlyError } from '~/lib/portal/labels';
 export const prerender = false;
+
+/** "+36 30 123 4567", "0036-30-1234567" → "+36301234567"; null when empty; undefined when unusable. */
+function normaliseWhatsapp(raw: string): string | null | undefined {
+  const compact = raw.trim().replace(/[\s().-]/g, '').replace(/^00/, '+');
+  if (!compact) return null;
+  return /^\+[1-9]\d{7,14}$/.test(compact) ? compact : undefined;
+}
 export const POST: APIRoute = async ({ request, locals, redirect }) => {
-  if (locals.profile?.role !== 'admin') return new Response('Forbidden', { status: 403 });
+  if (locals.profile?.role !== 'admin') return new Response('Ehhez nincs jogosultsága.', { status: 403 });
   const form = await request.formData();
   const current = await locals.supabase.from('site_settings').select('*').eq('id', 1).single();
-  if (current.error) return redirect('/portal/settings/company?error=' + encodeURIComponent(current.error.message));
+  if (current.error) return redirect('/portal/settings/company?error=' + encodeURIComponent(friendlyError(current.error.message)));
   const row = current.data;
+  const whatsapp = 'whatsapp' in row ? normaliseWhatsapp(String(form.get('whatsapp') ?? '')) : null;
+  if (whatsapp === undefined) {
+    return redirect('/portal/settings/company?error=' + encodeURIComponent('A WhatsApp-számot nemzetközi formátumban adja meg, pl. +36301234567.'));
+  }
   const phones = [0,1,2].map((index) => ({
     ...(row.phones?.[index] ?? {}),
     display: String(form.get(`phone_${index}`) ?? '').trim(),
@@ -45,7 +57,9 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
       facebookHu: String(form.get('facebook_hu') ?? '').trim(),
     },
     reach: { countries: Number(form.get('reach_countries')), languages: Number(form.get('reach_languages')) },
+    // Only written once migration 0014 has added the column.
+    ...('whatsapp' in row ? { whatsapp } : {}),
   };
   const { error } = await locals.supabase.from('site_settings').update(patch).eq('id', 1);
-  return redirect(error ? '/portal/settings/company?error=' + encodeURIComponent(error.message) : '/portal/settings/company?saved=1');
+  return redirect(error ? '/portal/settings/company?error=' + encodeURIComponent(friendlyError(error.message)) : '/portal/settings/company?saved=1');
 };

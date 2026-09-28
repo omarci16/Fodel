@@ -3,27 +3,34 @@
 // /portal/properties/new.astro — a blank draft, not a separate empty form.
 export const prerender = false;
 
-const { supabase, user } = Astro.locals;
-if (!user) return Astro.redirect('/portal/login');
+import { isBlogLocale } from '~/lib/blog';
+import { friendlyError } from '~/lib/portal/labels';
 
-const locale = Astro.url.searchParams.get('locale') === 'nl' ? 'nl' : Astro.url.searchParams.get('locale') === 'hu' ? 'hu' : null;
-if (!locale) return Astro.redirect('/portal/content/blog');
-const slug = `${locale === 'hu' ? 'uj-cikk' : 'nieuw-artikel'}-${Date.now().toString(36)}`;
-const { data, error } = await supabase
-  .from('blog_posts')
-  .insert({
-    locale,
-    slug,
-    title: locale === 'hu' ? 'Új cikk' : 'Nieuw artikel',
-    excerpt: '',
-    body_md: '',
-    category: '',
-    published: false,
-    created_by: user.id,
-  })
-  .select('id')
-  .single();
+const { supabase, user, profile } = Astro.locals;
+if (!user || profile?.role !== 'admin') return Astro.redirect('/portal/login');
 
-if (error || !data) return new Response(error?.message ?? 'failed', { status: 500 });
+const requested = Astro.url.searchParams.get('locale');
+if (!isBlogLocale(requested)) return Astro.redirect('/portal/content/blog');
+const locale = requested;
+const caseStudy = Astro.url.searchParams.get('kind') === 'case_study';
+
+const NEW_TITLE = { hu: 'Új cikk', nl: 'Nieuw artikel', en: 'New article', de: 'Neuer Artikel' } as const;
+const NEW_SLUG = { hu: 'uj-cikk', nl: 'nieuw-artikel', en: 'new-article', de: 'neuer-artikel' } as const;
+
+const draft: Record<string, unknown> = {
+  locale,
+  slug: `${NEW_SLUG[locale]}-${Date.now().toString(36)}`,
+  title: NEW_TITLE[locale],
+  excerpt: '',
+  body_md: '',
+  category: '',
+  published: false,
+  created_by: user.id,
+};
+if (caseStudy) draft.kind = 'case_study';
+
+const { data, error } = await supabase.from('blog_posts').insert(draft).select('id').single();
+
+if (error || !data) return new Response(friendlyError(error?.message), { status: 500 });
 return Astro.redirect(`/portal/content/blog/${data.id}`);
 ---

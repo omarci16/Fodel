@@ -39,6 +39,12 @@ import { COMPANY } from '~/config/company';
 import { BRAND } from '~/i18n/ui';
 
 export type EmailLocale = 'hu' | 'nl';
+/**
+ * The shell alone also renders English and German — used only by the invite,
+ * whose body text an admin writes and approves (email_templates). Every other
+ * template stays hu/nl, the two languages with reviewed copy.
+ */
+export type ShellLocale = EmailLocale | 'en' | 'de';
 
 /* ── Palette (mirrors src/styles/tokens.css) ─────────────────────────────── */
 const INK = '#102a43';
@@ -89,6 +95,16 @@ export function p(text: string): string {
 /** Body copy that carries weight — the sentence the whole email exists to deliver. */
 export function lead(text: string): string {
   return `<p style="margin:0 0 18px;font-family:${SANS};font-size:16px;line-height:1.7;color:${INK};">${paragraphs(text)}</p>`;
+}
+
+/**
+ * "If the button does not work, copy this address" — the label, then the raw
+ * URL on its own line, breakable so a long token never widens the email.
+ * Built here rather than by passing markup into small(), which escapes its
+ * input and would print the tags as text.
+ */
+export function linkFallback(label: string, url: string): string {
+  return `<p style="margin:0 0 14px;font-family:${SANS};font-size:13px;line-height:1.7;color:${TAUPE};">${esc(label)}<br><span style="word-break:break-all;">${esc(url)}</span></p>`;
 }
 
 export function small(text: string): string {
@@ -167,9 +183,17 @@ const FOOTER_COPY = {
     why: 'U ontvangt deze e-mail omdat u een FODEL-account heeft of een advertentie bij ons heeft geplaatst.',
     contact: 'Contact',
   },
+  en: {
+    why: 'You are receiving this email because FODEL invited you to its advertiser portal.',
+    contact: 'Contact',
+  },
+  de: {
+    why: 'Sie erhalten diese E-Mail, weil FODEL Sie zu seinem Inserentenportal eingeladen hat.',
+    contact: 'Kontakt',
+  },
 } as const;
 
-function wordmark(locale: EmailLocale): string {
+function wordmark(locale: ShellLocale): string {
   // BRAND[locale].name is "FODEL INGATLAN" / "FODEL VASTGOED" — the sub-label
   // is whatever follows the wordmark, exactly as src/components/Logo.astro
   // derives it. Same rule, one source.
@@ -187,7 +211,7 @@ function wordmark(locale: EmailLocale): string {
  *   follows, which is how "Kedves Gábor, ‌ ‌ ‌ ‌ ‌ ‌" ends up in an inbox.
  */
 export function shell(opts: {
-  locale: EmailLocale;
+  locale: ShellLocale;
   preheader: string;
   body: string;
 }): string {
@@ -265,7 +289,7 @@ export function shell(opts: {
  * than stripping tags from the HTML, because a good plain-text email is
  * written, not generated — the button becomes a labelled URL on its own line.
  */
-export function textShell(opts: { locale: EmailLocale; body: string }): string {
+export function textShell(opts: { locale: ShellLocale; body: string }): string {
   const { locale, body } = opts;
   const mail = locale === 'hu' ? COMPANY.email.hu : COMPANY.email.primary;
   const sub = BRAND[locale].name.replace('FODEL', '').trim();

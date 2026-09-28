@@ -18,14 +18,17 @@ interface Props {
   title: string;
   /** Heading shown on the panel. */
   heading: string;
+  /** Page language — the invite screen follows the invitee's language. */
+  lang?: 'hu' | 'nl' | 'en' | 'de';
 }
 
-const { title, heading } = Astro.props;
+const { title, heading, lang = 'hu' } = Astro.props;
+const brandLocale = lang === 'nl' || lang === 'hu' ? lang : 'nl';
 ---
 
-<Portal title={title} bare>
+<Portal title={title} bare lang={lang}>
   <div class="panel">
-    <div class="brand"><Logo locale="hu" href="/hu/" /></div>
+    <div class="brand"><Logo locale={brandLocale} href={`/${lang}/`} /></div>
     <h1>{heading}</h1>
     <slot />
   </div>

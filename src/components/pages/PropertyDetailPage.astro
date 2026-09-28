@@ -22,6 +22,9 @@ import { propertyAlternates, crumbs } from '~/lib/page';
 import { propertySchema, breadcrumbSchema, videoObjectSchema } from '~/lib/seo';
 import { eur, huf, area, floorArea, epcLabel, formatDate } from '~/lib/format';
 import { extractYouTubeId } from '~/lib/video';
+import WhatsApp from '~/components/WhatsApp.astro';
+import { getCompany } from '~/lib/runtime-config';
+import { abs } from '~/lib/seo';
 
 interface Props {
   locale: Locale;
@@ -95,6 +98,14 @@ const metaDescription = `${title} — ${d.location.settlement}, ${d.location.cou
 } ${d.ref}.`;
 
 const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
+
+// WhatsApp (brief §9): the chat opens with the listing named and linked, so
+// FODEL knows which house is meant. The visitor edits and sends it.
+const { whatsapp } = await getCompany();
+const whatsappMessage =
+  locale === 'hu'
+    ? `Jó napot! Érdeklődöm a(z) „${title}” (#${d.ref}) hirdetés iránt: ${abs(pageUrl)}`
+    : `Goedendag, ik heb interesse in „${title}” (#${d.ref}): ${abs(pageUrl)}`;
 ---
 
 <Base
@@ -104,6 +115,7 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
   alternates={propertyAlternates(d.categorySlugs, d.ref)}
   ogType="article"
   ogImage={shareImage.src}
+  whatsapp={{ message: whatsappMessage }}
   schema={[
     propertySchema(property, locale, pageUrl, shareImage.src),
     breadcrumbSchema(trail),
@@ -349,6 +361,11 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
           ))
         }
       </p>
+      {whatsapp && (
+        <div class="enq-wa">
+          <WhatsApp locale={locale} number={whatsapp} message={whatsappMessage} onDark />
+        </div>
+      )}
     </aside>
   </div>
 
@@ -962,6 +979,12 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
     text-decoration: underline;
     text-decoration-thickness: 1px;
     text-underline-offset: 4px;
+  }
+
+  .enq-wa {
+    display: flex;
+    justify-content: center;
+    margin-top: 16px;
   }
 
   /* ── Similar ── */

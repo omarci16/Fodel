@@ -29,13 +29,22 @@
 import { BRAND, CATEGORY_FALLBACK, LOCALE_META, type PlannedLocale } from '~/i18n/ui';
 import { COMPANY } from '~/config/company';
 import { abs } from '~/lib/seo';
+import PostCard from '~/components/PostCard.astro';
+import { BLOG_PATH, type BlogPost } from '~/lib/blog';
 import '~/styles/global.css';
 
 interface Props {
   locale: Extract<PlannedLocale, 'de' | 'en' | 'fr'>;
+  /** The newest articles written in this language (en/de only). None → no section at all. */
+  posts?: BlogPost[];
 }
 
-const { locale } = Astro.props;
+const { locale, posts = [] } = Astro.props;
+const LATEST = {
+  en: { title: 'Latest articles', all: 'All articles' },
+  de: { title: 'Neueste Artikel', all: 'Alle Artikel' },
+  fr: null,
+}[locale];
 const brand = BRAND[locale];
 const meta = LOCALE_META[locale];
 const canonical = abs(Astro.url.pathname);
@@ -130,6 +139,18 @@ const STRINGS = {
         <p class="address">{COMPANY.address.oneLine}</p>
       </section>
     </main>
+
+    {LATEST && posts.length > 0 && (locale === 'en' || locale === 'de') && (
+      <section class="latest" aria-labelledby="latest-title">
+        <div class="latest-head">
+          <h2 id="latest-title">{LATEST.title}</h2>
+          <a href={BLOG_PATH[locale]}>{LATEST.all} →</a>
+        </div>
+        <div class="latest-grid">
+          {posts.map((post) => <PostCard post={post} locale={locale} />)}
+        </div>
+      </section>
+    )}
   </body>
 </html>
 
@@ -263,10 +284,50 @@ const STRINGS = {
     text-decoration: underline;
     text-underline-offset: 3px;
   }
+  .latest {
+    max-width: 1180px;
+    margin: 24px auto 64px;
+    padding: 0 24px;
+  }
+  .latest-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+  .latest-head h2 {
+    font-family: var(--serif);
+    font-weight: var(--fw-medium);
+    font-size: clamp(24px, 2.6vw, 34px);
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+  .latest-head a {
+    font-weight: var(--fw-medium);
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .latest-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+  }
+  @media (max-width: 1000px) {
+    .latest-grid {
+      grid-template-columns: 1fr;
+    }
+  }
   @media (max-width: 760px) {
     .bridge {
       margin: 8px;
       border-radius: var(--r-xl);
+    }
+    .latest {
+      margin: 16px auto 40px;
+      padding: 0 8px;
     }
   }
 </style>

@@ -9,7 +9,8 @@
 import type { APIRoute } from 'astro';
 import crypto from 'node:crypto';
 import { createSupabaseAdminClient } from '~/lib/supabase-server';
-import { deliver, templates } from '~/lib/email/send';
+import { deliver } from '~/lib/email/send';
+import { buildInvite, isInviteLocale } from '~/lib/portal/invites';
 
 export const prerender = false;
 
@@ -42,7 +43,13 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
   }
 
   if (action === 'resend') {
+    const stored = (invite.payload as { locale?: string } | null)?.locale;
+    const locale = isInviteLocale(stored) ? stored : 'hu';
     const token = crypto.randomBytes(32).toString('hex');
+    const acceptUrl = `${new URL(request.url).origin}/portal/invite/${token}`;
+    const message = await buildInvite(admin, locale, invite.role, acceptUrl);
+    if (!message) return json(422, { ok: false, error: 'no-template' });
+
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     const expiresAt = new Date(Date.now() + EXPIRES_DAYS * 24 * 60 * 60 * 1000);
 
@@ -52,9 +59,7 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
       .eq('id', inviteId);
     if (error) return json(500, { ok: false, error: error.message });
 
-    const locale = (invite.payload as { locale?: string } | null)?.locale === 'nl' ? 'nl' : 'hu';
-    const acceptUrl = `${new URL(request.url).origin}/portal/invite/${token}`;
-    await deliver(invite.email, templates.invite(locale, { role: invite.role, acceptUrl }));
+    await deliver(invite.email, message);
 
     return json(200, { ok: true });
   }

@@ -1,0 +1,76 @@
+/*
+ * Article body typography for the English/German article pages
+ * (BridgeArticlePage). Mirrors the rules scoped inside ArticlePage.astro, which
+ * keeps its own copy so the live hu/nl pages are untouched by this addition;
+ * change both together.
+ */
+.prose h2 {
+  font-family: var(--serif);
+  font-weight: var(--fw-medium);
+  font-size: clamp(24px, 2.4vw, 32px);
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+  color: var(--ink);
+  margin: 48px 0 16px;
+}
+.prose h3 {
+  font-family: var(--serif);
+  font-weight: var(--fw-medium);
+  font-size: var(--fs-lead);
+  color: var(--ink);
+  margin: 32px 0 10px;
+}
+.prose p {
+  font-size: var(--fs-body-lg);
+  line-height: 1.75;
+  color: var(--taupe);
+  margin-bottom: 20px;
+}
+.prose ul,
+.prose ol {
+  margin: 0 0 20px 22px;
+}
+.prose li {
+  font-size: var(--fs-body-lg);
+  line-height: 1.7;
+  color: var(--taupe);
+  margin-bottom: 8px;
+}
+.prose li::marker {
+  color: var(--ink);
+}
+.prose a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+.prose hr {
+  border: none;
+  height: 1px;
+  background: var(--border);
+  margin: 48px 0;
+}
+.prose blockquote {
+  margin: 32px 0;
+  padding: 24px 28px;
+  border-radius: var(--r-lg);
+  background: var(--white);
+  border: 1px solid rgba(16, 42, 67, 0.07);
+  font-family: var(--serif);
+  font-size: var(--fs-lead);
+  line-height: 1.55;
+  color: var(--ink);
+}
+.prose blockquote p {
+  margin: 0;
+  color: inherit;
+  font-size: inherit;
+}
+.prose strong {
+  font-weight: var(--fw-medium);
+  color: var(--ink);
+}
+.prose img {
+  border-radius: var(--r-lg);
+}

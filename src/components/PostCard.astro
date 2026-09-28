@@ -1,0 +1,165 @@
+---
+/**
+ * One blog post as a card — cover, category, title, excerpt, date — in the
+ * same rounded style as the blog index. Used where posts appear outside that
+ * index: the homepage's latest-articles band and the English/German pages.
+ *
+ * A post without a cover keeps the card's proportions with a quiet branded
+ * panel, so a row of three never has one card shorter than the others.
+ */
+import ArrowChip from '~/components/ArrowChip.astro';
+import { postPath, type BlogPost, type BlogLocale } from '~/lib/blog';
+
+interface Props {
+  post: BlogPost;
+  locale: BlogLocale;
+  class?: string;
+  style?: string;
+}
+
+const { post, locale, class: className, style } = Astro.props;
+const LANG_TAG = { hu: 'hu-HU', nl: 'nl-NL', en: 'en-GB', de: 'de-DE' } as const;
+const MINUTES = { hu: 'perc', nl: 'min.', en: 'min read', de: 'Min. Lesezeit' } as const;
+const CASE = { hu: 'Esettanulmány', nl: 'Casestudy', en: 'Case study', de: 'Fallstudie' } as const;
+const date = post.published_at
+  ? new Intl.DateTimeFormat(LANG_TAG[locale], { year: 'numeric', month: 'long', day: 'numeric' }).format(post.published_at)
+  : null;
+---
+
+<article class:list={['post-card', className]} style={style}>
+  <a href={postPath(post)}>
+    <div class:list={['post-media', { empty: !post.cover_url }]}>
+      {post.cover_url ? (
+        <img src={post.cover_url} alt={post.cover_alt ?? ''} loading="lazy" decoding="async" width="700" height="438" />
+      ) : (
+        <span class="post-mark" aria-hidden="true">FODEL</span>
+      )}
+    </div>
+    <div class="post-copy">
+      <div class="post-top">
+        <span class="post-pill">{post.kind === 'case_study' ? CASE[locale] : post.category}</span>
+        <ArrowChip size={40} class="post-chip" />
+      </div>
+      <h3>{post.title}</h3>
+      <p class="post-excerpt">{post.excerpt}</p>
+      <p class="post-meta">
+        {date && post.published_at && <time datetime={post.published_at.toISOString()}>{date}</time>}
+        <span aria-hidden="true">·</span>
+        <span>{post.reading_minutes} {MINUTES[locale]}</span>
+      </p>
+    </div>
+  </a>
+</article>
+
+<style>
+  .post-card a {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+    border-radius: var(--r-xl);
+    background: var(--white);
+    border: 1px solid rgba(16, 42, 67, 0.07);
+    --chip-bg: rgba(16, 42, 67, 0.07);
+    --chip-fg: var(--ink);
+    transition:
+      transform 0.6s var(--ease-out),
+      box-shadow 0.6s var(--ease-out);
+  }
+  .post-card a:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-md);
+    --chip-bg: var(--ink);
+    --chip-fg: var(--cream);
+  }
+  .post-card a:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 3px;
+  }
+  .post-media {
+    position: relative;
+    aspect-ratio: 16 / 10;
+    overflow: hidden;
+    background: var(--mist);
+  }
+  .post-media img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 1.4s var(--ease-out);
+  }
+  .post-card a:hover .post-media img {
+    transform: scale(1.04);
+  }
+  .post-media.empty {
+    display: grid;
+    place-items: center;
+    background:
+      radial-gradient(120% 90% at 100% 0%, rgba(16, 42, 67, 0.08) 0%, transparent 60%),
+      var(--linen);
+  }
+  .post-mark {
+    font-family: var(--serif);
+    font-weight: var(--fw-medium);
+    font-size: 17px;
+    letter-spacing: 0.38em;
+    margin-right: -0.38em;
+    color: rgba(16, 42, 67, 0.4);
+  }
+  .post-copy {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    gap: 12px;
+    padding: 24px 26px 26px;
+  }
+  .post-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .post-pill {
+    display: inline-flex;
+    align-items: center;
+    height: 30px;
+    padding: 0 13px;
+    border-radius: var(--r-pill);
+    background: rgba(16, 42, 67, 0.07);
+    font-size: 13px;
+    font-weight: var(--fw-medium);
+    color: var(--ink);
+  }
+  h3 {
+    font-family: var(--serif);
+    font-weight: var(--fw-medium);
+    font-size: clamp(21px, 1.7vw, 25px);
+    letter-spacing: -0.015em;
+    line-height: 1.2;
+    color: var(--ink);
+    text-wrap: balance;
+  }
+  .post-excerpt {
+    font-size: var(--fs-small);
+    line-height: 1.6;
+    color: var(--taupe);
+  }
+  .post-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: auto;
+    padding-top: 12px;
+    font-size: 13.5px;
+    color: var(--taupe);
+  }
+  @media (max-width: 700px) {
+    .post-copy {
+      padding: 20px 20px 22px;
+    }
+  }
+</style>

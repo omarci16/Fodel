@@ -12,8 +12,8 @@
 
 import type { APIContext } from 'astro';
 import { Resend } from 'resend';
-import { COMPANY } from '~/config/company';
 import { logEvent } from '~/lib/activity';
+import { senderAddress, officeInbox, replyToAddress } from '~/lib/email/routing';
 
 export type FieldRule = {
   name: string;
@@ -36,7 +36,12 @@ export interface FormDefinition {
    * side effects specific to one form each, so they live here as an opt-in
    * hook rather than complicating this shared handler.
    */
-  onSuccess?: (values: Record<string, string>, extras: Record<string, string>) => Promise<void>;
+  onSuccess?: (
+    values: Record<string, string>,
+    extras: Record<string, string>,
+    /** The raw submission, for what `fields` cannot carry — the valuation form's photos. */
+    form: FormData
+  ) => Promise<void>;
   /**
    * Suppresses the generic "thanks for your message" acknowledgement.
    *
@@ -184,11 +189,12 @@ const ACK = {
 async function runHook(
   def: FormDefinition,
   values: Record<string, string>,
-  extras: Record<string, string>
+  extras: Record<string, string>,
+  form: FormData
 ): Promise<void> {
   if (!def.onSuccess) return;
   try {
-    await def.onSuccess(values, extras);
+    await def.onSuccess(values, extras, form);
   } catch (error) {
     console.error(`[form:${def.id}] onSuccess hook failed`, error);
   }
@@ -260,8 +266,8 @@ export async function handleForm(
 
   const html = buildEmail(def, result.values, extras);
   const apiKey = import.meta.env.RESEND_API_KEY;
-  const inbox = import.meta.env.FODEL_INBOX ?? COMPANY.email.primary;
-  const from = import.meta.env.FODEL_FROM ?? 'FODEL Website <website@fodel.nl>';
+  const inbox = officeInbox();
+  const from = senderAddress('website');
 
   if (!apiKey) {
     // Local development: log rather than fail, so forms are testable offline.
@@ -271,7 +277,7 @@ export async function handleForm(
     // and persists an enquiry — real state changes, not email side effects, so
     // skipping them offline would make the whole registration flow untestable
     // without a Resend key.
-    await runHook(def, result.values, extras);
+    await runHook(def, result.values, extras, form);
     return respond(200, { ok: true, delivered: false });
   }
 
@@ -300,10 +306,11 @@ export async function handleForm(
         to: result.values.email,
         subject: ack.subject,
         html: ack.body(result.values.name ?? '', phones),
+        replyTo: replyToAddress(),
       });
     }
 
-    await runHook(def, result.values, extras);
+    await runHook(def, result.values, extras, form);
 
     return respond(200, { ok: true, delivered: true });
   } catch (error) {

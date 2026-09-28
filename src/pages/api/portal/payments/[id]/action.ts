@@ -60,6 +60,32 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
     return json(200, { ok: true });
   }
 
+  /* ── record a refund that was made by hand ────────────────────────────── */
+  // A record, not a transfer: there is no refund integration and no final
+  // refund rule (brief §7), so this only states that money went back, when,
+  // and how — after someone actually sent it.
+  if (action === 'mark_refunded') {
+    if (!['paid', 'manual'].includes(order.status)) return json(409, { ok: false, error: 'not-settled' });
+    const note = String(body.note ?? '').trim().slice(0, 500);
+    if (!note) return json(422, { ok: false, error: 'note-required' });
+    const { error } = await admin
+      .from('payments')
+      .update({ status: 'refunded', refunded_at: new Date().toISOString(), refund_note: note })
+      .eq('id', id);
+    if (error) return json(500, { ok: false, error: error.message });
+    await logEvent({
+      kind: 'payment.refunded',
+      actorId: user?.id ?? null,
+      actorEmail: profile?.email ?? null,
+      subjectType: 'payment',
+      subjectId: order.id,
+      propertyId: order.property_id,
+      source: 'portal',
+      payload: { note },
+    }).catch(() => {});
+    return json(200, { ok: true });
+  }
+
   /* ── confirm a bank transfer without coupling settlement to publication ─ */
   if (action === 'mark_paid') {
     if (order.status !== 'pending') return json(409, { ok: false, error: 'not-pending' });

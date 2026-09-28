@@ -58,9 +58,11 @@ images Astro emits alongside the optimised variants (11 MB, unreferenced).
    Frankfurt/`eu-central-1` recommended — closest to Hungary/Netherlands).
 2. SQL Editor → paste and run, in order: `supabase/migrations/0001_init.sql`,
    `0002_seed_properties.sql`, `0003_portal_infrastructure.sql`,
-   `0004_search.sql`, `0005_fodel_11.sql`.
+   `0004_search.sql`, `0005_fodel_11.sql`, then every later file in number
+   order up to `0014_brief2.sql`.
 
-   **`0005` must be run in two steps**, and it says so at the top of the file.
+   **`0005` and `0014` must each be run in two steps**, and both say so at the
+   top of the file (split at the `STEP 2` marker).
    Its first statement adds a value to an enum, and PostgreSQL refuses to use a
    newly-added enum value inside the same transaction that added it — pasting
    the whole file at once fails with *"unsafe use of new value
@@ -201,6 +203,16 @@ serves the real production output.
 0. **Run `supabase/migrations/0005_fodel_11.sql`** against the project, in the
    two steps its header describes. Nothing in 1.1 — payment, password reset,
    self-registration, photo captions — works without it.
+0b. **Run `supabase/migrations/0014_brief2.sql`** (brief 2, 2026-09-28), again
+   in two steps: first the single `alter type property_status add value
+   'rejected'` line on its own, then everything below `STEP 2`. It adds listing
+   rejection with a refund flag, free-listing invites, the Top 10 curation
+   function, the payments ledger (refunds), abandoned registrations, en/de blog
+   posts and case studies, the valuation workflow (answers, photos in the
+   private `valuation-media` bucket, "hiánypótlás"), and the WhatsApp /
+   services / automation settings. The site degrades safely before it is run
+   (no WhatsApp button, no valuation entry point on the homepage, old-style
+   valuation rows), but those features stay off until it is.
 1. **KvK number.** Not published on any FODEL property, and Dutch law requires it
    on the website. Set `registration.kvk` in `src/config/company.ts`. Until then
    the footer and colofon render a red `—` and `npm run verify` fails.
@@ -404,7 +416,8 @@ axe-core (pre-Stage-1): **0 violations** across 13 routes including 390px mobile
 Vercel is configured (`@astrojs/vercel`). Set every variable from
 `.env.example` in the project's Environment Variables settings — at minimum
 `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
-`RESEND_API_KEY`, `FODEL_INBOX` and `FODEL_FROM`; `PMTILES_URL` once the
+`RESEND_API_KEY`, `FODEL_INBOX` and `FODEL_FROM` (plus `FODEL_REPLY_TO` if
+customer replies should go somewhere other than `FODEL_INBOX`); `PMTILES_URL` once the
 basemap is built and uploaded; the `STRIPE_*` vars only if card payment is
 deliberately turned on. To move host, swap the adapter in `astro.config.mjs`
 — nothing else is host-specific, though `output: 'server'` (needed for the

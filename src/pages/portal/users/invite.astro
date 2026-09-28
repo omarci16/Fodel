@@ -2,9 +2,17 @@
 export const prerender = false;
 
 import Portal from '~/layouts/Portal.astro';
+import { inviteAvailability } from '~/lib/portal/invites';
+import { LOCALE_LABEL } from '~/lib/portal/labels';
 
 const sent = Astro.url.searchParams.get('sent');
 const err = Astro.url.searchParams.get('error');
+const languages = await inviteAvailability(Astro.locals.supabase);
+const SOURCE_NOTE = {
+  approved: 'jóváhagyott sablon',
+  'built-in': 'alapértelmezett szöveg',
+  missing: 'nincs jóváhagyott szöveg',
+} as const;
 ---
 
 <Portal title="Meghívás">
@@ -29,18 +37,51 @@ const err = Astro.url.searchParams.get('error');
       </select>
     </div>
     <div class="field">
-      <label for="locale">Nyelv</label>
-      <select id="locale" name="locale">
-        <option value="hu">Magyar</option>
-        <option value="nl">Holland</option>
+      <label for="locale">A meghívó nyelve</label>
+      <select id="locale" name="locale" required>
+        <option value="" selected disabled>Válasszon nyelvet…</option>
+        {languages.map((language) => (
+          <option value={language.locale} disabled={!language.sendable}>
+            {LOCALE_LABEL[language.locale]} — {SOURCE_NOTE[language.source]}
+          </option>
+        ))}
       </select>
-      <p class="hint">Ezen a nyelven kapja a meghívót és az összes további értesítést.</p>
+      <p class="hint">
+        A nyelvet Ön választja ki — az e-mail címből nem következtetünk rá. Angol és német meghívó
+        csak jóváhagyott szöveggel küldhető; a szövegek a
+        <a href="/portal/settings/templates">Meghívólevelek</a> oldalon szerkeszthetők.
+      </p>
+    </div>
+    <div class="field" id="free-field">
+      <label class="check">
+        <input type="checkbox" name="free_listing" value="yes" />
+        Ingyenes hirdetésfeladás
+      </label>
+      <p class="hint">
+        A meghívott első hirdetése díjbekérő nélkül kerül elbírálásra. A jogosultságot a rendszer
+        tárolja, a linkben nem szerepel. A közzététel ekkor is munkatársi jóváhagyáshoz kötött.
+      </p>
     </div>
     <button type="submit" class="btn">Meghívó küldése</button>
   </form>
 
   <a href="/portal/users" class="back">← Vissza a felhasználókhoz</a>
 </Portal>
+
+<script>
+  // A free listing only means something for a seller account.
+  const role = document.getElementById('role') as HTMLSelectElement | null;
+  const free = document.getElementById('free-field');
+  const sync = () => {
+    if (!role || !free) return;
+    const owner = role.value === 'owner';
+    free.hidden = !owner;
+    const box = free.querySelector('input');
+    if (box && !owner) box.checked = false;
+  };
+  role?.addEventListener('change', sync);
+  sync();
+</script>
 
 <style>
   .head { margin-bottom: 24px; }
@@ -51,12 +92,14 @@ const err = Astro.url.searchParams.get('error');
   .notice.ok { background: rgba(16, 42, 67, 0.06); border-left: 2px solid var(--ink); }
   .notice.error { background: rgba(179, 38, 30, 0.06); border-left: 2px solid #b3261e; color: #b3261e; }
 
-  .panel { max-width: 400px; }
+  .panel { max-width: 460px; }
   .field { display: flex; flex-direction: column; margin-bottom: 18px; }
   label { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--taupe); margin-bottom: 8px; }
   input, select { border: 1px solid var(--border); background: #fff; padding: 11px 12px; font-size: var(--fs-body); color: var(--ink); }
 
   .hint { margin-top: 8px; font-size: var(--fs-micro); line-height: 1.6; color: var(--taupe); }
+  .hint a { text-decoration: underline; }
+  label.check { display: flex; gap: 10px; align-items: center; text-transform: none; letter-spacing: 0; font-size: var(--fs-small); color: var(--ink); margin-bottom: 0; }
 
   .btn { padding: 12px 24px; background: var(--ink); color: var(--cream); font-size: var(--fs-micro); letter-spacing: var(--ls-button); text-transform: uppercase; }
   .back { display: inline-block; margin-top: 24px; font-size: var(--fs-small); text-decoration: underline; color: var(--taupe); }

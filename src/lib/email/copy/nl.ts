@@ -186,6 +186,9 @@ export const NL = {
       `Op basis van de opgegeven gegevens en vergelijkbare woningen is onze indicatieve schatting: ${range}.`,
     disclaimerWithCount: (n: number) =>
       `Deze schatting is indicatief, geen taxatierapport, en vervangt geen officiële taxatie. Gebaseerd op ${n} vergelijkbare woningen.`,
+    /** When an admin priced it by hand — there is no comparable count to cite. */
+    disclaimer:
+      'Deze schatting is indicatief, geen taxatierapport, en vervangt geen officiële taxatie.',
     cta: 'Nu adverteren',
     ctaUrl: 'submitAd',
   },
@@ -195,6 +198,24 @@ export const NL = {
     preheader: 'Onze medewerker neemt persoonlijk contact met u op.',
     heading: 'Dank u voor uw aanvraag',
     body: 'Op basis van de opgegeven gegevens hebben wij momenteel te weinig vergelijkbare woningen voor een betrouwbare schatting. Onze medewerker neemt persoonlijk contact met u op.',
+  },
+
+  valuationNeedsInfo: {
+    subject: 'Waardebepaling — wij hebben nog enkele gegevens nodig',
+    preheader: 'Voor de schatting hebben wij nog wat extra informatie nodig.',
+    heading: 'Wij hebben nog enkele gegevens nodig',
+    body: 'Bedankt voor uw aanvraag voor een waardebepaling. Voor de schatting vraagt onze medewerker u om het volgende:',
+    after: 'Beantwoord deze e-mail met de ontbrekende gegevens. Zodra wij die hebben ontvangen, maken wij de schatting.',
+  },
+
+  rejected: {
+    subject: (ref: string) => `Uw advertentie kan niet worden geplaatst — #${ref}`,
+    preheader: 'De uitkomst van de beoordeling en de toelichting.',
+    heading: 'Wij kunnen de advertentie niet plaatsen',
+    body: (title: string, ref: string) =>
+      `Het spijt ons: onze medewerker heeft uw advertentie „${title}” (#${ref}) na beoordeling niet goedgekeurd. De toelichting:`,
+    refund: 'Heeft u al voor de advertentie betaald? Dan nemen wij over de terugbetaling apart contact met u op.',
+    after: 'Heeft u een vraag, of denkt u dat er sprake is van een misverstand? Beantwoord dan gewoon deze e-mail.',
   },
 
   invoiceIssued: {

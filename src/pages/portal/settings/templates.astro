@@ -1,0 +1,118 @@
+---
+/**
+ * Invite wording per language (brief §7). The final text comes from Gábor and
+ * Éva; until a language has an approved version, Hungarian and Dutch use the
+ * built-in text and English/German cannot be sent at all.
+ *
+ * Each saved version is previewed exactly as the recipient will see it,
+ * including the fixed link-fallback and expiry lines, so approving it means
+ * approving the whole email.
+ */
+export const prerender = false;
+
+import Portal from '~/layouts/Portal.astro';
+import { INVITE_LOCALES, inviteTemplates } from '~/lib/portal/invites';
+import { templates } from '~/lib/email/templates';
+import { LOCALE_LABEL } from '~/lib/portal/labels';
+
+const { supabase, profile } = Astro.locals;
+if (profile?.role !== 'admin') return Astro.redirect('/portal/dashboard');
+
+const saved = Astro.url.searchParams.get('saved');
+const err = Astro.url.searchParams.get('error');
+const rows = await inviteTemplates(supabase);
+const SAMPLE_URL = 'https://fodel.nl/portal/invite/minta-link';
+---
+
+<Portal title="Meghívólevelek">
+  <header class="head">
+    <p class="eyebrow"><a href="/portal/settings">← Beállítások</a></p>
+    <h1>Meghívólevelek</h1>
+    <p class="lede">
+      A meghívó szövege nyelvenként. Élesben csak jóváhagyott szöveg megy ki: magyarul és hollandul
+      addig az eddigi alapértelmezett szöveg, angolul és németül jóváhagyott szöveg nélkül meghívó
+      nem küldhető.
+    </p>
+  </header>
+
+  {saved && <p class="notice ok">Mentve ({LOCALE_LABEL[saved] ?? saved}).</p>}
+  {err && <p class="notice error">{decodeURIComponent(err)}</p>}
+
+  {INVITE_LOCALES.map((locale) => {
+    const row = rows.get(locale);
+    const builtIn = locale === 'hu' || locale === 'nl';
+    const preview = row ? templates.inviteFromTemplate(locale, row, SAMPLE_URL) : null;
+    return (
+      <section class="lang" id={locale}>
+        <div class="lang-head">
+          <h2>{LOCALE_LABEL[locale]}</h2>
+          <span class:list={['pill', row?.approved ? 'pill-ok' : row ? 'pill-warn' : builtIn ? '' : 'pill-off']}>
+            {row?.approved
+              ? 'Jóváhagyva — ez megy ki'
+              : row
+                ? 'Piszkozat — nem megy ki'
+                : builtIn
+                  ? 'Alapértelmezett szöveg van használatban'
+                  : 'Nincs szöveg — nem küldhető'}
+          </span>
+        </div>
+        <form method="POST" action="/api/portal/settings/templates" class="tpl">
+          <input type="hidden" name="locale" value={locale} />
+          <label>Tárgy <input name="subject" value={row?.subject ?? ''} maxlength="150" required /></label>
+          <label>Címsor <input name="heading" value={row?.heading ?? ''} maxlength="150" required /></label>
+          <label>Szöveg <textarea name="body" rows="5" maxlength="3000" required>{row?.body ?? ''}</textarea></label>
+          <label>Gomb felirata <input name="cta" value={row?.cta ?? ''} maxlength="60" required /></label>
+          <label class="check">
+            <input type="checkbox" name="approved" value="yes" checked={row?.approved} />
+            Jóváhagyom: ez a szöveg mehet éles ügyfeleknek
+          </label>
+          <div class="actions">
+            <button type="submit" class="btn">Mentés</button>
+            {row && (
+              <button type="submit" name="action" value="delete" class="btn ghost">
+                {builtIn ? 'Visszaállítás az alapértelmezettre' : 'Törlés'}
+              </button>
+            )}
+          </div>
+        </form>
+        {preview && (
+          <details class="preview">
+            <summary>Előnézet: „{preview.subject}”</summary>
+            <iframe title={`Előnézet — ${LOCALE_LABEL[locale]}`} srcdoc={preview.html} loading="lazy"></iframe>
+          </details>
+        )}
+      </section>
+    );
+  })}
+</Portal>
+
+<style>
+  .head { margin-bottom: 24px; max-width: 760px; }
+  .eyebrow { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--taupe); margin-bottom: 8px; }
+  .eyebrow a { text-decoration: underline; }
+  h1 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 26px; color: var(--ink); margin-bottom: 10px; }
+  .lede { font-size: var(--fs-small); line-height: 1.7; color: var(--taupe); }
+  .notice { padding: 12px 16px; font-size: var(--fs-small); margin-bottom: 20px; max-width: 760px; }
+  .notice.ok { background: rgba(16, 42, 67, 0.06); border-left: 2px solid var(--ink); }
+  .notice.error { background: rgba(179, 38, 30, 0.06); border-left: 2px solid #b3261e; color: #b3261e; }
+
+  .lang { max-width: 760px; padding: 24px 0 32px; border-top: 1px solid var(--border); scroll-margin-top: 90px; }
+  .lang-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+  h2 { font-family: var(--serif); font-size: 19px; color: var(--ink); }
+  .pill { font-size: var(--fs-micro); padding: 3px 10px; border: 1px solid var(--border); color: var(--taupe); }
+  .pill-ok { background: rgba(16, 42, 67, 0.08); border-color: var(--ink); color: var(--ink); }
+  .pill-warn { background: rgba(200, 150, 0, 0.1); border-color: #96700b; color: #6b4f08; }
+  .pill-off { background: rgba(179, 38, 30, 0.06); border-color: #b3261e; color: #b3261e; }
+
+  .tpl { display: grid; gap: 14px; }
+  .tpl label { display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; color: var(--taupe); }
+  .tpl input:not([type='checkbox']), .tpl textarea { border: 1px solid var(--border); background: #fff; padding: 10px; font-size: var(--fs-small); color: var(--ink); text-transform: none; letter-spacing: 0; font-family: inherit; }
+  .tpl .check { flex-direction: row; align-items: center; gap: 10px; text-transform: none; letter-spacing: 0; font-size: var(--fs-small); color: var(--ink); }
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn { padding: 10px 20px; background: var(--ink); color: var(--cream); font-size: var(--fs-micro); letter-spacing: var(--ls-button); text-transform: uppercase; }
+  .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--ink); }
+
+  .preview { margin-top: 18px; }
+  .preview summary { cursor: pointer; font-size: var(--fs-small); color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .preview iframe { width: 100%; height: 620px; margin-top: 12px; border: 1px solid var(--border); background: #fff; }
+</style>

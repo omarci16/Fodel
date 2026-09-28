@@ -17,9 +17,11 @@ interface Props {
   title: string;
   /** Hide the top bar's nav — used by the login and invite-accept screens. */
   bare?: boolean;
+  /** Document language. The portal works in Hungarian; only invite acceptance follows the invitee. */
+  lang?: string;
 }
 
-const { title, bare = false } = Astro.props;
+const { title, bare = false, lang = 'hu' } = Astro.props;
 const profile = Astro.locals.profile;
 
 const NAV = [
@@ -30,6 +32,7 @@ const NAV = [
   { href: '/portal/enquiries', label: 'Érdeklődők' },
   ...(profile?.role === 'admin'
     ? [
+        { href: '/portal/top10', label: 'Top 10' },
         { href: '/portal/payments', label: 'Fizetések' },
         { href: '/portal/database', label: 'Adatbázis' },
         { href: '/portal/content/blog', label: 'Blog' },
@@ -42,14 +45,18 @@ const NAV = [
 ];
 
 const current = Astro.url.pathname;
+
+// The public homepage in the signed-in person's own language. Plain
+// navigation: the session stays, unlike the logout button beside it.
+const homeHref = profile?.locale === 'nl' ? '/nl/' : '/hu/';
 ---
 
 <!doctype html>
-<html lang="hu">
+<html lang={lang}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{title} — FODEL portál</title>
+    <title>{title} — {lang === 'hu' ? 'FODEL portál' : 'FODEL'}</title>
     <meta name="robots" content="noindex, nofollow" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   </head>
@@ -74,6 +81,7 @@ const current = Astro.url.pathname;
               <>
                 <span class="name">{profile.full_name ?? profile.email}</span>
                 <span class="role">{profile.role === 'admin' ? 'Admin' : 'Hirdető'}</span>
+                <a class="home-link" href={homeHref}>Vissza a főoldalra</a>
                 <form method="POST" action="/portal/logout">
                   <button type="submit" class="logout">Kilépés</button>
                 </form>
@@ -151,6 +159,18 @@ const current = Astro.url.pathname;
     color: var(--taupe);
     border: 1px solid var(--border);
     padding: 2px 8px;
+  }
+  /* .topbar-prefixed to outrank the nav's own `.topbar a` underline rule. */
+  .topbar .home-link {
+    font-size: var(--fs-micro);
+    letter-spacing: 0.04em;
+    color: var(--ink);
+    padding: 5px 12px;
+    border: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .topbar .home-link:hover {
+    border-color: var(--ink);
   }
   .logout {
     font-size: var(--fs-micro);

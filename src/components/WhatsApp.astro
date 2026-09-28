@@ -1,0 +1,142 @@
+---
+/**
+ * WhatsApp contact (brief §9): a link that opens WhatsApp with FODEL's number
+ * and, optionally, a pre-written message the visitor can edit and send
+ * themselves. Not a notification system — nothing is sent automatically.
+ *
+ * Renders nothing unless a real number is configured (Cégadatok →
+ * WhatsApp-szám). Two looks:
+ *   floating — one round button, bottom-right, placed by Base.astro once per
+ *              page. Below the mobile menu; on narrow screens it steps aside
+ *              while the cookie banner is open, so it never covers its buttons.
+ *   inline   — a pill among other contact options (contact page, a listing's
+ *              enquiry panel).
+ */
+import type { Locale } from '~/i18n/ui';
+
+interface Props {
+  locale: Locale;
+  /** International format, e.g. +36301234567. Null/empty renders nothing. */
+  number: string | null;
+  message?: string;
+  variant?: 'floating' | 'inline';
+  onDark?: boolean;
+}
+
+const { locale, number, message, variant = 'inline', onDark = false } = Astro.props;
+const digits = (number ?? '').replace(/\D/g, '');
+const href = digits.length >= 8 ? `https://wa.me/${digits}${message ? `?text=${encodeURIComponent(message)}` : ''}` : null;
+const label = locale === 'hu' ? 'Írjon nekünk WhatsAppon' : 'Stuur ons een WhatsApp-bericht';
+---
+
+{href && (
+  <a
+    class:list={['wa', `wa-${variant}`, { 'on-dark': onDark }]}
+    href={href}
+    target="_blank"
+    rel="noopener"
+    aria-label={variant === 'floating' ? label : undefined}
+    title={variant === 'floating' ? label : undefined}
+    data-wa
+  >
+    <svg class="wa-glyph" viewBox="0 0 32 32" width="22" height="22" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M16.02 3.2C8.95 3.2 3.2 8.93 3.2 16c0 2.26.6 4.47 1.73 6.41L3.1 28.8l6.56-1.72A12.77 12.77 0 0 0 16.02 28.8c7.07 0 12.8-5.73 12.8-12.8S23.09 3.2 16.02 3.2Zm0 23.42c-1.95 0-3.86-.52-5.53-1.51l-.4-.24-3.9 1.02 1.04-3.8-.26-.39a10.6 10.6 0 0 1-1.63-5.7c0-5.87 4.78-10.64 10.68-10.64 5.88 0 10.66 4.77 10.66 10.64 0 5.88-4.78 10.62-10.66 10.62Zm5.85-7.96c-.32-.16-1.9-.94-2.19-1.04-.3-.11-.51-.16-.72.16-.21.32-.83 1.04-1.02 1.26-.19.21-.37.24-.69.08-.32-.16-1.35-.5-2.57-1.59-.95-.85-1.59-1.9-1.78-2.22-.19-.32-.02-.49.14-.65.14-.14.32-.37.48-.56.16-.19.21-.32.32-.53.1-.21.05-.4-.03-.56-.08-.16-.72-1.74-.99-2.38-.26-.62-.52-.54-.72-.55h-.61c-.21 0-.56.08-.85.4-.29.32-1.12 1.1-1.12 2.67 0 1.58 1.15 3.1 1.31 3.32.16.21 2.26 3.45 5.48 4.84.77.33 1.37.53 1.83.68.77.24 1.47.21 2.02.13.62-.09 1.9-.78 2.17-1.53.27-.75.27-1.39.19-1.53-.08-.13-.29-.21-.61-.37Z"
+      />
+    </svg>
+    {variant === 'inline' && <span>WhatsApp</span>}
+  </a>
+)}
+
+<style>
+  .wa {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: var(--ink);
+    transition:
+      background-color 0.35s var(--ease-out),
+      color 0.35s var(--ease-out),
+      transform 0.35s var(--ease-out),
+      box-shadow 0.35s var(--ease-out);
+  }
+  .wa:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 3px;
+  }
+
+  .wa-inline {
+    min-height: 44px;
+    padding: 0 18px 0 14px;
+    border-radius: var(--r-pill);
+    border: 1px solid rgba(16, 42, 67, 0.18);
+    font-size: 15px;
+    font-weight: var(--fw-medium);
+  }
+  .wa-inline .wa-glyph {
+    color: #1a9e4d;
+  }
+  .wa-inline:hover {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--cream);
+  }
+  .wa-inline:hover .wa-glyph {
+    color: currentColor;
+  }
+  .wa-inline.on-dark {
+    color: var(--cream);
+    border-color: rgba(244, 244, 242, 0.28);
+  }
+  .wa-inline.on-dark .wa-glyph {
+    color: #4ade80;
+  }
+  .wa-inline.on-dark:hover {
+    background: var(--cream);
+    color: var(--ink);
+  }
+  .wa-inline.on-dark:focus-visible {
+    outline-color: var(--cream);
+  }
+
+  /* Between the grain film (900) and the nav/mobile menu (1000). */
+  .wa-floating {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: 950;
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    background: #1a9e4d;
+    color: #fff;
+    box-shadow: 0 14px 34px -12px rgba(10, 29, 48, 0.55);
+    animation: fx-fade-up 0.9s var(--ease-out) 0.6s both;
+  }
+  .wa-floating .wa-glyph {
+    width: 28px;
+    height: 28px;
+  }
+  .wa-floating:hover {
+    transform: translateY(-3px);
+    background: #168a43;
+  }
+  @media (max-width: 640px) {
+    .wa-floating {
+      right: 14px;
+      bottom: 14px;
+      width: 54px;
+      height: 54px;
+    }
+    :global(body:has(#cookie-consent:not([hidden]))) .wa-floating {
+      display: none;
+    }
+  }
+  @media print {
+    .wa-floating {
+      display: none;
+    }
+  }
+</style>

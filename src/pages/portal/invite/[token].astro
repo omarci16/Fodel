@@ -4,12 +4,16 @@
  * here (see src/middleware.ts's PUBLIC_PORTAL_PATHS). Validated by hashing
  * the token from the URL and comparing to the stored hash, same principle as
  * a password: the raw value never round-trips through the database.
+ *
+ * 2.1: the screen speaks the language the invite was written in, so a German
+ * invitee does not land on a Hungarian page straight from a German email.
  */
 export const prerender = false;
 
 import crypto from 'node:crypto';
 import AuthPanel from '~/components/portal/AuthPanel.astro';
 import { createSupabaseAdminClient } from '~/lib/supabase-server';
+import { isInviteLocale, type InviteLocale } from '~/lib/portal/invites';
 
 const { token } = Astro.params;
 const err = Astro.url.searchParams.get('error');
@@ -34,24 +38,76 @@ const usable = !invalid && !expired && !used;
 // A self-service registration carries the listing they described on the public
 // form. Saying so here is what makes the next screen unsurprising: they arrive
 // in a half-filled editor rather than wondering where their answers went.
-const intake = (invite?.payload ?? {}) as { settlement?: string };
+const intake = (invite?.payload ?? {}) as { settlement?: string; locale?: string };
 const hasIntake = Boolean(intake.settlement);
+const lang: InviteLocale = isInviteLocale(intake.locale) ? intake.locale : 'hu';
+
+const T = {
+  hu: {
+    title: 'Meghívó elfogadása', titleInvalid: 'Meghívó',
+    heading: 'Üdvözöljük a FODEL portálon', headingInvalid: 'A meghívó nem érvényes',
+    account: 'Fiók létrehozása ehhez:',
+    intake: (place: string) => `A(z) ${place} településen lévő ingatlanhoz megadott adatait megőriztük — a jelszó beállítása után rögtön a hirdetésénél folytathatja.`,
+    name: 'Teljes név', password: 'Jelszó', submit: 'Fiók létrehozása',
+    hint: 'A jelszó legalább 8 karakter legyen.',
+    notFound: 'Ez a meghívó link nem található.',
+    expired: 'Ez a meghívó lejárt. Kérjen újat a FODEL-től.',
+    used: 'Ezt a meghívót már felhasználták — ha Öné a fiók, jelentkezzen be.',
+    login: 'Bejelentkezés',
+  },
+  nl: {
+    title: 'Uitnodiging accepteren', titleInvalid: 'Uitnodiging',
+    heading: 'Welkom bij het FODEL-portaal', headingInvalid: 'De uitnodiging is niet geldig',
+    account: 'Account aanmaken voor:',
+    intake: (place: string) => `De gegevens die u voor de woning in ${place} heeft ingevuld, hebben wij bewaard — na het instellen van een wachtwoord gaat u direct verder met uw advertentie.`,
+    name: 'Volledige naam', password: 'Wachtwoord', submit: 'Account aanmaken',
+    hint: 'Het wachtwoord moet minimaal 8 tekens lang zijn.',
+    notFound: 'Deze uitnodigingslink bestaat niet.',
+    expired: 'Deze uitnodiging is verlopen. Vraag FODEL om een nieuwe.',
+    used: 'Deze uitnodiging is al gebruikt — is het account van u, log dan in.',
+    login: 'Inloggen',
+  },
+  en: {
+    title: 'Accept invitation', titleInvalid: 'Invitation',
+    heading: 'Welcome to the FODEL portal', headingInvalid: 'This invitation is not valid',
+    account: 'Create an account for:',
+    intake: (place: string) => `We have kept the details you entered for the property in ${place} — once you set a password you can carry on with your listing.`,
+    name: 'Full name', password: 'Password', submit: 'Create account',
+    hint: 'The password must be at least 8 characters long.',
+    notFound: 'This invitation link does not exist.',
+    expired: 'This invitation has expired. Please ask FODEL for a new one.',
+    used: 'This invitation has already been used — if the account is yours, please sign in.',
+    login: 'Sign in',
+  },
+  de: {
+    title: 'Einladung annehmen', titleInvalid: 'Einladung',
+    heading: 'Willkommen im FODEL-Portal', headingInvalid: 'Die Einladung ist nicht gültig',
+    account: 'Konto erstellen für:',
+    intake: (place: string) => `Ihre Angaben zur Immobilie in ${place} haben wir gespeichert — nach dem Festlegen eines Passworts können Sie direkt mit Ihrer Anzeige fortfahren.`,
+    name: 'Vollständiger Name', password: 'Passwort', submit: 'Konto erstellen',
+    hint: 'Das Passwort muss mindestens 8 Zeichen lang sein.',
+    notFound: 'Dieser Einladungslink existiert nicht.',
+    expired: 'Diese Einladung ist abgelaufen. Bitte fordern Sie bei FODEL eine neue an.',
+    used: 'Diese Einladung wurde bereits verwendet — wenn das Konto Ihnen gehört, melden Sie sich bitte an.',
+    login: 'Anmelden',
+  },
+}[lang];
 ---
 
 <AuthPanel
-  title={usable ? 'Meghívó elfogadása' : 'Meghívó'}
-  heading={usable ? 'Üdvözöljük a FODEL portálon' : 'A meghívó nem érvényes'}
+  title={usable ? T.title : T.titleInvalid}
+  heading={usable ? T.heading : T.headingInvalid}
+  lang={lang}
 >
   {
     usable ? (
       <>
         <p class="body">
-          Fiók létrehozása ehhez: <strong>{invite!.email}</strong>
+          {T.account} <strong>{invite!.email}</strong>
           {hasIntake && (
             <>
               <br />
-              A(z) {intake.settlement} településen lévő ingatlanhoz megadott adatait megőriztük —
-              a jelszó beállítása után rögtön a hirdetésénél folytathatja.
+              {T.intake(intake.settlement!)}
             </>
           )}
         </p>
@@ -61,25 +117,25 @@ const hasIntake = Boolean(intake.settlement);
         <form method="POST" action="/api/portal/invite/accept">
           <input type="hidden" name="token" value={token} />
           <div class="field">
-            <label for="full_name">Teljes név</label>
+            <label for="full_name">{T.name}</label>
             <input id="full_name" name="full_name" required autofocus autocomplete="name" />
           </div>
           <div class="field">
-            <label for="password">Jelszó</label>
+            <label for="password">{T.password}</label>
             <input id="password" name="password" type="password" required minlength="8" autocomplete="new-password" />
           </div>
-          <button type="submit" class="submit">Fiók létrehozása</button>
+          <button type="submit" class="submit">{T.submit}</button>
         </form>
-        <p class="hint">A jelszó legalább 8 karakter legyen.</p>
+        <p class="hint">{T.hint}</p>
       </>
     ) : (
       <>
         <p class="body">
-          {invalid && 'Ez a meghívó link nem található.'}
-          {expired && 'Ez a meghívó lejárt. Kérjen újat a FODEL-től.'}
-          {used && 'Ezt a meghívót már felhasználták — ha Öné a fiók, jelentkezzen be.'}
+          {invalid && T.notFound}
+          {expired && T.expired}
+          {used && T.used}
         </p>
-        <p class="hint"><a href="/portal/login">Bejelentkezés</a></p>
+        <p class="hint"><a href="/portal/login">{T.login}</a></p>
       </>
     )
   }

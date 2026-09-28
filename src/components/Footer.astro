@@ -11,7 +11,7 @@
 import Logo from './Logo.astro';
 import Eyebrow from './Eyebrow.astro';
 import ArrowChip from './ArrowChip.astro';
-import { UI, BRAND, CATEGORY_FALLBACK, path, type Locale } from '~/i18n/ui';
+import { UI, BRAND, CATEGORY_FALLBACK, path, type Locale, type RouteKey } from '~/i18n/ui';
 import { getCompany } from '~/lib/runtime-config';
 import { slugify } from '~/lib/properties';
 
@@ -29,14 +29,19 @@ const weekdayHours = locale === 'hu'
   : `Maandag–vrijdag · ${COMPANY.hours.weekdays.from}–${COMPANY.hours.weekdays.to}`;
 const foundedPlace = locale === 'hu' ? 'Hága, Hollandia' : 'Den Haag, Nederland';
 
-const navItems = [
+const navItems: { key: RouteKey; label: string }[] = [
   { key: 'properties', label: ui.nav.properties },
   { key: 'sellers', label: ui.nav.sellers },
   { key: 'buyers', label: ui.nav.buyers },
   { key: 'about', label: ui.nav.about },
   { key: 'blog', label: ui.nav.blog },
+  // The valuation form, linked only while an admin has it switched on
+  // (Beállítások → Szolgáltatások) — never a link to an unstaffed service.
+  ...(COMPANY.services.valuationEntry
+    ? [{ key: 'valuation' as const, label: locale === 'hu' ? 'Értékbecslés' : 'Waardebepaling' }]
+    : []),
   { key: 'contact', label: ui.nav.contact },
-] as const;
+];
 
 const legalItems = [
   { key: 'imprint', label: locale === 'hu' ? 'Impresszum' : 'Colofon' },

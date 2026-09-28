@@ -28,6 +28,12 @@ const ui = UI[locale];
 const c = copy(locale).contact;
 const hu = locale === 'hu';
 const COMPANY = await getCompany();
+// WhatsApp only with a real, configured number (brief §9) — no placeholder.
+const whatsappHref = COMPANY.whatsapp ? `https://wa.me/${COMPANY.whatsapp.replace(/\D/g, '')}` : null;
+// Keep the two-column grid even: the opening-hours tile spans the row when it
+// would otherwise sit alone.
+const tilesBeforeHours = COMPANY.phones.filter((p) => p.public).length + 1 + (whatsappHref ? 1 : 0);
+const hoursWide = tilesBeforeHours % 2 === 0;
 const weekdayHours = hu
   ? `Hétfő–Péntek · ${COMPANY.hours.weekdays.from}–${COMPANY.hours.weekdays.to}`
   : `Maandag–vrijdag · ${COMPANY.hours.weekdays.from}–${COMPANY.hours.weekdays.to}`;
@@ -38,6 +44,7 @@ const weekdayHours = hu
   title={c.meta.title}
   description={c.meta.description}
   alternates={alternatesFor('contact')}
+  whatsapp={{}}
 >
   <div class="contact">
     {/* ── Details ── */}
@@ -81,7 +88,22 @@ const weekdayHours = hu
             <span class="tile-value">{COMPANY.email.primary}</span>
           </a>
         </li>
-        <li>
+        {whatsappHref && (
+          <li>
+            <a class="tile" href={whatsappHref} target="_blank" rel="noopener">
+              <span class="tile-icon" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 32 32" fill="none">
+                  <path d="M16 4.5C9.65 4.5 4.5 9.6 4.5 15.9c0 2.2.62 4.33 1.8 6.17L4.6 27.5l5.6-1.62A11.5 11.5 0 0 0 16 27.4c6.35 0 11.5-5.1 11.5-11.44C27.5 9.6 22.35 4.5 16 4.5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+                  <path d="M12.2 10.6c.3 0 .6.1.75.5l.9 2.1c.1.3.06.55-.12.8l-.7.85c.7 1.35 1.75 2.4 3.1 3.1l.85-.7c.25-.2.5-.23.8-.12l2.1.9c.4.16.5.45.5.75v.6c0 .85-.7 1.55-1.6 1.5-4.1-.27-7.35-3.52-7.62-7.62-.05-.9.65-1.6 1.5-1.6h.54Z" fill="currentColor" />
+                </svg>
+              </span>
+              <span class="tile-label">WhatsApp</span>
+              <span class="tile-value">{hu ? 'Írjon nekünk' : 'Stuur ons een bericht'}</span>
+              <span class="tile-note num">{COMPANY.whatsapp}</span>
+            </a>
+          </li>
+        )}
+        <li class:list={{ wide: hoursWide }}>
           <div class="tile">
             <span class="tile-icon" aria-hidden="true">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none">

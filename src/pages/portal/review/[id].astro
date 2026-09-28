@@ -146,7 +146,14 @@ const { data: creditableReferral } = property.owner_id
     </section>
   )}
 
-  {reviewable && (
+  {reviewable && property.free_listing && (
+    <p class="notice ok">
+      Ingyenes hirdetés — a hirdető admin által küldött, ingyenes feltöltésre jogosító meghívóval
+      regisztrált. Jóváhagyáskor nem készül díjbekérő, a hirdetés azonnal élesedik.
+    </p>
+  )}
+
+  {reviewable && !property.free_listing && (
     <section class="order" id="order">
       <h2>Fizetendő díj</h2>
       <p class="hint">
@@ -240,7 +247,9 @@ const { data: creditableReferral } = property.owner_id
   {(reviewable || awaitingPayment) && (
     <section class="actions">
       {reviewable && (
-        <button type="button" class="btn" id="approve-btn">Jóváhagyás és díjbekérő küldése</button>
+        <button type="button" class="btn" id="approve-btn" data-free={property.free_listing ? 'yes' : undefined}>
+          {property.free_listing ? 'Jóváhagyás és élesítés (ingyenes)' : 'Jóváhagyás és díjbekérő küldése'}
+        </button>
       )}
       {awaitingPayment && (
         <button type="button" class="btn" id="publish-btn">Átutalás megérkezett — élesítés</button>
@@ -250,6 +259,17 @@ const { data: creditableReferral } = property.owner_id
         <label for="note">Javítási megjegyzés (ha visszaküldi)</label>
         <textarea id="note" rows="4" placeholder="Mit kell javítani?"></textarea>
         <button type="button" class="btn ghost" id="reject-btn">Javítás kérése</button>
+      </div>
+
+      <div class="changes-form reject-form">
+        <label for="reject-note">Elutasítás indoklása</label>
+        <textarea id="reject-note" rows="3" placeholder="Miért nem tehető közzé a hirdetés?"></textarea>
+        <label class="inline-check">
+          <input type="checkbox" id="refund-required" />
+          Visszatérítés szükséges (csak rögzítés — pénzmozgást nem indít)
+        </label>
+        <button type="button" class="btn danger" id="final-reject-btn">Elutasítás</button>
+        <p class="hint">Az elutasítás végleges: a hirdető értesítést kap az indoklással, a hirdetés nem küldhető be újra.</p>
       </div>
 
       <p class="action-status" id="action-status" role="status"></p>
@@ -317,7 +337,8 @@ const { data: creditableReferral } = property.owner_id
       const messages = {
         'not-submitted': 'Ez a hirdetés már nem vár elbírálásra — frissítse az oldalt.',
         'not-awaiting-payment': 'Ez a hirdetés nem fizetésre vár — frissítse az oldalt.',
-        'note-required': 'Írjon megjegyzést a javítás kéréséhez.',
+        'note-required': 'Írjon megjegyzést / indoklást.',
+        'not-reviewable': 'Ez a hirdetés ebben az állapotban nem bírálható el — frissítse az oldalt.',
         'unknown-extra': 'Ismeretlen kiegészítő — frissítse az oldalt.',
         'bad-quantity': 'A mennyiség 1 és 60 között lehet.',
       };
@@ -327,7 +348,11 @@ const { data: creditableReferral } = property.owner_id
     location.href = '/portal/properties?status=submitted';
   }
 
-  document.getElementById('approve-btn')?.addEventListener('click', () => {
+  document.getElementById('approve-btn')?.addEventListener('click', (event) => {
+    if (event.currentTarget.dataset.free === 'yes') {
+      if (confirm('Jóváhagyja és élesíti ezt az ingyenes hirdetést?')) doAction('approve', {});
+      return;
+    }
     const order = readOrder();
     if (!order) { alert('Válasszon csomagot.'); return; }
     const shown = totalEl?.textContent ?? '';
@@ -346,6 +371,15 @@ const { data: creditableReferral } = property.owner_id
     const note = document.getElementById('note').value.trim();
     if (!note) { alert('Írjon megjegyzést a javítás kéréséhez.'); return; }
     doAction('request_changes', { note });
+  });
+
+  document.getElementById('final-reject-btn')?.addEventListener('click', () => {
+    const note = document.getElementById('reject-note').value.trim();
+    if (!note) { alert('Írja meg az elutasítás indoklását — a hirdető ezt kapja meg.'); return; }
+    const refundRequired = document.getElementById('refund-required').checked;
+    if (confirm(`Véglegesen elutasítja a hirdetést?${refundRequired ? ' A visszatérítés szükségességét rögzítjük.' : ''}`)) {
+      doAction('reject', { note, refundRequired });
+    }
   });
 </script>
 
@@ -401,6 +435,11 @@ const { data: creditableReferral } = property.owner_id
   .changes-form { max-width: 480px; margin-top: 24px; }
   .changes-form label { display: block; font-size: var(--fs-eyebrow); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--taupe); margin-bottom: 8px; }
   .changes-form textarea { width: 100%; border: 1px solid var(--border); padding: 12px; font-size: var(--fs-body); }
+  .reject-form { padding-top: 24px; border-top: 1px solid var(--border); }
+  .reject-form .inline-check { display: flex; gap: 10px; align-items: center; margin: 12px 0 0; text-transform: none; letter-spacing: 0; font-size: var(--fs-small); color: var(--ink); }
+  .btn.danger { background: transparent; color: #b3261e; border: 1px solid #b3261e; margin-top: 12px; }
+  .btn.danger:hover { background: #b3261e; color: #fff; }
+  .notice.ok { background: rgba(16, 42, 67, 0.06); border-left: 2px solid var(--ink); color: var(--ink); }
   .action-status { font-size: var(--fs-small); color: var(--taupe); margin-top: 14px; min-height: 1.5em; }
 
   @media (max-width: 720px) {

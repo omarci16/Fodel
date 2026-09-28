@@ -1,70 +1,131 @@
 ---
-/** Blog admin — list, same filter-chip pattern as /portal/payments. */
+/**
+ * Blog admin — articles and case studies in four languages.
+ *
+ * Each row is one language version. The "Nyelvek" column shows the versions
+ * linked to it, so a missing or unpublished translation is visible at a
+ * glance rather than discovered from the public site.
+ */
 export const prerender = false;
 
 import Portal from '~/layouts/Portal.astro';
+import { BLOG_LOCALES, isBlogLocale, PLACEHOLDER_PREFIX } from '~/lib/blog';
 
 const { supabase, profile } = Astro.locals;
 if (profile?.role !== 'admin') return Astro.redirect('/portal/dashboard');
 
-const filter = Astro.url.searchParams.get('locale') ?? '';
+const params = Astro.url.searchParams;
+const localeFilter = isBlogLocale(params.get('locale')) ? params.get('locale')! : '';
+const kindFilter = params.get('kind') === 'case_study' ? 'case_study' : params.get('kind') === 'article' ? 'article' : '';
 
-let query = supabase
-  .from('blog_posts')
-  .select('id, locale, slug, title, category, published, published_at, updated_at')
-  .order('updated_at', { ascending: false });
-if (filter) query = query.eq('locale', filter);
+const { data: rows } = await supabase.from('blog_posts').select('*').order('updated_at', { ascending: false });
+const all = (rows ?? []).map((row: any) => ({ ...row, kind: row.kind === 'case_study' ? 'case_study' : 'article' }));
 
-const { data: posts } = await query;
-const [{ count: huCount }, { count: nlCount }] = await Promise.all([
-  supabase.from('blog_posts').select('id', { count: 'exact', head: true }).eq('locale', 'hu'),
-  supabase.from('blog_posts').select('id', { count: 'exact', head: true }).eq('locale', 'nl'),
-]);
+const posts = all.filter(
+  (post) => (!localeFilter || post.locale === localeFilter) && (!kindFilter || post.kind === kindFilter)
+);
+const count = (locale: string) => all.filter((post) => post.locale === locale && (!kindFilter || post.kind === kindFilter)).length;
+const versionsOf = (post: (typeof all)[number]) =>
+  post.group_id ? all.filter((other) => other.group_id === post.group_id && other.id !== post.id) : [];
+
+const query = (changes: Record<string, string>) => {
+  const next = new URLSearchParams(params);
+  for (const [key, value] of Object.entries(changes)) {
+    if (value) next.set(key, value);
+    else next.delete(key);
+  }
+  return `/portal/content/blog${next.size ? `?${next}` : ''}`;
+};
+
+const statusOf = (post: (typeof all)[number]) => {
+  if (!post.published) return String(post.title).startsWith(PLACEHOLDER_PREFIX) ? 'Fordításra vár' : 'Piszkozat';
+  if (post.published_at && new Date(post.published_at).getTime() > Date.now()) return 'Időzítve';
+  return 'Publikus';
+};
 
 const dateFmt = new Intl.DateTimeFormat('hu-HU', { year: 'numeric', month: 'short', day: 'numeric' });
+const LANG = { hu: 'Magyar', nl: 'Holland', en: 'Angol', de: 'Német' } as const;
 ---
 
 <Portal title="Blog">
   <header class="head">
     <p class="eyebrow">Tartalom</p>
-    <h1>Blog</h1>
-    <a href="/portal/content/blog/new?locale=hu" class="btn">+ HU cikk</a>
-    <a href="/portal/content/blog/new?locale=nl" class="btn">+ NL cikk</a>
+    <h1>Blog és esettanulmányok</h1>
   </header>
 
+  <form class="create" method="GET" action="/portal/content/blog/new">
+    <label>Új
+      <select name="kind">
+        <option value="article">cikk</option>
+        <option value="case_study">esettanulmány</option>
+      </select>
+    </label>
+    <label>nyelve
+      <select name="locale">
+        {BLOG_LOCALES.map((locale) => <option value={locale}>{LANG[locale]}</option>)}
+      </select>
+    </label>
+    <button type="submit" class="btn">+ Létrehozás</button>
+    <p class="hint">A többi nyelvi változatot a szerkesztőből lehet egy kattintással létrehozni — üres piszkozatként, fordítás nélkül.</p>
+  </form>
+
   <div class="filters">
-    <a href="/portal/content/blog" aria-current={!filter ? 'page' : undefined}>Mind</a>
-    <a href="/portal/content/blog?locale=hu" aria-current={filter === 'hu' ? 'page' : undefined}>HU <span>{huCount ?? 0}</span></a>
-    <a href="/portal/content/blog?locale=nl" aria-current={filter === 'nl' ? 'page' : undefined}>NL <span>{nlCount ?? 0}</span></a>
+    <a href={query({ kind: '' })} aria-current={!kindFilter ? 'page' : undefined}>Minden típus</a>
+    <a href={query({ kind: 'article' })} aria-current={kindFilter === 'article' ? 'page' : undefined}>Cikkek</a>
+    <a href={query({ kind: 'case_study' })} aria-current={kindFilter === 'case_study' ? 'page' : undefined}>Esettanulmányok</a>
+  </div>
+  <div class="filters">
+    <a href={query({ locale: '' })} aria-current={!localeFilter ? 'page' : undefined}>Minden nyelv</a>
+    {BLOG_LOCALES.map((locale) => (
+      <a href={query({ locale })} aria-current={localeFilter === locale ? 'page' : undefined}>
+        {locale.toUpperCase()} <span>{count(locale)}</span>
+      </a>
+    ))}
   </div>
 
-  {posts && posts.length > 0 ? (
+  {posts.length > 0 ? (
     <table class="list">
-      <thead><tr><th>Cím</th><th>Nyelv</th><th>Kategória</th><th>Állapot</th><th>Frissítve</th></tr></thead>
+      <thead><tr><th>Cím</th><th>Típus</th><th>Nyelv</th><th>Nyelvi változatok</th><th>Kategória</th><th>Állapot</th><th>Frissítve</th></tr></thead>
       <tbody>
-        {posts.map((p) => (
+        {posts.map((post) => (
           <tr>
-            <td><a href={`/portal/content/blog/${p.id}`}>{p.title || '(névtelen)'}</a></td>
-            <td>{p.locale.toUpperCase()}</td>
-            <td>{p.category || '—'}</td>
-            <td><span class:list={['pill', { published: p.published }]}>{p.published ? 'Publikus' : 'Piszkozat'}</span></td>
-            <td class="sub">{dateFmt.format(new Date(p.updated_at))}</td>
+            <td><a href={`/portal/content/blog/${post.id}`}>{post.title || '(névtelen)'}</a></td>
+            <td>{post.kind === 'case_study' ? 'Esettanulmány' : 'Cikk'}</td>
+            <td>{String(post.locale).toUpperCase()}</td>
+            <td>
+              {versionsOf(post).length === 0
+                ? <span class="sub">—</span>
+                : versionsOf(post).map((other) => (
+                    <a class:list={['version', { live: other.published }]} href={`/portal/content/blog/${other.id}`} title={statusOf(other)}>
+                      {String(other.locale).toUpperCase()}
+                    </a>
+                  ))}
+            </td>
+            <td>{post.category || '—'}</td>
+            <td><span class:list={['pill', { published: statusOf(post) === 'Publikus' }]}>{statusOf(post)}</span></td>
+            <td class="sub">{dateFmt.format(new Date(post.updated_at))}</td>
           </tr>
         ))}
       </tbody>
     </table>
   ) : (
-    <p class="empty">Nincs még cikk.</p>
+    <p class="empty">Ehhez a szűréshez nincs tartalom.</p>
   )}
 </Portal>
 
 <style>
-  .head { margin-bottom: 20px; display: flex; align-items: baseline; gap: 20px; }
-  .eyebrow { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--taupe); flex-basis: 100%; margin-bottom: 4px; }
-  h1 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 26px; color: var(--ink); flex: 1; }
+  .head { margin-bottom: 20px; }
+  .eyebrow { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--taupe); margin-bottom: 4px; }
+  h1 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 26px; color: var(--ink); }
   .btn { padding: 9px 18px; background: var(--ink); color: var(--cream); font-size: var(--fs-micro); letter-spacing: var(--ls-button); text-transform: uppercase; }
 
-  .filters { display: flex; gap: 4px; margin-bottom: 22px; }
+  .create { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin-bottom: 24px; padding: 16px; border: 1px solid var(--border); }
+  .create label { display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; color: var(--taupe); }
+  .create select { border: 1px solid var(--border); background: #fff; padding: 8px 10px; font-size: var(--fs-small); color: var(--ink); }
+  .hint { flex-basis: 100%; font-size: var(--fs-micro); color: var(--taupe); }
+
+  .filters { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 10px; }
+  .filters + .filters { margin-bottom: 22px; }
   .filters a { padding: 7px 14px; font-size: var(--fs-micro); letter-spacing: 0.04em; color: var(--taupe); border: 1px solid var(--border); }
   .filters a[aria-current='page'] { background: var(--ink); color: var(--cream); border-color: var(--ink); }
   .filters span { margin-left: 5px; opacity: 0.65; }
@@ -76,7 +137,13 @@ const dateFmt = new Intl.DateTimeFormat('hu-HU', { year: 'numeric', month: 'shor
   .list td { padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--ink); }
   .list a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
   .sub { font-size: var(--fs-micro); color: var(--taupe); }
+  .version { display: inline-block; margin-right: 4px; padding: 1px 6px; font-size: var(--fs-micro); border: 1px dashed var(--border); text-decoration: none !important; }
+  .version.live { border-style: solid; border-color: var(--ink); }
 
-  .pill { display: inline-block; font-size: var(--fs-micro); padding: 3px 10px; border: 1px solid var(--border); }
+  .pill { display: inline-block; font-size: var(--fs-micro); padding: 3px 10px; border: 1px solid var(--border); white-space: nowrap; }
   .pill.published { background: rgba(16, 42, 67, 0.08); border-color: var(--ink); }
+
+  @media (max-width: 860px) {
+    .list { display: block; overflow-x: auto; white-space: nowrap; }
+  }
 </style>

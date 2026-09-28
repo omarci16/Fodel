@@ -189,6 +189,9 @@ export const HU = {
       `A megadott adatok és a hasonló ingatlanok alapján tájékoztató jellegű becslésünk: ${range}.`,
     disclaimerWithCount: (n: number) =>
       `Ez a becslés tájékoztató jellegű, nem értékbecslői szakvélemény, és nem helyettesíti a hivatalos ingatlanértékelést. Az összeg ${n} hasonló ingatlan adatai alapján készült.`,
+    /** When an admin priced it by hand — there is no comparable count to cite. */
+    disclaimer:
+      'Ez a becslés tájékoztató jellegű, nem értékbecslői szakvélemény, és nem helyettesíti a hivatalos ingatlanértékelést.',
     cta: 'Hirdesse meg most',
     ctaUrl: 'submitAd',
   },
@@ -198,6 +201,24 @@ export const HU = {
     preheader: 'Munkatársunk személyesen felveszi Önnel a kapcsolatot.',
     heading: 'Köszönjük a megkeresést',
     body: 'A megadott adatok alapján jelenleg nem áll elég összehasonlítható ingatlan a rendelkezésünkre egy megbízható becsléshez. Munkatársunk személyesen felveszi Önnel a kapcsolatot.',
+  },
+
+  valuationNeedsInfo: {
+    subject: 'Értékbecslés — néhány adatot még kérnénk',
+    preheader: 'A becsléshez további információra van szükségünk.',
+    heading: 'Néhány adatot még kérnénk',
+    body: 'Köszönjük értékbecslési kérését. A becslés elkészítéséhez munkatársunk az alábbiakat kérné Öntől:',
+    after: 'Kérjük, válaszoljon erre az e-mailre a hiányzó adatokkal. A becslést az adatok beérkezése után készítjük el.',
+  },
+
+  rejected: {
+    subject: (ref: string) => `Hirdetését nem tudjuk közzétenni — #${ref}`,
+    preheader: 'Az elbírálás eredménye és az indoklás.',
+    heading: 'A hirdetést nem tudjuk közzétenni',
+    body: (title: string, ref: string) =>
+      `Sajnáljuk, a(z) „${title}” (#${ref}) hirdetést munkatársunk az elbírálás után nem hagyta jóvá. Az indoklás:`,
+    refund: 'Ha a hirdetésért már fizetett, a visszatérítésről külön felvesszük Önnel a kapcsolatot.',
+    after: 'Ha kérdése van, vagy úgy gondolja, hogy félreértés történt, egyszerűen válaszoljon erre az e-mailre.',
   },
 
   invoiceIssued: {

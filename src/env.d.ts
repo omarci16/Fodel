@@ -8,6 +8,7 @@ interface ImportMetaEnv {
   readonly RESEND_API_KEY: string;
   readonly FODEL_INBOX: string;
   readonly FODEL_FROM: string;
+  readonly FODEL_REPLY_TO?: string;
   readonly STRIPE_SECRET_KEY: string;
   readonly STRIPE_WEBHOOK_SECRET: string;
   readonly STRIPE_ENABLED: string;

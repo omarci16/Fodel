@@ -1,0 +1,16 @@
+---
+export const prerender = false;
+import BridgeArticlePage from '~/components/pages/BridgeArticlePage.astro';
+import { postBySlug } from '~/lib/blog';
+
+const { slug } = Astro.params;
+// Drafts, future-dated posts and other languages' slugs all come back null.
+const post = slug ? await postBySlug('de', slug) : null;
+if (!post) {
+  Astro.response.status = 404;
+  return Astro.rewrite('/404');
+}
+Astro.response.headers.set('Cache-Control', 's-maxage=300, stale-while-revalidate=86400');
+---
+
+<BridgeArticlePage locale="de" post={post} />

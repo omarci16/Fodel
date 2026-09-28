@@ -1,0 +1,110 @@
+---
+/**
+ * Service and automation switches (brief §1/A, §4, §7, §8).
+ *
+ * The valuation switches are live settings. The two automations are shown so
+ * the team can see they exist and what they are waiting for, but cannot be
+ * turned on here — see /api/portal/settings/services.
+ */
+export const prerender = false;
+
+import Portal from '~/layouts/Portal.astro';
+import { SERVICES_DEFAULT, AUTOMATION_DEFAULT, type Services, type Automation } from '~/lib/runtime-config';
+
+const { supabase, profile } = Astro.locals;
+if (profile?.role !== 'admin') return Astro.redirect('/portal/dashboard');
+
+const { data: row } = await supabase.from('site_settings').select('*').eq('id', 1).maybeSingle();
+const migrated = Boolean(row && 'services' in row);
+const services: Services = { ...SERVICES_DEFAULT, ...(row?.services ?? {}) };
+const automation: Automation = { ...AUTOMATION_DEFAULT, ...(row?.automation ?? {}) };
+const saved = Astro.url.searchParams.has('saved');
+const err = Astro.url.searchParams.get('error');
+---
+
+<Portal title="Szolgáltatások">
+  <header class="head">
+    <p class="eyebrow"><a href="/portal/settings">← Beállítások</a></p>
+    <h1>Szolgáltatások és automatizmusok</h1>
+    <p class="lede">A nyilvános oldalak a mentés után legfeljebb néhány percen belül frissülnek.</p>
+  </header>
+
+  {!migrated && <p class="notice error">Ezekhez a beállításokhoz futtassa le a 0014-es migrációt.</p>}
+  {saved && <p class="notice ok">Mentve.</p>}
+  {err && <p class="notice error">{err}</p>}
+
+  <form method="POST" action="/api/portal/settings/services" class="settings">
+    <fieldset disabled={!migrated}>
+      <h2>Értékbecslés</h2>
+      <label class="check">
+        <input type="checkbox" name="valuation_entry" value="yes" checked={services.valuationEntry} />
+        <span>
+          <strong>Belépési pont a főoldalon és a láblécben</strong>
+          Csak akkor kapcsolja be, ha a beérkező kéréseket munkatárs ténylegesen feldolgozza
+          (Értékbecslések menü). Kikapcsolva az űrlap közvetlen címen elérhető marad, de a főoldal nem
+          irányít rá forgalmat.
+        </span>
+      </label>
+      <label class="check">
+        <input type="checkbox" name="valuation_free" value="yes" checked={services.valuationFreeConfirmed} />
+        <span>
+          <strong>Az alapbecslés díjmentessége megerősítve</strong>
+          Amíg nincs bejelölve, a weboldal sehol nem nevezi a becslést „ingyenesnek”.
+        </span>
+      </label>
+
+      <h3>Tájékoztatás a becslés jellegéről</h3>
+      <p class="hint">
+        Az értékbecslési űrlap alatt megjelenő szöveg. Üresen hagyva az eddigi szöveg marad érvényben.
+        Csak jóváhagyott megfogalmazást mentsen: ne ígérjen pontosságot, azonnali eredményt vagy hivatalos
+        szakvéleményt.
+      </p>
+      <label class="text">Magyar<textarea name="notice_hu" rows="3" maxlength="800">{services.valuationNotice?.hu ?? ''}</textarea></label>
+      <label class="text">Holland<textarea name="notice_nl" rows="3" maxlength="800">{services.valuationNotice?.nl ?? ''}</textarea></label>
+
+      <h2>Automatizmusok</h2>
+      <label class="check locked">
+        <input type="checkbox" disabled checked={automation.registrationReminder} />
+        <span>
+          <strong>Emlékeztető félbehagyott regisztráció után — előkészítve, kikapcsolva</strong>
+          Bekapcsolás előtt szükséges: végleges levélszöveg, időzítés, feladó, és az adatkezelési alap
+          (az általános adatkezelési elfogadás nem marketinghozzájárulás). A küldés ismétlésbiztos, és a
+          befejezett regisztráció törli a függő emlékeztetőt.
+        </span>
+      </label>
+      <label class="check locked">
+        <input type="checkbox" disabled checked={automation.inviteAutomation} />
+        <span>
+          <strong>Automatikus meghívás / hirdetői engedélyezés — előkészítve, kikapcsolva</strong>
+          Bekapcsolás előtt szükségesek az automatikus engedélyezés feltételei. A kapcsoló kizárólag a
+          meghívásra vonatkozhat: a hirdetések közzététele mindig munkatársi jóváhagyáshoz kötött marad.
+        </span>
+      </label>
+
+      <button type="submit" class="btn">Mentés</button>
+    </fieldset>
+  </form>
+</Portal>
+
+<style>
+  .head { margin-bottom: 24px; max-width: 720px; }
+  .eyebrow { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--taupe); margin-bottom: 8px; }
+  .eyebrow a { text-decoration: underline; }
+  h1 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 26px; color: var(--ink); margin-bottom: 10px; }
+  .lede, .hint { font-size: var(--fs-small); line-height: 1.7; color: var(--taupe); }
+  .notice { padding: 12px 16px; font-size: var(--fs-small); margin-bottom: 20px; max-width: 720px; }
+  .notice.ok { background: rgba(16, 42, 67, 0.06); border-left: 2px solid var(--ink); }
+  .notice.error { background: rgba(179, 38, 30, 0.06); border-left: 2px solid #b3261e; color: #b3261e; }
+
+  .settings { max-width: 720px; }
+  .settings fieldset { display: grid; gap: 16px; border: 0; }
+  h2 { font-family: var(--serif); font-size: 19px; color: var(--ink); margin-top: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  h3 { font-size: var(--fs-small); color: var(--ink); margin-top: 8px; }
+  .check { display: grid; grid-template-columns: 20px 1fr; gap: 12px; align-items: start; font-size: var(--fs-small); line-height: 1.6; color: var(--taupe); }
+  .check input { margin-top: 4px; }
+  .check strong { display: block; color: var(--ink); font-weight: 500; }
+  .check.locked { opacity: 0.75; }
+  .text { display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; color: var(--taupe); }
+  .text textarea { border: 1px solid var(--border); background: #fff; padding: 10px; font-size: var(--fs-small); color: var(--ink); text-transform: none; letter-spacing: 0; font-family: inherit; }
+  .btn { justify-self: start; margin-top: 8px; padding: 12px 24px; background: var(--ink); color: var(--cream); font-size: var(--fs-micro); letter-spacing: var(--ls-button); text-transform: uppercase; }
+</style>

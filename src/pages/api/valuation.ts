@@ -1,8 +1,14 @@
 import type { APIRoute } from 'astro';
 import { handleForm } from '~/lib/form-handler';
 import { createSupabaseAdminClient } from '~/lib/supabase-server';
+import { processAndUploadImage } from '~/lib/media';
+import { VALUATION_QUESTIONS, questionField, pickAnswers } from '~/data/valuation-questions';
 
 export const prerender = false;
+
+/** Photos a visitor can attach. The browser scales them down first (ValuationPage). */
+const MAX_PHOTOS = 6;
+const PHOTO_BUCKET = 'valuation-media';
 
 /**
  * The public valuation lead magnet. Writes `status = 'queued'` and returns
@@ -27,10 +33,19 @@ export const POST: APIRoute = (context) =>
       { name: 'plotM2', label: 'Telek (m²)', type: 'number', maxLength: 12 },
       { name: 'yearBuilt', label: 'Építés éve', type: 'number', maxLength: 6 },
       { name: 'condition', label: 'Állapot', maxLength: 200 },
+      // Listed as fields so the office notification shows the answers too.
+      ...VALUATION_QUESTIONS.map((question) => ({
+        name: questionField(question.id),
+        label: question.label.hu,
+        maxLength: 60,
+      })),
     ],
-    onSuccess: async (values) => {
+    onSuccess: async (values, extras, form) => {
       const admin = createSupabaseAdminClient();
-      await admin.from('valuations').insert({
+      const id = crypto.randomUUID();
+
+      const base = {
+        id,
         source: 'public_lead',
         category: values.category,
         county: values.county,
@@ -43,6 +58,39 @@ export const POST: APIRoute = (context) =>
         contact_email: values.email,
         contact_phone: values.phone || null,
         status: 'queued',
+      };
+
+      // Every photo goes through sharp (EXIF/GPS stripped, re-encoded) into a
+      // private bucket. One unreadable photo must not cost the whole lead.
+      const files = form
+        .getAll('photos')
+        .filter((entry): entry is File => entry instanceof File && entry.size > 0)
+        .slice(0, MAX_PHOTOS);
+      const photos: { path: string; width: number; height: number }[] = [];
+      for (const file of files) {
+        try {
+          const uploaded = await processAndUploadImage(admin, id, file, PHOTO_BUCKET);
+          photos.push({ path: uploaded.path, width: uploaded.width, height: uploaded.height });
+        } catch (error) {
+          console.error('[form:valuation] photo skipped', error);
+        }
+      }
+
+      const { error } = await admin.from('valuations').insert({
+        ...base,
+        locale: extras.Locale === 'nl' ? 'nl' : 'hu',
+        answers: pickAnswers(values),
+        photos,
       });
+      if (!error) return;
+
+      // Before migration 0014 the new columns do not exist yet — the lead is
+      // still worth keeping without them (the office email has the answers).
+      if (/column|schema cache/i.test(error.message)) {
+        const retry = await admin.from('valuations').insert(base);
+        if (retry.error) throw retry.error;
+        return;
+      }
+      throw error;
     },
   });

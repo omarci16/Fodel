@@ -10,7 +10,8 @@ export const prerender = false;
 
 import Portal from '~/layouts/Portal.astro';
 import { SITE_URL } from '~/config/site.mjs';
-import { path } from '~/i18n/ui';
+import { BLOG_LOCALES, BLOG_PATH, PLACEHOLDER_PREFIX, isBlogLocale, type BlogLocale } from '~/lib/blog';
+import { MAX_UPLOAD_MB } from '~/lib/media';
 
 const { supabase, profile } = Astro.locals;
 if (profile?.role !== 'admin') return Astro.redirect('/portal/dashboard');
@@ -18,34 +19,41 @@ if (profile?.role !== 'admin') return Astro.redirect('/portal/dashboard');
 const { id } = Astro.params;
 const { data: post } = await supabase.from('blog_posts').select('*').eq('id', id).maybeSingle();
 if (!post) return new Response('Cikk nem található.', { status: 404 });
+const locale: BlogLocale = isBlogLocale(post.locale) ? post.locale : 'hu';
+const kind = post.kind === 'case_study' ? 'case_study' : 'article';
+const migrated = 'kind' in post;
+
 const { data: categoryTerms } = await supabase
   .from('taxonomy_terms')
   .select('key, labels')
   .eq('group_key', 'blog_category')
   .eq('enabled', true)
   .order('sort_order');
+const labelFor = (term: any, lang: string) => term.labels?.[lang] || term.labels?.hu;
 
-const otherLocale = post.locale === 'hu' ? 'nl' : 'hu';
+// Every language version linked to this one.
+const { data: groupRows } = post.group_id
+  ? await supabase.from('blog_posts').select('id, locale, title, published, published_at').eq('group_id', post.group_id).neq('id', id)
+  : { data: [] };
+const versions = groupRows ?? [];
+const versionLocales = new Set([locale, ...versions.map((v: any) => v.locale)]);
+const missingLocales = BLOG_LOCALES.filter((l) => !versionLocales.has(l));
+const missingForeign = missingLocales.filter((l) => l !== 'hu');
+
+// Posts in other languages that could be linked as this one's translation.
 const { data: candidates } = await supabase
   .from('blog_posts')
-  .select('id, title, slug')
-  .eq('locale', otherLocale)
+  .select('id, title, locale, group_id')
+  .neq('locale', locale)
   .neq('id', id)
   .order('updated_at', { ascending: false })
-  .limit(50);
+  .limit(100);
+const linkable = (candidates ?? []).filter((c: any) => !versionLocales.has(c.locale) && (!c.group_id || c.group_id !== post.group_id));
 
-let linkedSibling = null;
-if (post.group_id) {
-  const { data } = await supabase
-    .from('blog_posts')
-    .select('id, title, slug, locale')
-    .eq('group_id', post.group_id)
-    .neq('id', id)
-    .limit(1);
-  linkedSibling = data?.[0] ?? null;
-}
-
-const publicUrl = post.published ? `${SITE_URL}${path(post.locale, 'blog')}${post.slug}/` : null;
+const isLive = post.published && post.published_at && new Date(post.published_at).getTime() <= Date.now();
+const publicUrl = isLive ? `${SITE_URL}${BLOG_PATH[locale]}${post.slug}/` : null;
+const placeholder = String(post.title).startsWith(PLACEHOLDER_PREFIX);
+const LANG = { hu: 'Magyar', nl: 'Holland', en: 'Angol', de: 'Német' } as const;
 ---
 
 <Portal title={post.title || 'Új cikk'}>
@@ -55,30 +63,57 @@ const publicUrl = post.published ? `${SITE_URL}${path(post.locale, 'blog')}${pos
     <span class:list={['pill', { published: post.published }]} id="status-pill">{post.published ? 'Publikus' : 'Piszkozat'}</span>
   </header>
 
+  {placeholder && (
+    <p class="notice">
+      Ez egy üresen létrehozott nyelvi változat. Írja meg a címet és a szöveget ezen a nyelven — amíg
+      a cím „{PLACEHOLDER_PREFIX}” előtaggal kezdődik, a cikk nem publikálható.
+    </p>
+  )}
+
   <form id="editor" class="editor">
     <div class="col main">
       <label>Cím <input name="title" value={post.title} required /></label>
       <div class="row">
-        <label>Slug <input name="slug" value={post.slug} required /></label>
+        <label>URL (slug) <input name="slug" value={post.slug} required /></label>
         <label>Nyelv
-          <select name="locale">
-            <option value="hu" selected={post.locale === 'hu'}>HU</option>
-            <option value="nl" selected={post.locale === 'nl'}>NL</option>
+          <select name="locale" disabled={post.published} title={post.published ? 'Publikus cikk nyelve nem módosítható' : undefined}>
+            {BLOG_LOCALES.map((l) => (
+              <option value={l} selected={l === locale} disabled={l !== locale && versionLocales.has(l)}>{l.toUpperCase()}</option>
+            ))}
+          </select>
+        </label>
+        <label>Típus
+          <select name="kind" id="kind" disabled={!migrated}>
+            <option value="article" selected={kind === 'article'}>Cikk</option>
+            <option value="case_study" selected={kind === 'case_study'}>Esettanulmány</option>
           </select>
         </label>
         <label>Kategória
           <select name="category" id="blog-category">
-            {!(categoryTerms ?? []).some((term: any) => term.labels?.[post.locale] === post.category) && <option value={post.category}>{post.category}</option>}
+            <option value="" selected={!post.category}>Válasszon…</option>
+            {post.category && !(categoryTerms ?? []).some((term: any) => labelFor(term, locale) === post.category) && <option value={post.category} selected>{post.category}</option>}
             {(categoryTerms ?? []).map((term: any) => <option
-              value={term.labels?.[post.locale] ?? term.labels.hu}
-              data-hu={term.labels.hu}
-              data-nl={term.labels.nl}
-              selected={(term.labels?.[post.locale] ?? term.labels.hu) === post.category}
-            >{term.labels?.[post.locale] ?? term.labels.hu}</option>)}
+              value={labelFor(term, locale)}
+              data-hu={labelFor(term, 'hu')}
+              data-nl={labelFor(term, 'nl')}
+              data-en={labelFor(term, 'en')}
+              data-de={labelFor(term, 'de')}
+              selected={labelFor(term, locale) === post.category}
+            >{labelFor(term, locale)}</option>)}
           </select>
         </label>
       </div>
+      <p class="hint">Új kategória a <a href="/portal/taxonomy#blog_category">Szótár</a> oldalon vehető fel.</p>
       <label>Kivonat <textarea name="excerpt" rows="2">{post.excerpt}</textarea></label>
+
+      <div class="toolbar" role="toolbar" aria-label="Beszúrás a szövegbe">
+        <label class="tool">
+          <input type="file" id="inline-file" accept="image/jpeg,image/png,image/webp" hidden />
+          <span>Kép beszúrása</span>
+        </label>
+        <button type="button" class="tool" id="insert-link">Link beszúrása</button>
+        <span class="hint" id="toolbar-status">JPG, PNG vagy WebP, legfeljebb {MAX_UPLOAD_MB} MB.</span>
+      </div>
 
       <div class="body-grid">
         <label class="body-label">Szöveg (Markdown)
@@ -90,6 +125,17 @@ const publicUrl = post.published ? `${SITE_URL}${path(post.locale, 'blog')}${pos
         </div>
       </div>
 
+      <fieldset class="case-fields" id="case-fields" hidden={kind !== 'case_study'} disabled={!migrated}>
+        <legend>Esettanulmány</legend>
+        <p class="hint">
+          Csak valós, ellenőrizhető adatot írjon ide. A kitöltött részek külön fejezetként jelennek meg a
+          cikk alatt; az üresen hagyottak nem.
+        </p>
+        <label>Módszertan <textarea name="caseMethod" rows="4">{post.case_method ?? ''}</textarea></label>
+        <label>Eredmények <textarea name="caseResults" rows="4">{post.case_results ?? ''}</textarea></label>
+        <label>Források <textarea name="caseSources" rows="3" placeholder="Egy forrás soronként, lehetőleg linkkel">{post.case_sources ?? ''}</textarea></label>
+      </fieldset>
+
       <div class="seo-panel">
         <h2>SEO</h2>
         <label>SEO cím <input name="seoTitle" id="seo-title" value={post.seo_title ?? ''} maxlength="70" /></label>
@@ -99,7 +145,7 @@ const publicUrl = post.published ? `${SITE_URL}${path(post.locale, 'blog')}${pos
 
         <div class="serp">
           <p class="serp-title" id="serp-title"></p>
-          <p class="serp-url"><span id="serp-prefix">{SITE_URL}{path(post.locale, 'blog')}</span><span id="serp-slug">{post.slug}</span>/</p>
+          <p class="serp-url"><span id="serp-prefix">{SITE_URL}{BLOG_PATH[locale]}</span><span id="serp-slug">{post.slug}</span>/</p>
           <p class="serp-desc" id="serp-desc"></p>
         </div>
 
@@ -114,7 +160,7 @@ const publicUrl = post.published ? `${SITE_URL}${path(post.locale, 'blog')}${pos
 
       <div class="actions">
         <button type="submit" class="btn">Mentés</button>
-        <button type="button" class="btn ghost" id="publish-btn">{post.published ? 'Visszavonás' : 'Publikálás'}</button>
+        <button type="button" class="btn ghost" id="publish-btn" data-published={post.published ? 'yes' : 'no'}>{post.published ? 'Visszavonás' : 'Publikálás'}</button>
         <button type="button" class="btn ghost danger" id="delete-btn">Törlés</button>
         <p class="action-status" id="action-status" role="status"></p>
       </div>
@@ -137,7 +183,7 @@ const publicUrl = post.published ? `${SITE_URL}${path(post.locale, 'blog')}${pos
         <div class="fb-preview">
           <div class="fb-media">{(post.og_image_url || post.cover_url) && <img src={post.og_image_url || post.cover_url} alt="" />}</div>
           <div class="fb-body">
-            <p class="fb-domain">FODEL.HU</p>
+            <p class="fb-domain">FODEL.NL</p>
             <p class="fb-title" id="fb-title">{post.title}</p>
             <p class="fb-desc" id="fb-desc">{post.excerpt}</p>
           </div>
@@ -145,16 +191,43 @@ const publicUrl = post.published ? `${SITE_URL}${path(post.locale, 'blog')}${pos
       </section>
 
       <section class="panel">
-        <h2>Fordítás összekapcsolása</h2>
-        {linkedSibling ? (
-          <p class="hint">Összekapcsolva: <a href={`/portal/content/blog/${linkedSibling.id}`}>{linkedSibling.title} ({linkedSibling.locale.toUpperCase()})</a></p>
-        ) : (
-          <select id="link-target">
-            <option value="">Nincs összekapcsolva</option>
-            {(candidates ?? []).map((c) => <option value={c.id}>{c.title}</option>)}
-          </select>
+        <h2>Nyelvi változatok</h2>
+        <ul class="versions">
+          <li><strong>{locale.toUpperCase()}</strong> — ez a változat</li>
+          {versions.map((v: any) => (
+            <li>
+              <a href={`/portal/content/blog/${v.id}`}>{String(v.locale).toUpperCase()}</a> —
+              {v.published ? ' publikus' : String(v.title).startsWith(PLACEHOLDER_PREFIX) ? ' fordításra vár' : ' piszkozat'}
+            </li>
+          ))}
+        </ul>
+        {missingLocales.length > 0 && (
+          <div class="version-actions">
+            <p class="hint">
+              Üres, összekapcsolt piszkozatot hoz létre. Ez nem fordítás: minden nyelvi változatot külön kell
+              megírni és publikálni.
+            </p>
+            {missingLocales.length > 1 && (
+              <button type="button" class="btn ghost small" data-versions={missingLocales.join(',')}>Összes nyelv</button>
+            )}
+            {missingForeign.length > 1 && missingForeign.length !== missingLocales.length && (
+              <button type="button" class="btn ghost small" data-versions={missingForeign.join(',')}>Összes külföldi nyelv</button>
+            )}
+            {missingLocales.map((l) => (
+              <button type="button" class="btn ghost small" data-versions={l}>+ {LANG[l]}</button>
+            ))}
+          </div>
         )}
-        {linkedSibling && <button type="button" class="btn ghost small" id="unlink-btn">Szétkapcsolás</button>}
+        {linkable.length > 0 && (
+          <label class="link-existing">Meglévő cikk összekapcsolása
+            <select id="link-target">
+              <option value="">Válasszon…</option>
+              {linkable.map((c: any) => <option value={c.id}>{String(c.locale).toUpperCase()} · {c.title}</option>)}
+            </select>
+          </label>
+        )}
+        {versions.length > 0 && <button type="button" class="btn ghost small" id="unlink-btn">Leválasztás a csoportról</button>}
+        <p class="hint" id="versions-status" role="status"></p>
       </section>
 
       {publicUrl && (
@@ -168,7 +241,12 @@ const publicUrl = post.published ? `${SITE_URL}${path(post.locale, 'blog')}${pos
   </form>
 </Portal>
 
-<script define:vars={{ postId: post.id }}>
+<script>
+  import { exposeShrinkImage } from '~/scripts/shrink-image';
+  exposeShrinkImage();
+</script>
+
+<script define:vars={{ postId: post.id, blogPaths: BLOG_PATH }}>
   const form = document.getElementById('editor');
   const actionStatus = document.getElementById('action-status');
   const bodyMd = document.getElementById('body-md');
@@ -218,7 +296,7 @@ const publicUrl = post.published ? `${SITE_URL}${path(post.locale, 'blog')}${pos
     document.getElementById('serp-desc').textContent = seoDesc.value || form.querySelector('[name="excerpt"]').value || '(leírás)';
     document.getElementById('serp-slug').textContent = slugInput.value;
     const locale = form.querySelector('[name="locale"]').value;
-    document.getElementById('serp-prefix').textContent = `${location.origin}/${locale}/${locale === 'hu' ? 'blog' : 'nieuws'}/`;
+    document.getElementById('serp-prefix').textContent = `${location.origin}${blogPaths[locale] ?? '/'}`;
     document.getElementById('fb-title').textContent = titleInput.value;
     document.getElementById('fb-desc').textContent = form.querySelector('[name="excerpt"]').value;
   }
@@ -240,13 +318,20 @@ const publicUrl = post.published ? `${SITE_URL}${path(post.locale, 'blog')}${pos
     slugInput.value = slugInput.value.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
   });
 
+  const kindInput = document.getElementById('kind');
+  const caseFields = document.getElementById('case-fields');
+  kindInput?.addEventListener('change', () => {
+    if (caseFields) caseFields.hidden = kindInput.value !== 'case_study';
+  });
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     actionStatus.textContent = 'Mentés…';
     const fd = new FormData(form);
     const { ok, json } = await post(`/api/portal/content/blog/${postId}`, {
       action: 'save',
-      locale: fd.get('locale'),
+      locale: localeInput.value,
+      kind: kindInput?.value ?? 'article',
       slug: fd.get('slug'),
       title: fd.get('title'),
       category: fd.get('category'),
@@ -254,32 +339,92 @@ const publicUrl = post.published ? `${SITE_URL}${path(post.locale, 'blog')}${pos
       bodyMd: fd.get('bodyMd'),
       seoTitle: fd.get('seoTitle'),
       seoDescription: fd.get('seoDescription'),
+      caseMethod: fd.get('caseMethod') ?? '',
+      caseResults: fd.get('caseResults') ?? '',
+      caseSources: fd.get('caseSources') ?? '',
       featured: fd.get('featured') === 'on',
     });
-    actionStatus.textContent = ok && json.ok ? 'Mentve.' : (json.error === 'title-and-slug-required' ? 'A cím és a slug kötelező.' : 'Nem sikerült menteni.');
+    actionStatus.textContent = ok && json.ok ? 'Mentve.' : json.error || 'Nem sikerült menteni.';
   });
 
-  document.getElementById('publish-btn')?.addEventListener('click', async () => {
-    const willPublish = document.getElementById('status-pill').textContent !== 'Publikus';
-    const { ok } = await post(`/api/portal/content/blog/${postId}`, { action: willPublish ? 'publish' : 'unpublish' });
-    if (ok) location.reload();
+  document.getElementById('publish-btn')?.addEventListener('click', async (event) => {
+    const willPublish = event.currentTarget.dataset.published !== 'yes';
+    if (willPublish && !confirm('Mentette a legutóbbi módosításokat? A publikálás a mentett változatot teszi közzé.')) return;
+    actionStatus.textContent = willPublish ? 'Publikálás…' : 'Visszavonás…';
+    const { ok, json } = await post(`/api/portal/content/blog/${postId}`, { action: willPublish ? 'publish' : 'unpublish' });
+    if (ok && json.ok) location.reload();
+    else actionStatus.textContent = json.error || 'Nem sikerült.';
   });
 
   document.getElementById('delete-btn')?.addEventListener('click', async () => {
-    if (!confirm('Biztosan törli ezt a cikket?')) return;
+    if (!confirm('Biztosan törli ezt a nyelvi változatot? Ez nem vonható vissza.')) return;
     const { ok } = await post(`/api/portal/content/blog/${postId}`, { action: 'delete' });
     if (ok) location.href = '/portal/content/blog';
   });
 
+  const versionsStatus = document.getElementById('versions-status');
+  document.querySelectorAll('[data-versions]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const locales = button.dataset.versions.split(',');
+      versionsStatus.textContent = 'Létrehozás…';
+      const { ok, json } = await post(`/api/portal/content/blog/${postId}`, { action: 'create_versions', locales });
+      if (ok && json.ok) location.reload();
+      else versionsStatus.textContent = json.error || 'Nem sikerült létrehozni.';
+    });
+  });
+
   document.getElementById('link-target')?.addEventListener('change', async (e) => {
     const targetId = e.target.value;
-    await post(`/api/portal/content/blog/${postId}`, { action: 'link_translation', targetId: targetId || null });
-    location.reload();
+    if (!targetId) return;
+    const { ok, json } = await post(`/api/portal/content/blog/${postId}`, { action: 'link_translation', targetId });
+    if (ok && json.ok) location.reload();
+    else versionsStatus.textContent = json.error || 'Nem sikerült összekapcsolni.';
   });
 
   document.getElementById('unlink-btn')?.addEventListener('click', async () => {
+    if (!confirm('Leválasztja ezt a változatot a többi nyelvi változatról?')) return;
     await post(`/api/portal/content/blog/${postId}`, { action: 'link_translation', targetId: null });
     location.reload();
+  });
+
+  /** Inserts text at the cursor in the body and refreshes the preview. */
+  function insertAtCursor(text) {
+    const start = bodyMd.selectionStart ?? bodyMd.value.length;
+    const end = bodyMd.selectionEnd ?? start;
+    bodyMd.value = bodyMd.value.slice(0, start) + text + bodyMd.value.slice(end);
+    bodyMd.focus();
+    bodyMd.selectionStart = bodyMd.selectionEnd = start + text.length;
+    renderPreview();
+  }
+
+  const toolbarStatus = document.getElementById('toolbar-status');
+  const inlineFile = document.getElementById('inline-file');
+  inlineFile?.addEventListener('change', async () => {
+    const file = inlineFile.files?.[0];
+    if (!file) return;
+    const alt = prompt('Rövid képleírás (mi látható a képen)?', '') ?? '';
+    toolbarStatus.textContent = 'Kép feltöltése…';
+    // Phone photos are scaled down first: the server accepts ~4.5 MB per request.
+    const prepared = window.fodelShrinkImage ? await window.fodelShrinkImage(file) : file;
+    const fd = new FormData();
+    fd.append('file', prepared);
+    fd.append('field', 'inline');
+    const { ok, json } = await post(`/api/portal/content/blog/${postId}/media`, fd, false);
+    inlineFile.value = '';
+    if (!ok || !json.ok) {
+      toolbarStatus.textContent = 'Nem sikerült feltölteni a képet (JPG, PNG vagy WebP lehet).';
+      return;
+    }
+    insertAtCursor(`\n\n![${alt.replace(/[\[\]]/g, '')}](${json.url})\n\n`);
+    toolbarStatus.textContent = 'Kép beszúrva — ne felejtsen el menteni.';
+  });
+
+  document.getElementById('insert-link')?.addEventListener('click', () => {
+    const selected = bodyMd.value.slice(bodyMd.selectionStart, bodyMd.selectionEnd);
+    const href = prompt('Link címe (pl. https://… vagy /hu/ingatlanok/)', 'https://');
+    if (!href || href === 'https://') return;
+    const label = selected || prompt('A link szövege', '') || href;
+    insertAtCursor(`[${label.replace(/[\[\]]/g, '')}](${href.trim()})`);
   });
 
   async function upload(inputId, field, statusId) {
@@ -289,8 +434,9 @@ const publicUrl = post.published ? `${SITE_URL}${path(post.locale, 'blog')}${pos
       if (!file) return;
       const status = document.getElementById(statusId);
       status.textContent = 'Feltöltés…';
+      const prepared = window.fodelShrinkImage ? await window.fodelShrinkImage(file) : file;
       const fd = new FormData();
-      fd.append('file', file);
+      fd.append('file', prepared);
       fd.append('field', field);
       const { ok, json } = await post(`/api/portal/content/blog/${postId}/media`, fd, false);
       status.textContent = ok && json.ok ? 'Feltöltve.' : 'Nem sikerült feltölteni.';
@@ -314,6 +460,18 @@ const publicUrl = post.published ? `${SITE_URL}${path(post.locale, 'blog')}${pos
   .head { margin-bottom: 20px; display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
   .eyebrow { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--taupe); flex-basis: 100%; margin-bottom: 4px; }
   .eyebrow a { text-decoration: underline; text-underline-offset: 2px; }
+  .notice { padding: 12px 16px; margin-bottom: 18px; font-size: var(--fs-small); line-height: 1.6; background: rgba(200, 150, 0, 0.08); border-left: 2px solid #96700b; color: #6b4f08; }
+  .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 8px; }
+  .tool { display: inline-flex; align-items: center; padding: 6px 12px; font-size: var(--fs-micro); letter-spacing: 0.04em; border: 1px solid var(--border); color: var(--ink); background: #fff; cursor: pointer; }
+  .tool:hover { border-color: var(--ink); }
+  .case-fields { display: grid; gap: 12px; margin: 20px 0; padding: 16px; border: 1px solid var(--border); }
+  .case-fields legend { padding: 0 6px; font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; color: var(--taupe); }
+  .versions { list-style: none; font-size: var(--fs-small); margin-bottom: 12px; }
+  .versions li { padding: 4px 0; }
+  .versions a { text-decoration: underline; }
+  .version-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .version-actions .hint { flex-basis: 100%; }
+  .link-existing { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
   h1 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 24px; color: var(--ink); }
   h2 { font-family: var(--serif); font-size: 15px; color: var(--ink); margin-bottom: 12px; }
 

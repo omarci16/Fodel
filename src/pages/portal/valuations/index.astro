@@ -6,6 +6,8 @@ export const prerender = false;
 
 import Portal from '~/layouts/Portal.astro';
 import { eur } from '~/lib/format';
+import { VALUATION_STATUS_LABEL as STATUS_LABEL } from '~/lib/portal/labels';
+import { getTaxonomy, termLabel } from '~/lib/runtime-config';
 
 const { supabase, profile } = Astro.locals;
 if (profile?.role !== 'admin') return Astro.redirect('/portal/dashboard');
@@ -21,13 +23,9 @@ if (filter) query = query.eq('status', filter);
 
 const { data: valuations } = await query;
 
-const STATUS_LABEL: Record<string, string> = {
-  queued: 'Feldolgozásra vár',
-  insufficient_data: 'Kevés összehasonlító adat',
-  needs_review: 'Ellenőrzésre vár',
-  approved: 'Jóváhagyva',
-  rejected: 'Elvetve',
-};
+// The form stores the category key; an admin reads its Hungarian name.
+const taxonomy = await getTaxonomy();
+const categoryName = (key: string) => termLabel(taxonomy.category.find((term) => term.key === key), 'hu') || key;
 
 const dateFmt = new Intl.DateTimeFormat('hu-HU', { year: 'numeric', month: 'short', day: 'numeric' });
 ---
@@ -53,7 +51,7 @@ const dateFmt = new Intl.DateTimeFormat('hu-HU', { year: 'numeric', month: 'shor
           <tr>
             <td class="nowrap">{dateFmt.format(new Date(v.created_at))}</td>
             <td>{v.source === 'public_lead' ? 'Nyilvános' : 'Admin'}</td>
-            <td>{v.category} · {v.county}{v.settlement ? `, ${v.settlement}` : ''}</td>
+            <td>{categoryName(v.category)} · {v.county}{v.settlement ? `, ${v.settlement}` : ''}</td>
             <td>{v.contact_name ?? '—'}</td>
             <td class="right">{v.low_eur ? `${eur(v.low_eur)} – ${eur(v.high_eur)}` : '—'}</td>
             <td>
@@ -90,7 +88,7 @@ const dateFmt = new Intl.DateTimeFormat('hu-HU', { year: 'numeric', month: 'shor
 
   .pill { display: inline-block; font-size: var(--fs-micro); padding: 3px 10px; border: 1px solid var(--border); white-space: nowrap; }
   .pill-approved { background: rgba(16, 42, 67, 0.08); border-color: var(--ink); }
-  .pill-needs_review, .pill-queued { background: rgba(200, 150, 0, 0.1); border-color: #96700b; color: #6b4f08; }
+  .pill-needs_review, .pill-queued, .pill-needs_info { background: rgba(200, 150, 0, 0.1); border-color: #96700b; color: #6b4f08; }
   .pill-rejected, .pill-insufficient_data { opacity: 0.6; }
 
   @media (max-width: 860px) {

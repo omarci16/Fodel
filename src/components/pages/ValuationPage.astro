@@ -12,7 +12,8 @@ import PageHeader from '~/components/PageHeader.astro';
 import FormShell from '~/components/forms/FormShell.astro';
 import Field from '~/components/forms/Field.astro';
 import { UI, type Locale } from '~/i18n/ui';
-import { getTaxonomy, termLabel } from '~/lib/runtime-config';
+import { getCompany, getTaxonomy, termLabel } from '~/lib/runtime-config';
+import { VALUATION_QUESTIONS, questionField } from '~/data/valuation-questions';
 import { alternatesFor } from '~/lib/page';
 import { serviceSchema } from '~/lib/seo';
 
@@ -23,38 +24,67 @@ interface Props {
 const { locale } = Astro.props;
 const ui = UI[locale];
 const hu = locale === 'hu';
+const { services } = await getCompany();
+// "Free" is a promise: it only appears once the launch service is confirmed
+// free of charge in /portal/settings/services (brief §1/A).
+const free = services.valuationFreeConfirmed;
 
 const t = hu
   ? {
-      metaTitle: 'Ingyenes értékbecslés — Mennyit ér az ingatlana?',
+      metaTitle: free ? 'Ingyenes értékbecslés — Mennyit ér az ingatlana?' : 'Értékbecslés — Mennyit ér az ingatlana?',
       metaDescription:
         'Töltse ki az űrlapot, és egy munkanapon belül e-mailben elküldjük tájékoztató jellegű árbecslésünket, hasonló eladott és hirdetett ingatlanok alapján.',
       eyebrow: 'Értékbecslés',
       title: 'Mennyit ér',
       titleEm: 'az ingatlana?',
       body: 'Adja meg az ingatlan adatait. Munkatársunk hasonló ingatlanok alapján tájékoztató jellegű becslést készít, és egy munkanapon belül e-mailben elküldi.',
-      formHead: 'Ingyenes becslés kérése',
+      formHead: free ? 'Ingyenes becslés kérése' : 'Becslés kérése',
       submit: 'Becslés kérése',
       successTitle: 'Köszönjük!',
       successBody: 'Megkaptuk az adatokat. Egy munkanapon belül e-mailben elküldjük a becslést.',
       disclaimer:
         'Tájékoztató jellegű becslés, nem értékbecslői szakvélemény. Nem helyettesíti a hivatalos ingatlanértékelést, és abból jog nem származik.',
+      questionsHead: 'Kiegészítő kérdések',
+      questionsBody: 'Mind nem kötelező. Ha valamit nem tud biztosan, válassza a „Nem tudom” lehetőséget — ez nem számít kedvezőtlen válasznak.',
+      choose: 'Válasszon…',
+      photosLabel: 'Fényképek',
+      photosHint:
+        'Legfeljebb 6 kép, JPG, PNG vagy WebP formátumban. Világos, éles, az ingatlant kívül-belül bemutató képek segítik munkatársunkat a becslésben. A nagy képeket a böngésző küldés előtt lekicsinyíti.',
+      photosTooMany: 'Legfeljebb 6 képet csatolhat — az első 6-ot tartottuk meg.',
+      photosTooBig: 'Néhány kép túl nagy volt, ezeket kihagytuk — kérjük, válasszon kisebb vagy kevesebb képet.',
+      photosReady: 'Csatolt képek: {n}.',
+      photosWorking: 'Képek előkészítése…',
+      photosPick: 'Képek kiválasztása',
     }
   : {
-      metaTitle: 'Gratis waardebepaling — Wat is uw woning waard?',
+      metaTitle: free ? 'Gratis waardebepaling — Wat is uw woning waard?' : 'Waardebepaling — Wat is uw woning waard?',
       metaDescription:
         'Vul het formulier in en ontvang binnen één werkdag een indicatieve schatting per e-mail, gebaseerd op vergelijkbare verkochte en aangeboden woningen.',
       eyebrow: 'Waardebepaling',
       title: 'Wat is uw woning',
       titleEm: 'waard?',
       body: 'Geef de gegevens van de woning door. Onze medewerker maakt op basis van vergelijkbare woningen een indicatieve schatting en stuurt die binnen één werkdag per e-mail.',
-      formHead: 'Gratis schatting aanvragen',
+      formHead: free ? 'Gratis schatting aanvragen' : 'Schatting aanvragen',
       submit: 'Schatting aanvragen',
       successTitle: 'Dank u wel!',
       successBody: 'Wij hebben uw gegevens ontvangen. Binnen één werkdag ontvangt u de schatting per e-mail.',
       disclaimer:
         'Indicatieve schatting, geen taxatierapport. Vervangt geen officiële taxatie en hieraan kunnen geen rechten worden ontleend.',
+      questionsHead: 'Aanvullende vragen',
+      questionsBody: 'Allemaal optioneel. Weet u iets niet zeker, kies dan „Weet ik niet” — dat telt niet als ongunstig antwoord.',
+      choose: 'Kies…',
+      photosLabel: "Foto's",
+      photosHint:
+        "Maximaal 6 foto's, als JPG, PNG of WebP. Lichte, scherpe foto's van binnen en buiten helpen onze medewerker bij de schatting. Grote foto's worden vóór verzending door de browser verkleind.",
+      photosTooMany: "U kunt maximaal 6 foto's toevoegen — de eerste 6 zijn bewaard.",
+      photosTooBig: "Enkele foto's waren te groot en zijn weggelaten — kies kleinere of minder foto's.",
+      photosReady: "Toegevoegde foto's: {n}.",
+      photosWorking: "Foto's voorbereiden…",
+      photosPick: "Foto's kiezen",
     };
+
+// The accuracy notice is approved wording, editable in /portal/settings/services.
+const notice = services.valuationNotice?.[locale]?.trim() || t.disclaimer;
 
 const taxonomy = await getTaxonomy();
 const categoryOptions = taxonomy.category.filter((term) => term.enabled).map((term) => ({
@@ -87,6 +117,7 @@ const countyOptions = taxonomy.county.filter((term) => term.enabled).map((term) 
         submitLabel={t.submit}
         successTitle={t.successTitle}
         successBody={t.successBody}
+        multipart
       >
         <Field locale={locale} name="name" label={ui.form.name} required autocomplete="name" span="half" />
         <Field locale={locale} name="email" label={ui.form.email} type="email" required autocomplete="email" span="half" />
@@ -120,12 +151,95 @@ const countyOptions = taxonomy.county.filter((term) => term.enabled).map((term) 
           placeholder={hu ? 'pl. jó, felújítandó' : 'bijv. goed, opknapper'}
           span="full"
         />
+
+        <div class="photo-field">
+          <label for="f-photos">
+            {t.photosLabel} <span class="req">({ui.form.optional})</span>
+          </label>
+          <p class="hint" id="f-photos-hint">{t.photosHint}</p>
+          <div class="photo-drop">
+          <span class="photo-pick" aria-hidden="true">{t.photosPick}</span>
+          <input
+            id="f-photos"
+            name="photos"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            multiple
+            aria-describedby="f-photos-hint f-photos-status"
+            data-too-many={t.photosTooMany}
+            data-too-big={t.photosTooBig}
+            data-ready={t.photosReady}
+            data-working={t.photosWorking}
+          />
+          </div>
+          <p class="photo-status" id="f-photos-status" role="status"></p>
+        </div>
+
+        <fieldset class="questions">
+          <legend>{t.questionsHead}</legend>
+          <p class="questions-body">{t.questionsBody}</p>
+          <div class="questions-grid">
+            {VALUATION_QUESTIONS.map((question) => (
+              <Field
+                locale={locale}
+                name={questionField(question.id)}
+                label={question.label[locale]}
+                type="select"
+                options={[
+                  { value: '', label: t.choose },
+                  ...question.options.map((option) => ({ value: option.value, label: option.label[locale] })),
+                ]}
+                span="full"
+              />
+            ))}
+          </div>
+        </fieldset>
       </FormShell>
 
-      <p class="disclaimer">{t.disclaimer}</p>
+      <p class="disclaimer">{notice}</p>
     </div>
   </section>
 </Base>
+
+<script>
+  import { shrinkImage } from '~/scripts/shrink-image';
+
+  /* The whole request must stay under Vercel's 4.5 MB body limit, so photos
+     are scaled down here and swapped back into the input before submit. */
+  const MAX_PHOTOS = 6;
+  const MAX_TOTAL = 4 * 1024 * 1024;
+  const input = document.getElementById('f-photos') as HTMLInputElement | null;
+  const status = document.getElementById('f-photos-status');
+
+  input?.addEventListener('change', async () => {
+    if (!input.files || !status) return;
+    const picked = Array.from(input.files);
+    const notes: string[] = [];
+    if (picked.length > MAX_PHOTOS) notes.push(input.dataset.tooMany ?? '');
+    status.textContent = input.dataset.working ?? '';
+
+    // Step down in size until the set fits; only then leave photos out.
+    const originals = picked.slice(0, MAX_PHOTOS);
+    let prepared: File[] = [];
+    for (const [edge, quality] of [[1600, 0.82], [1280, 0.75], [1024, 0.7]]) {
+      prepared = [];
+      for (const file of originals) prepared.push(await shrinkImage(file, edge, quality));
+      if (prepared.reduce((sum, file) => sum + file.size, 0) <= MAX_TOTAL) break;
+    }
+
+    const transfer = new DataTransfer();
+    let total = 0;
+    for (const file of prepared) {
+      if (total + file.size > MAX_TOTAL) continue;
+      total += file.size;
+      transfer.items.add(file);
+    }
+    if (transfer.files.length < prepared.length) notes.push(input.dataset.tooBig ?? '');
+    if (transfer.files.length > 0) notes.push((input.dataset.ready ?? '').replace('{n}', String(transfer.files.length)));
+    input.files = transfer.files;
+    status.textContent = notes.filter(Boolean).join(' ');
+  });
+</script>
 
 <style>
   .form-section {
@@ -156,6 +270,101 @@ const countyOptions = taxonomy.county.filter((term) => term.enabled).map((term) 
     padding: 16px 20px;
     border-radius: var(--r-md);
     background: rgba(16, 42, 67, 0.04);
+  }
+
+  .photo-field,
+  .questions {
+    grid-column: 1 / -1;
+  }
+  .photo-field {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 18px;
+  }
+  .photo-field label {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 2px 8px;
+    font-size: var(--fs-small);
+    font-weight: var(--fw-medium);
+    line-height: 1.4;
+    color: var(--ink);
+    margin-bottom: 9px;
+  }
+  .req {
+    font-size: 13px;
+    font-weight: var(--fw-regular);
+    color: var(--taupe);
+  }
+  .hint,
+  .questions-body {
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: var(--taupe);
+    margin: -3px 0 12px;
+  }
+  /* The native picker speaks the browser's language ("Choose Files"); a
+     transparent input over our own localised pill keeps the page in one. */
+  .photo-drop {
+    position: relative;
+    display: flex;
+    align-items: center;
+    padding: 14px 18px;
+    border: 1px dashed rgba(16, 42, 67, 0.28);
+    border-radius: var(--r-sm);
+    background: var(--white);
+    transition: border-color 0.3s var(--ease-out);
+  }
+  .photo-drop:hover {
+    border-color: var(--ink);
+  }
+  .photo-drop:focus-within {
+    outline: var(--focus-ring);
+    outline-offset: 3px;
+  }
+  .photo-pick {
+    padding: 8px 18px;
+    border-radius: 999px;
+    background: var(--ink);
+    color: var(--cream);
+    font-size: var(--fs-small);
+  }
+  .photo-field input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .photo-status {
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: var(--taupe);
+    margin-top: 7px;
+    min-height: 1.5em;
+  }
+  .questions {
+    border: 0;
+    margin: 8px 0 10px;
+    padding: 22px 0 0;
+    border-top: 1px solid rgba(16, 42, 67, 0.08);
+    min-width: 0;
+  }
+  .questions legend {
+    float: left;
+    width: 100%;
+    font-family: var(--serif);
+    font-weight: var(--fw-medium);
+    font-size: 20px;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+    margin-bottom: 8px;
+  }
+  .questions-body {
+    clear: both;
+    margin-top: 0;
   }
 
   @media (max-width: 700px) {

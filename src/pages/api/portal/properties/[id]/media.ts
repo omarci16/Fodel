@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
-import { processAndUploadImage, MediaUploadError } from '~/lib/media';
+import { processAndUploadImage, MediaUploadError, LOW_RESOLUTION_EDGE } from '~/lib/media';
+import { OWNER_EDITABLE } from '~/lib/portal/properties';
 import { logEvent } from '~/lib/activity';
 
 export const prerender = false;
@@ -12,12 +13,18 @@ export const POST: APIRoute = async ({ request, params, locals }) => {
 
   const { data: property } = await supabase
     .from('properties')
-    .select('id, owner_id')
+    .select('id, owner_id, status')
     .eq('id', id)
     .maybeSingle();
   if (!property) return json(404, { ok: false, error: 'not-found' });
-  if (profile?.role !== 'admin' && property.owner_id !== user?.id) {
+  const isAdmin = profile?.role === 'admin';
+  if (!isAdmin && property.owner_id !== user?.id) {
     return json(403, { ok: false, error: 'forbidden' });
+  }
+  // A submitted or live listing's photos change only through review — a
+  // re-upload must not slip past the human approval (brief §7).
+  if (!isAdmin && !OWNER_EDITABLE.includes(property.status)) {
+    return json(409, { ok: false, error: 'not-editable' });
   }
 
   const form = await request.formData();
@@ -57,7 +64,10 @@ export const POST: APIRoute = async ({ request, params, locals }) => {
       source: 'portal',
     }).catch(() => {});
 
-    return json(200, { ok: true, id: data.id });
+    // Not a rejection: a small photo is still a photo. But the seller should
+    // know it will look soft on a large screen while they can still replace it.
+    const lowResolution = Math.max(uploaded.originalWidth, uploaded.originalHeight) < LOW_RESOLUTION_EDGE;
+    return json(200, { ok: true, id: data.id, warning: lowResolution ? 'low-resolution' : undefined });
   } catch (e) {
     if (e instanceof MediaUploadError) return json(422, { ok: false, error: e.code });
     return json(500, { ok: false, error: 'unexpected' });

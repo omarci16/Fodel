@@ -1,6 +1,12 @@
 ---
-export const prerender = true;
+// Server-rendered since 2.1 so the newest DE articles appear without a
+// rebuild; the bridge content itself is unchanged. Cached at the CDN.
+export const prerender = false;
+Astro.response.headers.set('Cache-Control', 's-maxage=300, stale-while-revalidate=86400');
 import LocaleBridgePage from '~/components/pages/LocaleBridgePage.astro';
+import { latestArticles } from '~/lib/blog';
+
+const posts = await latestArticles('de', 3);
 ---
 
-<LocaleBridgePage locale="de" />
+<LocaleBridgePage locale="de" posts={posts} />

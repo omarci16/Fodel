@@ -13,6 +13,7 @@
  */
 import type { APIRoute } from 'astro';
 import { logEvent } from '~/lib/activity';
+import { eventLabel } from '~/lib/portal/labels';
 
 export const prerender = false;
 
@@ -26,7 +27,7 @@ function csvCell(value: unknown): string {
 export const GET: APIRoute = async ({ url, locals }) => {
   const { supabase, profile, user } = locals;
   if (profile?.role !== 'admin') {
-    return new Response('forbidden', { status: 403 });
+    return new Response('Ehhez nincs jogosultsága.', { status: 403 });
   }
 
   const params = url.searchParams;
@@ -53,12 +54,13 @@ export const GET: APIRoute = async ({ url, locals }) => {
   if (error) return new Response(error.message, { status: 500 });
 
   const rows = data ?? [];
-  const header = ['occurred_at', 'kind', 'actor_email', 'subject_type', 'subject_id', 'property_id', 'locale', 'source', 'payload'];
+  const header = ['Időpont', 'Esemény', 'Eseménykód', 'Ki (e-mail)', 'Tárgy típusa', 'Tárgy azonosító', 'Hirdetés azonosító', 'Nyelv', 'Forrás', 'Részletek (JSON)'];
   const lines = [header.join(',')];
   for (const row of rows) {
     lines.push(
       [
         row.occurred_at,
+        eventLabel(row.kind),
         row.kind,
         row.actor_email,
         row.subject_type,
@@ -82,7 +84,8 @@ export const GET: APIRoute = async ({ url, locals }) => {
     payload: { rowCount: rows.length, filters: Object.fromEntries(params) },
   }).catch(() => {});
 
-  return new Response(lines.join('\n'), {
+  // BOM so Excel opens the UTF-8 file with á/ő/ű intact.
+  return new Response('\uFEFF' + lines.join('\n'), {
     status: 200,
     headers: {
       'content-type': 'text/csv; charset=utf-8',

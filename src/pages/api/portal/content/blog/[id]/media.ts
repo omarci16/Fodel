@@ -19,7 +19,11 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
   const { id } = params;
   const form = await request.formData();
   const file = form.get('file');
-  const field = form.get('field') === 'og' ? 'og_image_url' : 'cover_url';
+  const requested = form.get('field');
+  // `inline` is a picture inside the article body: uploaded through the same
+  // pipeline, its URL handed back for the editor to insert — no column changes.
+  const inline = requested === 'inline';
+  const field = requested === 'og' ? 'og_image_url' : 'cover_url';
   if (!(file instanceof File)) return json(400, { ok: false, error: 'no-file' });
 
   const { data: post } = await supabase.from('blog_posts').select('cover_url, og_image_url').eq('id', id).maybeSingle();
@@ -27,6 +31,7 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
 
   try {
     const uploaded = await processAndUploadImage(supabase, id!, file, 'blog-media');
+    if (inline) return json(200, { ok: true, url: uploaded.url, width: uploaded.width, height: uploaded.height });
     const previous = field === 'og_image_url' ? post.og_image_url : post.cover_url;
     if (previous) await deleteImage(supabase, previous, 'blog-media');
 

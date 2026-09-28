@@ -15,6 +15,7 @@
 export const prerender = false;
 
 import Portal from '~/layouts/Portal.astro';
+import { eventLabel } from '~/lib/portal/labels';
 import { activeProperties, similarTo, text, url as propertyUrl } from '~/lib/properties';
 import { SITE_URL } from '~/config/site.mjs';
 
@@ -119,7 +120,7 @@ const mailtoHref = `mailto:${email}${mailtoBody ? `?subject=${encodeURIComponent
           {events.map((e) => (
             <tr>
               <td class="nowrap">{dateFmt.format(new Date(e.occurred_at))}</td>
-              <td><span class="pill">{e.kind}</span></td>
+              <td><span class="pill" title={e.kind}>{eventLabel(e.kind)}</span></td>
               <td class="sub">{e.source ?? '—'}</td>
             </tr>
           ))}

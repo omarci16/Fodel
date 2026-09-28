@@ -4,28 +4,28 @@
  * which were byte-identical apart from a locale literal. Supabase-backed
  * since FODEL 1.2; see src/lib/blog.ts.
  *
- * Renders 404 itself (rather than the route file) so both thin wrappers stay
- * truly thin — locale in, a real Response or nothing else out.
+ * The route file looks the post up and answers 404 itself: a Response
+ * returned from inside a component is dropped, so a missing slug used to
+ * render an empty page with status 200 (and a five-minute CDN cache).
  */
 export const prerender = false;
 
+import { getImage } from 'astro:assets';
 import Button from '~/components/Button.astro';
 import Base from '~/layouts/Base.astro';
 import { UI, path, type Locale, LOCALES } from '~/i18n/ui';
 import { crumbs } from '~/lib/page';
 import { articleSchema, breadcrumbSchema } from '~/lib/seo';
 import { formatDate } from '~/lib/format';
-import { postBySlug, siblingPost } from '~/lib/blog';
+import { siblingPost, type BlogPost } from '~/lib/blog';
 import { renderMarkdown } from '~/lib/markdown';
 
 interface Props {
   locale: Locale;
-  slug: string;
+  post: BlogPost;
 }
 
-const { locale, slug } = Astro.props;
-const post = await postBySlug(locale, slug);
-if (!post) return new Response('Cikk nem található.', { status: 404 });
+const { locale, post } = Astro.props;
 
 const ui = UI[locale];
 const url = `${path(locale, 'blog')}${post.slug}/`;
@@ -41,6 +41,28 @@ const alternates: Partial<Record<Locale, string>> = {
   ...(sibling ? { [otherLocale]: `${path(otherLocale, 'blog')}${sibling.slug}/` } : {}),
 };
 
+// The article's own share picture, cut to the 1200×630 the page's og:image
+// tags declare — the same treatment property pages get. Without one the site
+// default is used, never a guessed size.
+const shareSource = post.og_image_url ?? post.cover_url;
+let ogImage: string | undefined;
+if (shareSource) {
+  try {
+    ogImage = (await getImage({ src: shareSource, width: 1200, height: 630, fit: 'cover', format: 'jpg' })).src;
+  } catch (error) {
+    console.error('[article] share image could not be prepared', error);
+  }
+}
+
+const isCase = post.kind === 'case_study';
+const caseSections = isCase
+  ? [
+      { title: locale === 'hu' ? 'Módszertan' : 'Methode', md: post.case_method },
+      { title: locale === 'hu' ? 'Eredmények' : 'Resultaten', md: post.case_results },
+      { title: locale === 'hu' ? 'Források' : 'Bronnen', md: post.case_sources },
+    ].filter((section) => section.md?.trim())
+  : [];
+
 const trail = crumbs(locale, [
   { name: ui.nav.blog, url: path(locale, 'blog') },
   { name: post.title, url },
@@ -53,6 +75,7 @@ const trail = crumbs(locale, [
   description={post.seo_description || post.excerpt}
   alternates={alternates}
   ogType="article"
+  ogImage={ogImage}
   schema={[
     articleSchema({
       title: post.title,
@@ -77,7 +100,7 @@ const trail = crumbs(locale, [
 
   <article class="article">
     <header>
-      <span class="pill">{post.category}</span>
+      <span class="pill">{isCase ? (locale === 'hu' ? 'Esettanulmány' : 'Casestudy') : post.category}</span>
       <h1>{post.title}</h1>
       <p class="meta">
         {post.published_at && (
@@ -93,6 +116,13 @@ const trail = crumbs(locale, [
 
     <div class="prose" set:html={html} />
 
+    {caseSections.map((section) => (
+      <section class="case-section">
+        <h2>{section.title}</h2>
+        <div class="prose" set:html={renderMarkdown(section.md!)} />
+      </section>
+    ))}
+
     <footer class="foot">
       <Button variant="text" href={path(locale, 'blog')}>{ui.nav.blog}</Button>
       <Button variant="dark" href={path(locale, 'properties')}>{ui.cta.browseProperties}</Button>
@@ -101,6 +131,19 @@ const trail = crumbs(locale, [
 </Base>
 
 <style>
+  .case-section {
+    margin-top: 48px;
+    padding-top: 32px;
+    border-top: 1px solid var(--border);
+  }
+  .case-section h2 {
+    font-family: var(--serif);
+    font-weight: var(--fw-medium);
+    font-size: clamp(22px, 2vw, 28px);
+    letter-spacing: -0.015em;
+    color: var(--ink);
+    margin-bottom: 16px;
+  }
   .crumbs {
     padding: 28px var(--pad-x) 0;
   }

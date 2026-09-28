@@ -22,12 +22,14 @@ import {
   p,
   lead,
   small,
+  linkFallback,
   button,
   quote,
   facts,
   itemisedTotal,
   esc,
   type EmailLocale,
+  type ShellLocale,
 } from './layout';
 
 export type BuiltEmail = { subject: string; html: string; text: string };
@@ -76,7 +78,7 @@ export function registrationConfirm(
         lead(c.intro(settlement)) +
         p(c.body) +
         button(c.cta, opts.acceptUrl) +
-        small(`${common.linkFallback}<br><span style="word-break:break-all;">${esc(opts.acceptUrl)}</span>`) +
+        linkFallback(common.linkFallback, opts.acceptUrl) +
         small(c.expiry) +
         signOff(locale),
     }),
@@ -120,7 +122,7 @@ export function invite(
         h1(c.heading) +
         lead(c.body(roleWord)) +
         button(c.cta, opts.acceptUrl) +
-        small(`${common.linkFallback}<br><span style="word-break:break-all;">${esc(opts.acceptUrl)}</span>`) +
+        linkFallback(common.linkFallback, opts.acceptUrl) +
         small(c.expiry) +
         signOff(locale),
     }),
@@ -135,6 +137,58 @@ ${textCta(c.cta, opts.acceptUrl)}
 ${c.expiry}
 
 ${common.signOff}`,
+    }),
+  };
+}
+
+/**
+ * The invite from an admin-approved template (email_templates, migration
+ * 0014) — the wording Gábor and Éva sign off, in any of the four languages.
+ * Only the link fallback and the expiry line are fixed system text, and the
+ * template editor previews them, so what is approved is the whole email.
+ */
+export type InviteTemplate = { subject: string; heading: string; body: string; cta: string };
+
+export const INVITE_SYSTEM_TEXT: Record<ShellLocale, { linkFallback: string; expiry: string }> = {
+  hu: { linkFallback: HU.common.linkFallback, expiry: HU.invite.expiry },
+  nl: { linkFallback: NL.common.linkFallback, expiry: NL.invite.expiry },
+  en: {
+    linkFallback: 'If the button does not work, copy this address into your browser:',
+    expiry: 'The link is valid for 7 days and can be used once.',
+  },
+  de: {
+    linkFallback: 'Falls die Schaltfläche nicht funktioniert, kopieren Sie diese Adresse in Ihren Browser:',
+    expiry: 'Der Link ist 7 Tage gültig und kann einmal verwendet werden.',
+  },
+};
+
+export function inviteFromTemplate(
+  locale: ShellLocale,
+  template: InviteTemplate,
+  acceptUrl: string
+): BuiltEmail {
+  const system = INVITE_SYSTEM_TEXT[locale];
+  return {
+    subject: template.subject,
+    html: shell({
+      locale,
+      preheader: template.heading,
+      body:
+        h1(template.heading) +
+        lead(template.body) +
+        button(template.cta, acceptUrl) +
+        linkFallback(system.linkFallback, acceptUrl) +
+        small(system.expiry),
+    }),
+    text: textShell({
+      locale,
+      body: `${template.heading}
+
+${template.body}
+
+${textCta(template.cta, acceptUrl)}
+
+${system.expiry}`,
     }),
   };
 }
@@ -464,6 +518,7 @@ export function valuationReady(
   opts: { range: string; compCount: number; submitAdUrl: string }
 ): BuiltEmail {
   const c = copyFor(locale).valuationReady;
+  const disclaimer = opts.compCount > 0 ? c.disclaimerWithCount(opts.compCount) : c.disclaimer;
 
   return {
     subject: c.subject,
@@ -473,13 +528,13 @@ export function valuationReady(
       body:
         h1(c.heading) +
         lead(c.body(opts.range)) +
-        small(c.disclaimerWithCount(opts.compCount)) +
+        small(disclaimer) +
         button(c.cta, opts.submitAdUrl) +
         signOff(locale),
     }),
     text: textShell({
       locale,
-      body: `${c.heading}\n\n${c.body(opts.range)}\n\n${c.disclaimerWithCount(opts.compCount)}\n\n${textCta(c.cta, opts.submitAdUrl)}`,
+      body: `${c.heading}\n\n${c.body(opts.range)}\n\n${disclaimer}\n\n${textCta(c.cta, opts.submitAdUrl)}`,
     }),
   };
 }
@@ -490,6 +545,62 @@ export function valuationDeclined(locale: EmailLocale): BuiltEmail {
     subject: c.subject,
     html: shell({ locale, preheader: c.preheader, body: h1(c.heading) + lead(c.body) + signOff(locale) }),
     text: textShell({ locale, body: `${c.heading}\n\n${c.body}` }),
+  };
+}
+
+/** Admin asked a valuation lead for missing details. The note is the admin's own words. */
+export function valuationNeedsInfo(locale: EmailLocale, opts: { note: string }): BuiltEmail {
+  const c = copyFor(locale).valuationNeedsInfo;
+  const common = copyFor(locale).common;
+  return {
+    subject: c.subject,
+    html: shell({
+      locale,
+      preheader: c.preheader,
+      body: h1(c.heading) + lead(c.body) + quote(opts.note) + p(c.after) + signOff(locale),
+    }),
+    text: textShell({
+      locale,
+      body: `${c.heading}\n\n${c.body}\n\n  "${opts.note.replace(/\n/g, '\n  ')}"\n\n${c.after}\n\n${common.signOff}`,
+    }),
+  };
+}
+
+/* ── Listing rejected ─────────────────────────────────────────────────────── */
+// Terminal, unlike changesRequested: there is no edit link. Whether money goes
+// back is decided by a person — the email only promises contact about it.
+
+export function rejected(
+  locale: EmailLocale,
+  opts: { ref: string; title: string; note: string; refundRequired: boolean }
+): BuiltEmail {
+  const c = copyFor(locale).rejected;
+  const common = copyFor(locale).common;
+  return {
+    subject: c.subject(opts.ref),
+    html: shell({
+      locale,
+      preheader: c.preheader,
+      body:
+        h1(c.heading) +
+        lead(c.body(opts.title, opts.ref)) +
+        quote(opts.note) +
+        (opts.refundRequired ? p(c.refund) : '') +
+        p(c.after) +
+        p(common.signOff),
+    }),
+    text: textShell({
+      locale,
+      body: `${c.heading}
+
+${c.body(opts.title, opts.ref)}
+
+  "${opts.note.replace(/\n/g, '\n  ')}"
+${opts.refundRequired ? `\n${c.refund}\n` : ''}
+${c.after}
+
+${common.signOff}`,
+    }),
   };
 }
 
@@ -712,7 +823,7 @@ export function passwordReset(
         p(common.greeting(opts.name)) +
         lead(c.body) +
         button(c.cta, opts.resetUrl) +
-        small(`${common.linkFallback}<br><span style="word-break:break-all;">${esc(opts.resetUrl)}</span>`) +
+        linkFallback(common.linkFallback, opts.resetUrl) +
         small(c.expiry) +
         small(c.ignore) +
         signOff(locale),
@@ -743,6 +854,7 @@ ${common.signOff}`,
 export const templates = {
   registrationConfirm,
   invite,
+  inviteFromTemplate,
   welcome,
   submissionReceived,
   adminNewSubmission,
@@ -759,4 +871,6 @@ export const templates = {
   creditNoteIssued,
   valuationReady,
   valuationDeclined,
+  valuationNeedsInfo,
+  rejected,
 };

@@ -8,6 +8,13 @@
  *
  *   legacy only: awaiting_payment ──[Stripe / manual / publish_unpaid]──▶ published
  *
+ *   submitted | changes_requested | awaiting_payment ──reject──▶ rejected (terminal)
+ *
+ * 2.1 (brief §7): a listing whose owner was invited with a free listing
+ * (`free_listing`, set only by the server) is approved without an order —
+ * but it is still approved by a person. Nothing — payment, a free invite or
+ * a re-upload — publishes a listing without an admin pressing approve.
+ *
  * FODEL 1.3 changed the approval link again: approval still writes the exact
  * same pending order and due date, but publication no longer waits for money.
  * PAYMENT_GATES_PUBLISHING=true restores the 1.2 gate after a rebuild. Existing
@@ -38,6 +45,7 @@ import {
 import { SITE_URL } from '~/config/site.mjs';
 import { eur } from '~/lib/format';
 import { paymentGatesPublishing } from '~/config/flags';
+import { LISTING_PACKAGES } from '~/config/company';
 
 export const prerender = false;
 
@@ -65,7 +73,7 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
   const { data: property } = await supabase
     .from('properties')
     .select(
-      'id, ref, category, status, owner_id, package, price_huf, price_eur, settlement, county, video_url, homepage_featured, featured, property_translations(locale)'
+      'id, ref, category, status, owner_id, package, price_huf, price_eur, settlement, county, video_url, homepage_featured, featured, free_listing, property_translations(locale)'
     )
     .eq('id', id)
     .maybeSingle();
@@ -127,6 +135,34 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
 
     const owner = await ownerContact(supabase, property.owner_id);
     const locale = owner?.locale ?? 'hu';
+
+    // An admin-granted free listing: approved and published with no order at
+    // all, whatever PAYMENT_GATES_PUBLISHING says — there is nothing to pay.
+    if (property.free_listing) {
+      const requested = String(body.order?.packageId ?? property.package);
+      const packageId = LISTING_PACKAGES.some((pkg) => pkg.id === requested) ? requested : property.package;
+      const { error } = await supabase
+        .from('properties')
+        .update({ package: packageId, approved_at: new Date().toISOString(), approved_by: user!.id })
+        .eq('id', id);
+      if (error) return json(500, { ok: false, error: error.message });
+
+      const published = await publishProperty(supabase, id!, { notifyOwner: true });
+      if (!published.ok) return json(500, { ok: false, error: published.error });
+
+      await logEvent({
+        kind: 'listing.approve',
+        actorId: user!.id,
+        actorEmail: profile?.email ?? null,
+        subjectType: 'property',
+        subjectId: id,
+        propertyId: id,
+        source: 'portal',
+        payload: { free: true, totalCents: 0 },
+      }).catch(() => {});
+
+      return json(200, { ok: true, totalCents: 0, free: true });
+    }
 
     // The admin's confirmed order, or — if the review screen sent nothing —
     // what the listing itself implies. Either way the prices come from the
@@ -431,6 +467,64 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
       propertyId: id,
       source: 'portal',
       payload: { note },
+    }).catch(() => {});
+
+    return json(200, { ok: true });
+  }
+
+  /* ── reject ─────────────────────────────────────────────────────────── */
+  // Terminal. The admin states why, and records whether money has to go
+  // back — a decision for a person, so it is flagged on the listing and on
+  // any settled order, never executed: there is no final refund rule and no
+  // refund integration (brief §7). Unpaid orders are simply cancelled.
+
+  if (action === 'reject') {
+    if (!isAdmin) return json(403, { ok: false });
+    if (!['submitted', 'changes_requested', 'awaiting_payment'].includes(property.status)) {
+      return json(409, { ok: false, error: 'not-reviewable' });
+    }
+    const note = String(body.note ?? '').trim();
+    if (!note) return json(422, { ok: false, error: 'note-required' });
+    const refundRequired = Boolean(body.refundRequired);
+
+    const { error } = await supabase
+      .from('properties')
+      .update({
+        status: 'rejected',
+        rejected_at: new Date().toISOString(),
+        refund_required: refundRequired,
+        published_at: null,
+      })
+      .eq('id', id);
+    if (error) return json(500, { ok: false, error: error.message });
+
+    await supabase.from('review_notes').insert({ property_id: id, author_id: user!.id, note, kind: 'rejection' });
+
+    const admin = createSupabaseAdminClient();
+    await admin.from('payments').update({ status: 'cancelled' }).eq('property_id', id).eq('status', 'pending');
+    if (refundRequired) {
+      await admin
+        .from('payments')
+        .update({ refund_required: true })
+        .eq('property_id', id)
+        .in('status', ['paid', 'manual']);
+    }
+
+    const owner = await ownerContact(supabase, property.owner_id);
+    if (owner) {
+      const title = await listingTitle(supabase, property.id, owner.locale, property.ref);
+      await deliver(owner.email, templates.rejected(owner.locale, { ref: property.ref, title, note, refundRequired }));
+    }
+
+    await logEvent({
+      kind: 'listing.reject',
+      actorId: user!.id,
+      actorEmail: profile?.email ?? null,
+      subjectType: 'property',
+      subjectId: id,
+      propertyId: id,
+      source: 'portal',
+      payload: { note, refundRequired },
     }).catch(() => {});
 
     return json(200, { ok: true });

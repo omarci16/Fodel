@@ -13,6 +13,7 @@ import { LOCALE_OPTIONS } from '~/lib/portal/properties';
 import { extractYouTubeId } from '~/lib/video';
 import { logEvent } from '~/lib/activity';
 import { boundsFor, COUNTRIES } from '~/config/countries';
+import { friendlyError } from '~/lib/portal/labels';
 
 export const prerender = false;
 
@@ -80,8 +81,8 @@ export const POST: APIRoute = async ({ request, params, locals, redirect }) => {
       featured: form.get('featured') === 'yes',
       homepage_featured: form.get('homepage_featured') === 'yes',
       homepage_order: num(form, 'homepage_order') ?? 99,
-      editors_pick: form.get('editors_pick') === 'yes',
-      editors_pick_order: num(form, 'editors_pick_order') ?? 99,
+      // The Top 10 is curated in one place only — /portal/top10 — so its
+      // order can never be set two different ways.
       bargain: form.get('bargain') === 'yes',
       bargain_since: form.get('bargain') === 'yes' ? (existing.bargain_since ?? new Date().toISOString()) : null,
     } : {}),
@@ -115,7 +116,7 @@ export const POST: APIRoute = async ({ request, params, locals, redirect }) => {
   }
 
   const { error: updateError } = await supabase.from('properties').update(patch).eq('id', id);
-  if (updateError) return back('error=' + encodeURIComponent(updateError.message));
+  if (updateError) return back('error=' + encodeURIComponent(friendlyError(updateError.message)));
 
   for (const { value: locale } of LOCALE_OPTIONS) {
     const title = str(form, `title_${locale}`);
@@ -145,7 +146,7 @@ export const POST: APIRoute = async ({ request, params, locals, redirect }) => {
     const { error: trError } = await supabase
       .from('property_translations')
       .upsert(row, { onConflict: 'property_id,locale' });
-    if (trError) return back('error=' + encodeURIComponent(trError.message));
+    if (trError) return back('error=' + encodeURIComponent(friendlyError(trError.message)));
   }
 
   await logEvent({

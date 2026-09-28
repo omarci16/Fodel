@@ -11,6 +11,7 @@ import { graph, organisationSchema, abs } from '~/lib/seo';
 import Nav from '~/components/Nav.astro';
 import Footer from '~/components/Footer.astro';
 import CookieConsent from '~/components/CookieConsent.astro';
+import WhatsApp from '~/components/WhatsApp.astro';
 import '~/styles/global.css';
 import { getCompany } from '~/lib/runtime-config';
 
@@ -27,6 +28,12 @@ interface Props {
   noindex?: boolean;
   /** Property detail pages manage their own top spacing. */
   flush?: boolean;
+  /**
+   * The floating WhatsApp button — on the pages where contact is the point
+   * (home, contact, a listing), rendered here so a page can never show two.
+   * `message` pre-fills the chat; the visitor still sends it themselves.
+   */
+  whatsapp?: { message?: string };
 }
 
 const {
@@ -39,6 +46,7 @@ const {
   schema = [],
   noindex = false,
   flush = false,
+  whatsapp,
 } = Astro.props;
 
 const meta = LOCALE_META[locale];
@@ -111,6 +119,7 @@ const jsonLd = graph([organisationSchema(locale, company), ...schema]);
 
     <Footer locale={locale} />
     <CookieConsent locale={locale} />
+    {whatsapp && <WhatsApp locale={locale} number={company.whatsapp} message={whatsapp.message} variant="floating" />}
 
     <div class="grain" aria-hidden="true"></div>
     <div class="cursor" id="cursor" aria-hidden="true"></div>

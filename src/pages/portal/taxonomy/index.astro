@@ -8,6 +8,15 @@ const { data: terms } = await supabase.from('taxonomy_terms').select('*').order(
 const { data: properties } = await supabase.from('properties').select('category, features, condition_key, heating_key, status');
 const { data: blogPosts } = await supabase.from('blog_posts').select('locale, category, published');
 const groups = ['category','feature','condition','heating','county','region','blog_category'];
+const GROUP_LABEL: Record<string, string> = {
+  category: 'Ingatlantípusok',
+  feature: 'Jellemzők',
+  condition: 'Állapot',
+  heating: 'Fűtés',
+  county: 'Megyék',
+  region: 'Régiók',
+  blog_category: 'Blogkategóriák',
+};
 function counts(term: any) {
   if (term.group_key === 'blog_category') {
     const matches = (blogPosts ?? []).filter((post: any) => post.category === term.labels?.[post.locale]);
@@ -19,10 +28,11 @@ function counts(term: any) {
 }
 ---
 <Portal title="Szótár">
-  <header><p class="eyebrow">Admin</p><h1>Szótár</h1><p>Az új kategóriák mentés után, a gyorsítótár miatt legfeljebb 1 percen belül jelennek meg a nyilvános oldalon.</p></header>
-  <nav class="tabs">{groups.map((group) => <a href={`#${group}`}>{group}</a>)}</nav>
+  <header><p class="eyebrow">Admin</p><h1>Szótár</h1><p>Az új kategóriák mentés után, a gyorsítótár miatt legfeljebb 1 percen belül jelennek meg a nyilvános oldalon.</p>
+    <p class="scope"><strong>Mire hat a szótár?</strong> Az itt megadott szavak a típusok, jellemzők, megyék és blogkategóriák <em>megjelenített nevei</em> az egyes nyelveken (szűrők, kártyák, adatlapok). A hirdetések és cikkek szövegének fordítását nem befolyásolják: a rendszerben jelenleg nincs gépi fordítás, amely ezeket a kifejezéseket használná. Egységes szakmai szóhasználatot a fordításban ez a lista ma nem biztosít — ennek kívánt működését Marcival kell tisztázni.</p></header>
+  <nav class="tabs">{groups.map((group) => <a href={`#${group}`}>{GROUP_LABEL[group] ?? group}</a>)}</nav>
   {groups.map((group) => <section id={group}>
-    <h2>{group}</h2>
+    <h2>{GROUP_LABEL[group] ?? group}</h2>
     <div class="rows">
       {(terms ?? []).filter((term: any) => term.group_key === group).map((term: any) => {
         const use = counts(term); return <form class="term" data-id={term.id} data-live={use.live}>
@@ -44,10 +54,10 @@ function counts(term: any) {
   </section>)}
 </Portal>
 <script is:inline>
-  async function send(body){const response=await fetch('/api/portal/taxonomy',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});return {ok:response.ok,json:await response.json()};}
+  async function send(body){const response=await fetch('/api/portal/taxonomy',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});return {ok:response.ok,json:await response.json().catch(()=>({}))};}
   function labels(data){return Object.fromEntries(['hu','nl','de','en','fr'].map((locale)=>[locale,data.get(locale)]).filter(([,value])=>value));}
-  document.querySelectorAll('.term').forEach((form)=>form.addEventListener('submit',async(event)=>{event.preventDefault();const f=event.currentTarget;const data=new FormData(f);if(!data.has('enabled')&&Number(f.dataset.live)>0&&!confirm(`A kifejezést ${f.dataset.live} élő hirdetés használja. Biztosan kikapcsolja?`))return;const result=await send({action:'save',id:f.dataset.id,labels:labels(data),slugs:{hu:data.get('slugHu'),nl:data.get('slugNl')},schemaType:data.get('schemaType'),sortOrder:data.get('sortOrder'),enabled:data.has('enabled')});f.querySelector('output').textContent=result.ok?'Mentve — a nyilvános oldalon 1 percen belül frissül':result.json.error;}));
-  document.querySelectorAll('[data-delete]').forEach((button)=>button.addEventListener('click',async()=>{const f=button.closest('.term');if(!confirm('Biztosan törli?'))return;const result=await send({action:'delete',id:f.dataset.id});if(result.ok)location.reload();else f.querySelector('output').textContent=result.json.error==='in-use'?`Használatban (${result.json.count}); inkább kapcsolja ki.`:result.json.error;}));
-  document.querySelectorAll('.create').forEach((form)=>form.addEventListener('submit',async(event)=>{event.preventDefault();const f=event.currentTarget;const data=new FormData(f);const result=await send({action:'create',groupKey:f.dataset.group,key:data.get('key'),labels:labels(data),slugs:{hu:data.get('slugHu'),nl:data.get('slugNl')},schemaType:data.get('schemaType')});if(result.ok)location.reload();else f.querySelector('output').textContent=result.json.error;}));
+  document.querySelectorAll('.term').forEach((form)=>form.addEventListener('submit',async(event)=>{event.preventDefault();const f=event.currentTarget;const data=new FormData(f);if(!data.has('enabled')&&Number(f.dataset.live)>0&&!confirm(`A kifejezést ${f.dataset.live} élő hirdetés használja. Biztosan kikapcsolja?`))return;const result=await send({action:'save',id:f.dataset.id,labels:labels(data),slugs:{hu:data.get('slugHu'),nl:data.get('slugNl')},schemaType:data.get('schemaType'),sortOrder:data.get('sortOrder'),enabled:data.has('enabled')});f.querySelector('output').textContent=result.ok?'Mentve — a nyilvános oldalon 1 percen belül frissül':(result.json.error||'Nem sikerült.');}));
+  document.querySelectorAll('[data-delete]').forEach((button)=>button.addEventListener('click',async()=>{const f=button.closest('.term');if(!confirm('Biztosan törli?'))return;const result=await send({action:'delete',id:f.dataset.id});if(result.ok)location.reload();else f.querySelector('output').textContent=result.json.error||'Nem sikerült.';}));
+  document.querySelectorAll('.create').forEach((form)=>form.addEventListener('submit',async(event)=>{event.preventDefault();const f=event.currentTarget;const data=new FormData(f);const result=await send({action:'create',groupKey:f.dataset.group,key:data.get('key'),labels:labels(data),slugs:{hu:data.get('slugHu'),nl:data.get('slugNl')},schemaType:data.get('schemaType')});if(result.ok)location.reload();else f.querySelector('output').textContent=result.json.error||'Nem sikerült.';}));
 </script>
-<style>header{margin-bottom:28px}.tabs{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:36px}.tabs a{text-decoration:underline}section{margin-bottom:56px;scroll-margin-top:90px}.rows{display:grid;gap:8px}.term,.create{display:grid;grid-template-columns:120px repeat(5,minmax(95px,1fr)) repeat(3,minmax(100px,1fr)) 80px 130px auto auto auto;gap:8px;align-items:center;padding:10px;border:1px solid var(--border);overflow-x:auto}input{min-width:0;padding:8px;border:1px solid var(--border)}button{padding:8px 12px}.create{margin-top:12px}@media(max-width:1000px){.term,.create{grid-template-columns:1fr 1fr}}</style>
+<style>header{margin-bottom:28px}.scope{max-width:760px;margin-top:14px;padding:14px 18px;background:rgba(16,42,67,.05);border-left:2px solid var(--ink);font-size:var(--fs-small);line-height:1.65}.tabs{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:36px}.tabs a{text-decoration:underline}section{margin-bottom:56px;scroll-margin-top:90px}.rows{display:grid;gap:8px}.term,.create{display:grid;grid-template-columns:120px repeat(5,minmax(95px,1fr)) repeat(3,minmax(100px,1fr)) 80px 130px auto auto auto;gap:8px;align-items:center;padding:10px;border:1px solid var(--border);overflow-x:auto}input{min-width:0;padding:8px;border:1px solid var(--border)}button{padding:8px 12px}.create{margin-top:12px}@media(max-width:1000px){.term,.create{grid-template-columns:1fr 1fr}}</style>

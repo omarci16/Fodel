@@ -14,6 +14,7 @@
 export const prerender = false;
 
 import Portal from '~/layouts/Portal.astro';
+import { EVENT_LABEL, eventLabel } from '~/lib/portal/labels';
 
 const { supabase, profile } = Astro.locals;
 if (profile?.role !== 'admin') return Astro.redirect('/portal/dashboard');
@@ -54,27 +55,10 @@ const { data: properties } = propertyIds.length
   : { data: [] };
 const refById = new Map((properties ?? []).map((p: any) => [p.id, p.ref]));
 
-// Supabase has no cheap "distinct kind" helper without a view, and this
-// table's kinds are a small, known set defined entirely in application code
-// (every src/lib/activity.ts call site). Listed by hand rather than queried.
-const KNOWN_KINDS = [
-  'enquiry.created',
-  'search_request.created',
-  'listing.intake',
-  'callback.requested',
-  'referral.created',
-  'listing.submit',
-  'listing.approve',
-  'listing.request_changes',
-  'listing.mark_sold',
-  'listing.archive',
-  'listing.edited',
-  'listing.published',
-  'media.uploaded',
-  'payment.manual',
-  'auth.login',
-  'auth.registered',
-];
+// The kinds are a known set written only by application code (every
+// src/lib/activity.ts call site), so the filter chips come from the same
+// label table that names them — one list, not two that can drift apart.
+const KNOWN_KINDS = Object.keys(EVENT_LABEL);
 
 const nextCursor = events && events.length === PAGE_SIZE ? events[events.length - 1].occurred_at : null;
 
@@ -85,6 +69,12 @@ const dateFmt = new Intl.DateTimeFormat('hu-HU', {
   hour: '2-digit',
   minute: '2-digit',
 });
+
+// The export follows exactly the filter on screen (minus the page cursor —
+// it exports every matching row, not just this page).
+const exportParams = new URLSearchParams(params);
+exportParams.delete('before');
+const exportHref = `/api/portal/database/export${exportParams.size ? `?${exportParams}` : ''}`;
 
 const withParam = (key: string, value: string) => {
   const next = new URLSearchParams(params);
@@ -99,7 +89,7 @@ const withParam = (key: string, value: string) => {
   <header class="head">
     <p class="eyebrow">Adatbázis</p>
     <h1>Aktivitási napló</h1>
-    <a href="/api/portal/database/export" class="export-link">CSV export (aktuális szűrés, max. 10 000 sor) →</a>
+    <a href={exportHref} class="export-link">CSV export (aktuális szűrés, max. 10 000 sor) →</a>
   </header>
 
   <form method="GET" class="filters">
@@ -107,7 +97,7 @@ const withParam = (key: string, value: string) => {
     <div class="chips">
       <a href={withParam('kind', '')} aria-current={!kind ? 'page' : undefined}>Mind</a>
       {KNOWN_KINDS.map((k) => (
-        <a href={withParam('kind', k)} aria-current={kind === k ? 'page' : undefined}>{k}</a>
+        <a href={withParam('kind', k)} aria-current={kind === k ? 'page' : undefined}>{eventLabel(k)}</a>
       ))}
     </div>
     <div class="row">
@@ -117,6 +107,8 @@ const withParam = (key: string, value: string) => {
           <option value="" selected={!locale}>Mind</option>
           <option value="hu" selected={locale === 'hu'}>HU</option>
           <option value="nl" selected={locale === 'nl'}>NL</option>
+          <option value="en" selected={locale === 'en'}>EN</option>
+          <option value="de" selected={locale === 'de'}>DE</option>
         </select>
       </label>
       <label>
@@ -148,7 +140,7 @@ const withParam = (key: string, value: string) => {
         {events.map((e) => (
           <tr>
             <td class="nowrap">{dateFmt.format(new Date(e.occurred_at))}</td>
-            <td><span class="pill">{e.kind}</span></td>
+            <td><span class="pill" title={e.kind}>{eventLabel(e.kind)}</span></td>
             <td>
               {e.actor_email ? <a href={`/portal/database/people/${encodeURIComponent(e.actor_email)}`}>{e.actor_email}</a> : '—'}
             </td>

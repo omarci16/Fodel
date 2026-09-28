@@ -54,6 +54,13 @@ const SAMPLE_ORDER: Record<Locale, { label: string; amount: string }[]> = {
   ],
 };
 
+const SAMPLE_INVITE = {
+  subject: '[MINTA] Meghívó a FODEL portálra',
+  heading: '[MINTA] Meghívó',
+  body: 'Ez mintaszöveg. A végleges meghívószöveget Gábor és Éva adja meg a Beállítások → Meghívólevelek oldalon.',
+  cta: 'Meghívó elfogadása',
+};
+
 /** Every template with sample arguments that exercise its longest branch. */
 const CASES: Record<string, (locale: Locale) => BuiltEmail> = {
   registrationConfirm: (l) =>
@@ -152,6 +159,43 @@ const CASES: Record<string, (locale: Locale) => BuiltEmail> = {
       number: 'FD-2026-0001',
       viewUrl: `${SITE_URL}/portal/invoices/FD-2026-0001`,
     }),
+  rejected: (l) =>
+    templates.rejected(l, {
+      ref: SAMPLE_REF,
+      title: SAMPLE_TITLE,
+      note: 'A hirdetett ingatlan nem az Ön tulajdona, és a tulajdonos hozzájárulását nem csatolta.',
+      refundRequired: true,
+    }),
+  rejectedNoRefund: (l) =>
+    templates.rejected(l, {
+      ref: SAMPLE_REF,
+      title: SAMPLE_TITLE,
+      note: 'A hirdetett ingatlan nem az Ön tulajdona, és a tulajdonos hozzájárulását nem csatolta.',
+      refundRequired: false,
+    }),
+  valuationReady: (l) =>
+    templates.valuationReady(l, {
+      range: '€ 142 000 – € 168 000',
+      compCount: 11,
+      submitAdUrl: `${SITE_URL}${l === 'nl' ? '/nl/advertentie-plaatsen/' : '/hu/hirdetes-feladasa/'}`,
+    }),
+  // Priced by hand by an admin: no comparable count to cite.
+  valuationReadyManual: (l) =>
+    templates.valuationReady(l, {
+      range: '€ 142 000 – € 168 000',
+      compCount: 0,
+      submitAdUrl: `${SITE_URL}${l === 'nl' ? '/nl/advertentie-plaatsen/' : '/hu/hirdetes-feladasa/'}`,
+    }),
+  valuationDeclined: (l) => templates.valuationDeclined(l),
+  valuationNeedsInfo: (l) =>
+    templates.valuationNeedsInfo(l, {
+      note: 'Kérjük, küldjön néhány fényképet a ház külsejéről, és írja meg, mikor cserélték a tetőt.',
+    }),
+  // The admin-edited invite text (Beállítások → Meghívólevelek). The body here
+  // is a visible sample, not approved copy.
+  inviteFromTemplate: (l) => templates.inviteFromTemplate(l, SAMPLE_INVITE, `${SITE_URL}/portal/invite/${SAMPLE_TOKEN}`),
+  inviteFromTemplateEn: () => templates.inviteFromTemplate('en', SAMPLE_INVITE, `${SITE_URL}/portal/invite/${SAMPLE_TOKEN}`),
+  inviteFromTemplateDe: () => templates.inviteFromTemplate('de', SAMPLE_INVITE, `${SITE_URL}/portal/invite/${SAMPLE_TOKEN}`),
   creditNoteIssued: (l) =>
     templates.creditNoteIssued(l, {
       ref: SAMPLE_REF,

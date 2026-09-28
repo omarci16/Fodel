@@ -1,18 +1,29 @@
 import type { APIRoute } from 'astro';
 import { deleteImage } from '~/lib/media';
+import { OWNER_EDITABLE } from '~/lib/portal/properties';
 
 export const prerender = false;
 
+/**
+ * An owner may change photos only while the listing is theirs to edit (draft
+ * or changes requested) — the same rule as every other field. A live or
+ * submitted listing's photos change only through review (brief §7). RLS
+ * enforces the same rule independently since migration 0014.
+ */
 async function authorize(locals: App.Locals, propertyId: string) {
   const { supabase, profile, user } = locals;
   const { data: property } = await supabase
     .from('properties')
-    .select('id, owner_id')
+    .select('id, owner_id, status')
     .eq('id', propertyId)
     .maybeSingle();
   if (!property) return { ok: false as const, status: 404 };
-  if (profile?.role !== 'admin' && property.owner_id !== user?.id) {
+  const isAdmin = profile?.role === 'admin';
+  if (!isAdmin && property.owner_id !== user?.id) {
     return { ok: false as const, status: 403 };
+  }
+  if (!isAdmin && !OWNER_EDITABLE.includes(property.status)) {
+    return { ok: false as const, status: 409, error: 'not-editable' };
   }
   return { ok: true as const, supabase };
 }
@@ -23,23 +34,25 @@ const json = (status: number, body: Record<string, unknown>) =>
 export const DELETE: APIRoute = async ({ params, locals }) => {
   const { id, mediaId } = params;
   const auth = await authorize(locals, id!);
-  if (!auth.ok) return json(auth.status, { ok: false });
+  if (!auth.ok) return json(auth.status, { ok: false, error: 'error' in auth ? auth.error : undefined });
 
   const { data: media } = await auth.supabase
     .from('property_media')
     .select('storage_path, is_hero')
     .eq('id', mediaId)
-    .single();
-  if (media) await deleteImage(auth.supabase, media.storage_path);
+    .eq('property_id', id)
+    .maybeSingle();
+  if (!media) return json(404, { ok: false, error: 'not-found' });
+  await deleteImage(auth.supabase, media.storage_path);
 
-  const { error } = await auth.supabase.from('property_media').delete().eq('id', mediaId);
+  const { error } = await auth.supabase.from('property_media').delete().eq('id', mediaId).eq('property_id', id);
   if (error) return json(500, { ok: false, error: error.message });
 
   // Deleting the cover photo must not leave a listing with none. Promote the
   // next one by sort order, or the public page falls back to `media[0]`
   // anyway and the portal's "cover" badge silently disagrees with what the
   // website shows.
-  if (media?.is_hero) {
+  if (media.is_hero) {
     const { data: next } = await auth.supabase
       .from('property_media')
       .select('id')
@@ -67,7 +80,7 @@ export const DELETE: APIRoute = async ({ params, locals }) => {
 export const PATCH: APIRoute = async ({ params, request, locals }) => {
   const { id, mediaId } = params;
   const auth = await authorize(locals, id!);
-  if (!auth.ok) return json(auth.status, { ok: false });
+  if (!auth.ok) return json(auth.status, { ok: false, error: 'error' in auth ? auth.error : undefined });
 
   const body = await request.json().catch(() => ({}));
   const patch: Record<string, unknown> = {};
@@ -81,7 +94,7 @@ export const PATCH: APIRoute = async ({ params, request, locals }) => {
   }
 
   if (Object.keys(patch).length > 0) {
-    const { error } = await auth.supabase.from('property_media').update(patch).eq('id', mediaId);
+    const { error } = await auth.supabase.from('property_media').update(patch).eq('id', mediaId).eq('property_id', id);
     if (error) return json(500, { ok: false, error: error.message });
   }
 
@@ -90,7 +103,8 @@ export const PATCH: APIRoute = async ({ params, request, locals }) => {
     const { error } = await auth.supabase
       .from('property_media')
       .update({ is_hero: true })
-      .eq('id', mediaId);
+      .eq('id', mediaId)
+      .eq('property_id', id);
     if (error) return json(500, { ok: false, error: error.message });
   }
 

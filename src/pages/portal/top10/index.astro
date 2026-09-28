@@ -1,0 +1,230 @@
+---
+/**
+ * FODEL Top 10 — the one place the editorial selection is made.
+ *
+ * Up to ten listings, in order. What the homepage shows is exactly this list,
+ * minus anything that is no longer live (sold, archived, withdrawn, reserved):
+ * those stay here, marked, so the admin decides whether to replace them — the
+ * site never quietly back-fills a slot with a paid or random listing.
+ *
+ * The reorder happens in the browser; "Mentés" sends the whole order at once
+ * (see /api/portal/top10). Without JavaScript the page still shows the
+ * current selection and its public status.
+ */
+export const prerender = false;
+
+import Portal from '~/layouts/Portal.astro';
+import { STATUS_LABEL } from '~/lib/portal/properties';
+
+const { supabase, profile } = Astro.locals;
+if (profile?.role !== 'admin') return Astro.redirect('/portal/dashboard');
+
+const MAX = 10;
+
+const { data: rows } = await supabase
+  .from('properties')
+  .select('id, ref, status, reserved, settlement, price_eur, editors_pick, editors_pick_order, featured, homepage_featured, property_translations(locale, title)')
+  .order('ref', { ascending: true });
+
+type Row = NonNullable<typeof rows>[number];
+const titleOf = (row: Row) =>
+  (row.property_translations as { locale: string; title: string }[] | null)?.find((t) => t.locale === 'hu')?.title || 'Névtelen hirdetés';
+const isLive = (row: Row) => row.status === 'published' && !row.reserved;
+const hiddenReason = (row: Row) =>
+  row.status === 'published' && row.reserved ? 'Foglalt' : STATUS_LABEL[row.status] ?? row.status;
+
+const selected = (rows ?? [])
+  .filter((row) => row.editors_pick)
+  .sort((a, b) => a.editors_pick_order - b.editors_pick_order);
+const candidates = (rows ?? []).filter((row) => !row.editors_pick && isLive(row));
+const liveCount = selected.filter(isLive).length;
+const price = (n: number) => `€${n.toLocaleString('de-DE')}`;
+---
+
+<Portal title="Top 10">
+  <header class="head">
+    <p class="eyebrow">Főoldal</p>
+    <h1>FODEL Top 10</h1>
+    <p class="lede">
+      Szerkesztői válogatás: legfeljebb {MAX} ingatlan, az itt beállított sorrendben. A fizetős
+      kiemelések ettől függetlenek — fizetés önmagában nem ad helyet a listán.
+    </p>
+  </header>
+
+  <p class="summary" id="summary">
+    {selected.length} / {MAX} kiválasztva · {liveCount} jelenik meg a főoldalon
+    {selected.length > liveCount && ' (a nem élő tételek automatikusan rejtve maradnak)'}
+  </p>
+
+  <ol class="picks" id="picks">
+    {selected.map((row) => (
+      <li class="pick" data-id={row.id} data-live={isLive(row) ? 'yes' : 'no'}>
+        <span class="rank num"></span>
+        <div class="pick-main">
+          <a href={`/portal/properties/${row.id}`}>#{row.ref} · {titleOf(row)}</a>
+          <span class="sub">{row.settlement} · {price(row.price_eur)}</span>
+        </div>
+        {isLive(row)
+          ? <span class="pill pill-live">Megjelenik</span>
+          : <span class="pill pill-hidden" title="A főoldalon nem jelenik meg">Rejtve: {hiddenReason(row)}</span>}
+        <div class="pick-actions">
+          <button type="button" data-move="-1" aria-label="Feljebb">↑</button>
+          <button type="button" data-move="1" aria-label="Lejjebb">↓</button>
+          <button type="button" data-remove>Eltávolítás</button>
+        </div>
+      </li>
+    ))}
+  </ol>
+  <p class="empty" id="empty" hidden={selected.length > 0}>
+    A válogatás üres. Amíg így marad, a főoldalon nem jelenik meg Top 10 blokk.
+  </p>
+
+  <div class="add">
+    <label for="candidate">Élő hirdetés hozzáadása</label>
+    <div class="add-row">
+      <select id="candidate">
+        <option value="">Válasszon…</option>
+        {candidates.map((row) => (
+          <option
+            value={row.id}
+            data-label={`#${row.ref} · ${titleOf(row)}`}
+            data-sub={`${row.settlement} · ${price(row.price_eur)}`}
+          >
+            #{row.ref} · {titleOf(row)} — {row.settlement}{row.featured || row.homepage_featured ? ' (fizetős kiemelés)' : ''}
+          </option>
+        ))}
+      </select>
+      <button type="button" class="btn ghost" id="add-btn">Hozzáadás</button>
+    </div>
+    <p class="hint">Csak élő, nem foglalt hirdetés vehető fel.</p>
+  </div>
+
+  <div class="save-row">
+    <button type="button" class="btn" id="save-btn">Mentés</button>
+    <p class="status" id="status" role="status"></p>
+  </div>
+  <p class="hint">Mentés után a főoldal legfeljebb néhány percen belül frissül.</p>
+</Portal>
+
+<script define:vars={{ max: MAX }}>
+  const list = document.getElementById('picks');
+  const select = document.getElementById('candidate');
+  const addBtn = document.getElementById('add-btn');
+  const status = document.getElementById('status');
+  const summary = document.getElementById('summary');
+  const empty = document.getElementById('empty');
+
+  function refresh() {
+    const items = [...list.querySelectorAll('.pick')];
+    items.forEach((item, i) => {
+      item.querySelector('.rank').textContent = String(i + 1);
+      item.querySelector('[data-move="-1"]').disabled = i === 0;
+      item.querySelector('[data-move="1"]').disabled = i === items.length - 1;
+    });
+    const live = items.filter((item) => item.dataset.live === 'yes').length;
+    summary.textContent = `${items.length} / ${max} kiválasztva · ${live} jelenik meg a főoldalon` +
+      (items.length > live ? ' (a nem élő tételek automatikusan rejtve maradnak)' : '');
+    empty.hidden = items.length > 0;
+    addBtn.disabled = items.length >= max;
+    status.textContent = '';
+  }
+
+  list.addEventListener('click', (event) => {
+    const button = event.target.closest('button');
+    if (!button) return;
+    const item = button.closest('.pick');
+    if (button.dataset.move) {
+      const sibling = button.dataset.move === '-1' ? item.previousElementSibling : item.nextElementSibling;
+      if (!sibling) return;
+      if (button.dataset.move === '-1') list.insertBefore(item, sibling);
+      else list.insertBefore(sibling, item);
+      button.focus();
+    } else if (button.hasAttribute('data-remove')) {
+      const option = document.createElement('option');
+      option.value = item.dataset.id;
+      option.textContent = item.querySelector('a').textContent;
+      if (item.dataset.live === 'yes') select.append(option);
+      item.remove();
+    }
+    refresh();
+  });
+
+  addBtn.addEventListener('click', () => {
+    const option = select.selectedOptions[0];
+    if (!option || !option.value) return;
+    if (list.children.length >= max) return;
+    const item = document.createElement('li');
+    item.className = 'pick';
+    item.dataset.id = option.value;
+    item.dataset.live = 'yes';
+    item.innerHTML = `<span class="rank num"></span><div class="pick-main"><a></a><span class="sub"></span></div>
+      <span class="pill pill-live">Megjelenik</span>
+      <div class="pick-actions"><button type="button" data-move="-1" aria-label="Feljebb">↑</button>
+      <button type="button" data-move="1" aria-label="Lejjebb">↓</button>
+      <button type="button" data-remove>Eltávolítás</button></div>`;
+    const link = item.querySelector('a');
+    link.href = `/portal/properties/${option.value}`;
+    link.textContent = option.dataset.label || option.textContent;
+    item.querySelector('.sub').textContent = option.dataset.sub || '';
+    list.append(item);
+    option.remove();
+    select.value = '';
+    refresh();
+  });
+
+  document.getElementById('save-btn').addEventListener('click', async () => {
+    status.textContent = 'Mentés…';
+    const ids = [...list.querySelectorAll('.pick')].map((item) => item.dataset.id);
+    const res = await fetch('/api/portal/top10', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    });
+    const json = await res.json().catch(() => ({}));
+    status.textContent = res.ok && json.ok ? 'Mentve.' : json.error || 'Nem sikerült menteni.';
+  });
+
+  refresh();
+</script>
+
+<style>
+  .head { margin-bottom: 20px; }
+  .eyebrow { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--taupe); margin-bottom: 8px; }
+  h1 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 28px; color: var(--ink); margin-bottom: 10px; }
+  .lede { max-width: 64ch; font-size: var(--fs-small); line-height: 1.6; color: var(--taupe); }
+  .summary { font-size: var(--fs-small); color: var(--ink); margin-bottom: 14px; }
+
+  .picks { list-style: none; border-top: 1px solid var(--border); margin-bottom: 8px; }
+  .pick { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto auto; gap: 14px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .rank { font-family: var(--serif); font-size: 20px; color: var(--ink); text-align: center; }
+  .pick-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .pick-main a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
+  .sub { font-size: var(--fs-micro); color: var(--taupe); }
+  .pill { font-size: var(--fs-micro); padding: 3px 10px; border: 1px solid var(--border); white-space: nowrap; }
+  .pill-live { background: rgba(16, 42, 67, 0.08); border-color: var(--ink); }
+  .pill-hidden { background: rgba(179, 38, 30, 0.06); border-color: #b3261e; color: #b3261e; }
+  .pick-actions { display: flex; gap: 6px; }
+  .pick-actions button { min-width: 36px; font-size: var(--fs-micro); padding: 6px 10px; border: 1px solid var(--border); color: var(--taupe); }
+  .pick-actions button:hover:not(:disabled) { border-color: var(--ink); color: var(--ink); }
+  .pick-actions button:disabled { opacity: 0.35; }
+
+  .empty { color: var(--taupe); font-size: var(--fs-small); padding: 20px 0; }
+
+  .add { margin: 28px 0; max-width: 640px; }
+  .add label { display: block; font-size: var(--fs-eyebrow); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--taupe); margin-bottom: 8px; }
+  .add-row { display: flex; gap: 10px; }
+  .add-row select { flex: 1; min-width: 0; border: 1px solid var(--border); background: #fff; padding: 10px; font-size: var(--fs-small); color: var(--ink); }
+  .hint { font-size: var(--fs-micro); color: var(--taupe); margin-top: 8px; }
+
+  .btn { padding: 11px 22px; background: var(--ink); color: var(--cream); font-size: var(--fs-micro); letter-spacing: var(--ls-button); text-transform: uppercase; }
+  .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--ink); }
+  .btn:disabled { opacity: 0.4; }
+  .save-row { display: flex; align-items: center; gap: 16px; }
+  .status { font-size: var(--fs-small); color: var(--taupe); }
+
+  @media (max-width: 720px) {
+    .pick { grid-template-columns: 28px minmax(0, 1fr); }
+    .pick .pill, .pick-actions { grid-column: 2; justify-self: start; }
+    .add-row { flex-direction: column; }
+  }
+</style>

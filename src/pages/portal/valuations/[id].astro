@@ -11,6 +11,10 @@ export const prerender = false;
 import Portal from '~/layouts/Portal.astro';
 import { eur } from '~/lib/format';
 import type { Comp } from '~/lib/ai/valuation';
+import { VALUATION_STATUS_LABEL as STATUS_LABEL, LOCALE_LABEL } from '~/lib/portal/labels';
+import { describeAnswer } from '~/data/valuation-questions';
+import { getTaxonomy, termLabel } from '~/lib/runtime-config';
+import { createSupabaseAdminClient } from '~/lib/supabase-server';
 
 const { supabase, profile } = Astro.locals;
 if (profile?.role !== 'admin') return Astro.redirect('/portal/dashboard');
@@ -21,19 +25,32 @@ if (!v) return new Response('Nem található.', { status: 404 });
 
 const comps = (v.comps ?? []) as Comp[];
 
-const STATUS_LABEL: Record<string, string> = {
-  queued: 'Feldolgozásra vár',
-  insufficient_data: 'Kevés összehasonlító adat',
-  needs_review: 'Ellenőrzésre vár',
-  approved: 'Jóváhagyva',
-  rejected: 'Elvetve',
-};
+const taxonomy = await getTaxonomy();
+const categoryName = termLabel(taxonomy.category.find((term) => term.key === v.category), 'hu') || v.category;
+
+// Columns from migration 0014; absent (undefined) until it has been run.
+const answers = Object.entries((v.answers ?? {}) as Record<string, string>).map(([key, value]) => describeAnswer(key, value));
+const photoRows = (Array.isArray(v.photos) ? v.photos : []) as { path: string }[];
+const isLead = v.source === 'public_lead' && Boolean(v.contact_email);
+
+// The photos sit in a private bucket; an admin sees them through links that
+// expire after an hour, so a copied URL does not stay public.
+let photos: { url: string }[] = [];
+if (photoRows.length > 0) {
+  const { data: signed } = await createSupabaseAdminClient()
+    .storage.from('valuation-media')
+    .createSignedUrls(photoRows.map((photo) => photo.path), 60 * 60);
+  photos = (signed ?? []).flatMap((row) => (row.signedUrl ? [{ url: row.signedUrl }] : []));
+}
+
+const canCompute = ['queued', 'needs_info', 'insufficient_data'].includes(v.status);
+const canDecide = v.status !== 'queued';
 ---
 
 <Portal title="Értékbecslés">
   <header class="head">
     <p class="eyebrow"><a href="/portal/valuations">← Értékbecslések</a></p>
-    <h1>{v.category} · {v.county}{v.settlement ? `, ${v.settlement}` : ''}</h1>
+    <h1>{categoryName} · {v.county}{v.settlement ? `, ${v.settlement}` : ''}</h1>
     <span class="pill">{STATUS_LABEL[v.status] ?? v.status}</span>
   </header>
 
@@ -42,6 +59,8 @@ const STATUS_LABEL: Record<string, string> = {
       <h2>Adatok</h2>
       <dl class="facts">
         <div><dt>Forrás</dt><dd>{v.source === 'public_lead' ? 'Nyilvános űrlap' : 'Admin (hirdetés)'}</dd></div>
+        <div><dt>Típus</dt><dd>{categoryName}</dd></div>
+        {v.locale && <div><dt>Nyelv</dt><dd>{LOCALE_LABEL[v.locale] ?? v.locale}</dd></div>}
         <div><dt>Alapterület</dt><dd>{v.floor_m2 ?? '—'} m²</dd></div>
         <div><dt>Telek</dt><dd>{v.plot_m2 ?? '—'} m²</dd></div>
         <div><dt>Épült</dt><dd>{v.year_built ?? '—'}</dd></div>
@@ -49,8 +68,41 @@ const STATUS_LABEL: Record<string, string> = {
         {v.contact_name && <div><dt>Kapcsolat</dt><dd>{v.contact_name} · {v.contact_email} · {v.contact_phone ?? '—'}</dd></div>}
       </dl>
 
-      {v.status === 'queued' && (
-        <button type="button" class="btn" id="compute-btn">Számítás futtatása</button>
+      {answers.length > 0 && (
+        <>
+          <h2>Kiegészítő kérdések</h2>
+          <dl class="answers">
+            {answers.map((a) => (
+              <div><dt>{a.question}</dt><dd>{a.answer}</dd></div>
+            ))}
+          </dl>
+        </>
+      )}
+
+      {photoRows.length > 0 && (
+        <>
+          <h2>Fényképek ({photoRows.length})</h2>
+          {photos.length > 0 ? (
+            <ul class="photos">
+              {photos.map((photo, i) => (
+                <li><a href={photo.url} target="_blank" rel="noopener"><img src={photo.url} alt={`Beküldött kép ${i + 1}`} loading="lazy" /></a></li>
+              ))}
+            </ul>
+          ) : (
+            <p class="notice">A képeket most nem sikerült betölteni. Frissítse az oldalt.</p>
+          )}
+        </>
+      )}
+
+      {v.info_request && (
+        <>
+          <h2>Kért hiánypótlás</h2>
+          <p class="info-request">{v.info_request}</p>
+        </>
+      )}
+
+      {canCompute && (
+        <button type="button" class="btn" id="compute-btn">{v.status === 'queued' ? 'Számítás futtatása' : 'Számítás újrafuttatása'}</button>
       )}
 
       {comps.length > 0 && (
@@ -89,21 +141,34 @@ const STATUS_LABEL: Record<string, string> = {
     </div>
 
     <div class="col">
-      {v.low_eur != null && (
+      {canDecide && (
         <form id="band-form" class="panel">
           <h2>Ár-sáv</h2>
-          <label>Alsó (€) <input type="number" name="lowEur" value={v.low_eur} /></label>
-          <label>Közép (€) <input type="number" name="midEur" value={v.mid_eur} /></label>
-          <label>Felső (€) <input type="number" name="highEur" value={v.high_eur} /></label>
-          <label>Megjegyzés <textarea name="note" rows="3">{v.admin_note ?? ''}</textarea></label>
-
-          {(v.status === 'needs_review' || v.status === 'approved' || v.status === 'rejected') && (
-            <div class="actions">
-              <button type="button" class="btn" id="approve-btn">Jóváhagyás és e-mail küldése</button>
-              <button type="button" class="btn ghost" id="reject-btn">Elvetés</button>
-            </div>
+          {v.low_eur == null && (
+            <p class="hint">Nincs számított sáv. Jóváhagyni csak kitöltött sávval lehet — ha kézzel árazza, adja meg mindhárom értéket.</p>
           )}
+          <label>Alsó (€) <input type="number" name="lowEur" min="1" value={v.low_eur ?? ''} /></label>
+          <label>Közép (€) <input type="number" name="midEur" min="1" value={v.mid_eur ?? ''} /></label>
+          <label>Felső (€) <input type="number" name="highEur" min="1" value={v.high_eur ?? ''} /></label>
+          <label>Belső megjegyzés <textarea name="note" rows="3">{v.admin_note ?? ''}</textarea></label>
+
+          <div class="actions">
+            <button type="button" class="btn" id="approve-btn">{isLead ? 'Jóváhagyás és e-mail küldése' : 'Jóváhagyás'}</button>
+            <button type="button" class="btn ghost" id="reject-btn">Elvetés</button>
+          </div>
           <p class="action-status" id="action-status" role="status"></p>
+        </form>
+      )}
+
+      {isLead && v.status !== 'approved' && v.status !== 'rejected' && (
+        <form id="info-form" class="panel">
+          <h2>Hiánypótlás kérése</h2>
+          <p class="hint">Az ügyfél e-mailt kap {v.locale === 'nl' ? 'hollandul' : 'magyarul'}, benne az Ön szövegével. Írja le pontosan, milyen adatot vagy képet kér.</p>
+          <label>Mit kér az ügyféltől? <textarea name="infoNote" rows="4">{v.info_request ?? ''}</textarea></label>
+          <div class="actions">
+            <button type="button" class="btn" id="info-btn">Hiánypótlás kérése</button>
+          </div>
+          <p class="action-status" id="info-status" role="status"></p>
         </form>
       )}
     </div>
@@ -116,7 +181,7 @@ const STATUS_LABEL: Record<string, string> = {
 
   async function post(action, extra = {}) {
     const payload = { action, ...extra };
-    if (form) {
+    if (form && action !== 'request_info') {
       payload.lowEur = Number(form.lowEur?.value) || undefined;
       payload.midEur = Number(form.midEur?.value) || undefined;
       payload.highEur = Number(form.highEur?.value) || undefined;
@@ -130,25 +195,53 @@ const STATUS_LABEL: Record<string, string> = {
     return { ok: res.ok, json: await res.json().catch(() => ({})) };
   }
 
+  const failed = (json) => json.error || 'Nem sikerült. Próbálja újra.';
+
   document.getElementById('compute-btn')?.addEventListener('click', async (e) => {
     e.target.disabled = true;
     e.target.textContent = 'Számítás…';
     const { ok } = await post('compute');
     if (ok) location.reload();
+    else {
+      e.target.disabled = false;
+      e.target.textContent = 'Számítás sikertelen — újra';
+    }
   });
 
   document.getElementById('approve-btn')?.addEventListener('click', async () => {
+    const low = Number(form?.lowEur?.value);
+    const mid = Number(form?.midEur?.value);
+    const high = Number(form?.highEur?.value);
+    if (!(low > 0 && mid > 0 && high > 0) || low > mid || mid > high) {
+      actionStatus.textContent = 'Jóváhagyás előtt adjon meg érvényes ár-sávot (alsó ≤ közép ≤ felső).';
+      return;
+    }
     actionStatus.textContent = 'Feldolgozás…';
-    const { ok } = await post('approve');
-    actionStatus.textContent = ok ? 'Jóváhagyva.' : 'Nem sikerült.';
+    const { ok, json } = await post('approve');
+    actionStatus.textContent = ok ? 'Jóváhagyva.' : failed(json);
     if (ok) setTimeout(() => location.reload(), 600);
   });
 
   document.getElementById('reject-btn')?.addEventListener('click', async () => {
     if (!confirm('Biztosan elveti ezt a becslést?')) return;
     actionStatus.textContent = 'Feldolgozás…';
-    const { ok } = await post('reject');
-    actionStatus.textContent = ok ? 'Elvetve.' : 'Nem sikerült.';
+    const { ok, json } = await post('reject');
+    actionStatus.textContent = ok ? 'Elvetve.' : failed(json);
+    if (ok) setTimeout(() => location.reload(), 600);
+  });
+
+  document.getElementById('info-btn')?.addEventListener('click', async () => {
+    const infoForm = document.getElementById('info-form');
+    const status = document.getElementById('info-status');
+    const note = infoForm.infoNote.value.trim();
+    if (!note) {
+      status.textContent = 'Írja le, milyen adatot vagy képet kér.';
+      return;
+    }
+    if (!confirm('Elküldi a hiánypótlási kérést az ügyfélnek?')) return;
+    status.textContent = 'Küldés…';
+    const { ok, json } = await post('request_info', { note });
+    status.textContent = ok ? 'Elküldve.' : failed(json);
     if (ok) setTimeout(() => location.reload(), 600);
   });
 </script>
@@ -174,6 +267,14 @@ const STATUS_LABEL: Record<string, string> = {
   .right { text-align: right; }
 
   .notice { font-size: var(--fs-small); color: #6b4f08; background: rgba(200, 150, 0, 0.08); padding: 12px 16px; border-left: 2px solid #96700b; }
+  .answers { display: grid; gap: 10px; }
+  .answers dt { font-size: var(--fs-micro); color: var(--taupe); }
+  .answers dd { font-size: var(--fs-small); color: var(--ink); }
+  .photos { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+  .photos img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block; border-radius: 8px; }
+  .info-request { font-size: var(--fs-small); color: var(--ink); white-space: pre-wrap; background: rgba(16, 42, 67, 0.04); padding: 12px 16px; }
+  .hint { font-size: var(--fs-small); color: var(--taupe); line-height: 1.6; }
+  .panel + .panel { margin-top: 32px; padding-top: 8px; border-top: 1px solid var(--border); }
   .ai-adjustment { font-size: var(--fs-small); font-weight: 600; color: var(--ink); }
   .ai-rationale { font-size: var(--fs-small); color: var(--taupe); line-height: 1.7; margin-top: 6px; }
   .ai-factors { font-size: var(--fs-micro); color: var(--taupe); margin-top: 8px; padding-left: 18px; }

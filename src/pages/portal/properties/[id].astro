@@ -22,6 +22,7 @@ import { isStripeEnabled } from '~/lib/stripe';
 import { isAiEnabled } from '~/lib/ai/client';
 import { COMPANY } from '~/config/company';
 import { COUNTRIES } from '~/config/countries';
+import { MAX_UPLOAD_MB, MAX_EDGE, LOW_RESOLUTION_EDGE } from '~/lib/media';
 
 /** A demo photo (bare filename) needs Astro's asset pipeline to become a real URL; a real upload already is one. */
 function mediaSrc(storagePath: string): string {
@@ -80,7 +81,7 @@ const captionOf = (m: (typeof property.media)[number]) =>
 // could not read it back, because review_notes was admin-only. Migration 0005
 // opens it to the listing's owner; this is what that fixes.
 const { data: reviewNotes } =
-  property.status === 'changes_requested'
+  property.status === 'changes_requested' || property.status === 'rejected'
     ? await supabase
         .from('review_notes')
         .select('note, created_at')
@@ -148,12 +149,25 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
     </p>
   )}
 
-  {latestNote && (
+  {latestNote && property.status === 'changes_requested' && (
     <section class="review-note">
       <p class="eyebrow">Munkatársunk megjegyzése</p>
       <blockquote>{latestNote.note}</blockquote>
       <p class="review-note-foot">
-        Kérjük, végezze el a javítást, majd küldje be ismét — a folyamat innen ugyanúgy folytatódik.
+        Kérjük, végezze el a javítást — pótolja vagy cserélje a fényképeket, ha arra van szükség —,
+        majd küldje be ismét. A folyamat innen ugyanúgy folytatódik.
+      </p>
+    </section>
+  )}
+
+  {property.status === 'rejected' && (
+    <section class="review-note rejected">
+      <p class="eyebrow">A hirdetést elutasítottuk</p>
+      {latestNote && <blockquote>{latestNote.note}</blockquote>}
+      <p class="review-note-foot">
+        Az elutasított hirdetés nem szerkeszthető és nem küldhető be újra.
+        {property.refund_required && ' A visszatérítésről munkatársunk külön felveszi Önnel a kapcsolatot.'}
+        {isAdmin && property.refund_required && ' (Admin: visszatérítés szükséges — a Fizetések oldalon rögzíthető.)'}
       </p>
     </section>
   )}
@@ -239,9 +253,12 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
       {isAdmin && <section id="curation"><h2>Kiemelések</h2><div class="checkbox-grid">
         <label class="checkbox"><input type="checkbox" name="featured" value="yes" checked={property.featured} /> Fizetős kategória-kiemelés</label>
         <label class="checkbox"><input type="checkbox" name="homepage_featured" value="yes" checked={property.homepage_featured} /> Fizetős főoldali kiemelés</label>
-        <label class="checkbox"><input type="checkbox" name="editors_pick" value="yes" checked={property.editors_pick} /> FODEL Top 10</label>
         <label class="checkbox"><input type="checkbox" name="bargain" value="yes" checked={property.bargain} /> Alkalmi vétel</label>
-      </div><div class="grid-2"><Field locale="hu" name="homepage_order" label="Főoldali sorrend" type="number" value={String(property.homepage_order)} /><Field locale="hu" name="editors_pick_order" label="Top 10 sorrend" type="number" value={String(property.editors_pick_order)} /></div></section>}
+      </div><div class="grid-2"><Field locale="hu" name="homepage_order" label="Főoldali sorrend (fizetős kiemelés)" type="number" value={String(property.homepage_order)} /></div>
+      <p class="hint">
+        FODEL Top 10: {property.editors_pick ? `a válogatás ${property.editors_pick_order}. helyén` : 'nem szerepel'} —
+        a szerkesztői válogatás a <a href="/portal/top10">Top 10</a> oldalon kezelhető.
+      </p></section>}
 
       <section id="features">
         <h2>Jellemzők</h2>
@@ -418,7 +435,27 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
 
   <section id="media" class="media-section">
     <h2>Fényképek</h2>
-    <p class="hint">Húzza ide a képeket, vagy kattintson a tallózáshoz. JPG, PNG vagy WebP, max. 12 MB.</p>
+    <p class="hint">
+      Húzza ide a képeket, vagy kattintson a tallózáshoz. Formátum: JPG, PNG vagy WebP ·
+      legfeljebb {MAX_UPLOAD_MB} MB képenként (a nagy fájlokat a böngésző feltöltés előtt
+      automatikusan kicsinyíti) · a tárolt kép hosszabbik oldala legfeljebb {MAX_EDGE} képpont. Ajánlott legalább {LOW_RESOLUTION_EDGE} képpont a hosszabbik oldalon — ennél kisebb
+      képet is elfogadunk, de nagy képernyőn elmosódottnak látszhat.
+    </p>
+
+    <div class="photo-guide">
+      <p class="photo-guide-head">Milyen képek működnek a legjobban?</p>
+      <ul>
+        <li>Nappali fényben, világos helyiségekről készüljenek — kapcsolja fel a lámpákat is.</li>
+        <li>Élesek legyenek: tartsa stabilan a telefont, és törölje le a lencsét.</li>
+        <li>Mutassák be az egész ingatlant: homlokzat, minden fontos helyiség, kert, kilátás.</li>
+        <li>Rendezett, zsúfoltságmentes terekről — a vevő a házat nézze, ne a tárgyakat.</li>
+      </ul>
+      <p class="photo-guide-why">
+        A vevők többsége külföldről, a képek alapján dönt arról, hogy felveszi-e a kapcsolatot és
+        vállalja-e az utat a megtekintésre. A jó fénykép ezért közvetlenül több érdeklődést jelent.
+        A képeket munkatársunk az elbírálás során megnézi, és szükség esetén cserét kér.
+      </p>
+    </div>
 
     <p class="hint">
       Írjon minden képhez egy rövid leírást (pl. „Nappali cserépkályhával”). Ezt olvassa fel a
@@ -459,6 +496,11 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
     <p class="upload-status" id="upload-status" role="status"></p>
   </section>
 </Portal>
+
+<script>
+  import { exposeShrinkImage } from '~/scripts/shrink-image';
+  exposeShrinkImage();
+</script>
 
 <script define:vars={{ propertyId: property.id }}>
   // Locale tabs — plain show/hide, no framework.
@@ -535,19 +577,43 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
   const fileInput = document.getElementById('file-input');
   const status = document.getElementById('upload-status');
 
+  const UPLOAD_ERRORS = {
+    'unsupported-type': 'nem támogatott formátum (JPG, PNG vagy WebP lehet)',
+    'too-large': 'túl nagy fájl',
+    'unreadable-image': 'a fájl nem olvasható képként',
+    'storage-failed': 'a tárolás nem sikerült, próbálja újra',
+    'not-editable': 'a hirdetés jelenleg nem szerkeszthető',
+    forbidden: 'nincs jogosultsága',
+  };
+
   async function uploadFiles(files) {
+    const soft = [];
     for (const file of files) {
       status.textContent = `Feltöltés: ${file.name}…`;
-      const body = new FormData();
-      body.append('file', file);
-      try {
-        const res = await fetch(`/api/portal/properties/${propertyId}/media`, { method: 'POST', body });
-        const json = await res.json();
-        if (!res.ok || !json.ok) throw new Error(json.error ?? 'upload-failed');
-      } catch {
-        status.textContent = `Nem sikerült feltölteni: ${file.name}`;
+      // Large phone photos are scaled down in the browser first — the server
+      // accepts at most ~4.5 MB per request (see src/scripts/shrink-image.ts).
+      const prepared = window.fodelShrinkImage ? await window.fodelShrinkImage(file) : file;
+      if (prepared.size > 4.4 * 1024 * 1024) {
+        status.textContent = `Nem sikerült feltölteni: ${file.name} — a kép túl nagy (JPG, PNG vagy WebP formátumban próbálja).`;
         return;
       }
+      const body = new FormData();
+      body.append('file', prepared);
+      try {
+        const res = await fetch(`/api/portal/properties/${propertyId}/media`, { method: 'POST', body });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || !json.ok) throw new Error(json.error ?? 'upload-failed');
+        if (json.warning === 'low-resolution') soft.push(file.name);
+      } catch (error) {
+        const reason = UPLOAD_ERRORS[error.message];
+        status.textContent = `Nem sikerült feltölteni: ${file.name}${reason ? ` — ${reason}` : ''}`;
+        return;
+      }
+    }
+    if (soft.length) {
+      status.textContent = `Feltöltve. Kis felbontású kép: ${soft.join(', ')} — ha van nagyobb változata, érdemes azt feltölteni.`;
+      setTimeout(() => location.reload(), 4000);
+      return;
     }
     status.textContent = 'Kész — az oldal frissül…';
     location.reload();
@@ -724,6 +790,12 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
   .review-note .eyebrow { color: #b3261e; margin-bottom: 10px; }
   .review-note blockquote { font-size: var(--fs-body); line-height: var(--lh-body); color: var(--ink); margin: 0 0 12px; white-space: pre-line; }
   .review-note-foot { font-size: var(--fs-small); line-height: 1.7; color: var(--taupe); }
+
+  .photo-guide { margin: 4px 0 20px; padding: 16px 20px; background: rgba(16, 42, 67, 0.04); border-left: 2px solid var(--ink); }
+  .photo-guide-head { font-size: var(--fs-small); color: var(--ink); margin-bottom: 8px; }
+  .photo-guide ul { padding-left: 18px; margin-bottom: 10px; }
+  .photo-guide li { font-size: var(--fs-small); line-height: 1.7; color: var(--taupe); }
+  .photo-guide-why { font-size: var(--fs-micro); line-height: 1.7; color: var(--taupe); }
 
   .pay { padding: 28px 0; border-top: 1px solid var(--border); }
   .pay h2 { font-family: var(--serif); font-size: 19px; color: var(--ink); margin-bottom: 10px; }

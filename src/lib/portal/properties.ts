@@ -72,6 +72,9 @@ export type PortalProperty = {
   homepage_order: number;
   editors_pick: boolean;
   editors_pick_order: number;
+  free_listing?: boolean;
+  refund_required?: boolean;
+  rejected_at?: string | null;
   bargain: boolean;
   bargain_since: string | null;
   published_at: string | null;
@@ -294,6 +297,7 @@ export const STATUS_LABEL: Record<string, string> = {
   submitted: 'Elbírálásra vár',
   awaiting_payment: 'Fizetésre vár',
   changes_requested: 'Javítás szükséges',
+  rejected: 'Elutasítva',
   published: 'Élő hirdetés',
   sold: 'Eladva',
   archived: 'Archiválva',

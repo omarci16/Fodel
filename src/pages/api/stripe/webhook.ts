@@ -73,27 +73,39 @@ export const POST: APIRoute = async ({ request }) => {
       return new Response(null, { status: 200 });
     }
 
-    // Second delivery of the same event: the order is already settled.
-    if (order.status === 'paid' || order.status === 'manual') {
-      return new Response(null, { status: 200 });
-    }
-
+    // Settling and publishing are separate steps, so a retried delivery can
+    // finish a publish that failed the first time without paying twice.
+    const alreadySettled = ['paid', 'manual', 'refunded'].includes(order.status);
     const paidAt = new Date();
-    await admin
-      .from('payments')
-      .update({ status: 'paid', paid_at: paidAt.toISOString() })
-      .eq('id', order.id);
-
-    const result = await publishProperty(admin, order.property_id, { dedupeKey: event.id });
-    if (!result.ok) {
-      // The money is in and recorded; publication failed. Returning 500 asks
-      // Stripe to retry, which is exactly right — the retry will find the
-      // order already paid and simply re-attempt the publish.
-      console.error(`[stripe] payment recorded but publish failed for ${order.property_id}`, result.error);
-      return new Response('publish failed', { status: 500 });
+    if (!alreadySettled) {
+      await admin
+        .from('payments')
+        .update({ status: 'paid', paid_at: paidAt.toISOString() })
+        .eq('id', order.id);
     }
 
-    await sendReceipt(admin, order, paidAt);
+    // Money never publishes on its own (brief §7). Only a listing an admin
+    // approved and that is waiting for exactly this payment goes live. A
+    // checkout opened earlier and completed after the listing was sent back
+    // or rejected is recorded as paid and flagged for a refund decision.
+    const { data: property } = order.property_id
+      ? await admin.from('properties').select('status').eq('id', order.property_id).maybeSingle()
+      : { data: null };
+
+    if (property?.status === 'awaiting_payment') {
+      const result = await publishProperty(admin, order.property_id, { dedupeKey: event.id });
+      if (!result.ok) {
+        // The money is in and recorded; publication failed. A 500 makes
+        // Stripe retry, and the retry skips straight to this publish.
+        console.error(`[stripe] payment recorded but publish failed for ${order.property_id}`, result.error);
+        return new Response('publish failed', { status: 500 });
+      }
+    } else if (!alreadySettled && property?.status !== 'published') {
+      console.warn(`[stripe] payment for ${order.property_id} arrived while the listing is ${property?.status ?? 'missing'} — not published, flagged for refund review`);
+      await admin.from('payments').update({ refund_required: true }).eq('id', order.id).then(() => {}, () => {});
+    }
+
+    if (!alreadySettled) await sendReceipt(admin, order, paidAt);
     return new Response(null, { status: 200 });
   }
 

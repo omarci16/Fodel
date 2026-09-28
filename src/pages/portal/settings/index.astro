@@ -20,7 +20,13 @@ const referralLink = profile?.referral_code
     <p class="eyebrow">Beállítások</p>
     <h1>Profil</h1>
   </header>
-  {profile?.role === 'admin' && <p><a href="/portal/settings/company">Cégadatok és nyilvános elérhetőségek →</a></p>}
+  {profile?.role === 'admin' && (
+    <>
+      <p><a href="/portal/settings/company">Cégadatok és nyilvános elérhetőségek (WhatsApp is) →</a></p>
+      <p><a href="/portal/settings/services">Szolgáltatások és automatizmusok →</a></p>
+      <p><a href="/portal/settings/templates">Meghívólevelek →</a></p>
+    </>
+  )}
 
   {saved === 'profile' && <p class="notice ok">Profil mentve.</p>}
   {saved === 'password' && <p class="notice ok">Jelszó megváltoztatva.</p>}
