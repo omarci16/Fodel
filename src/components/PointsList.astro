@@ -16,7 +16,11 @@ const { items, class: className } = Astro.props;
   {
     items.map((item, i) => (
       <li style={`--reveal-delay:${(0.15 + i * 0.07).toFixed(2)}s`}>
-        <span class="dash draw" aria-hidden="true" />
+        <span class="mark" aria-hidden="true">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M2.5 6.25 5 8.75l4.5-5.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </span>
         <span>{item}</span>
       </li>
     ))
@@ -33,7 +37,7 @@ const { items, class: className } = Astro.props;
   }
   li {
     display: grid;
-    grid-template-columns: 40px 1fr;
+    grid-template-columns: 44px 1fr;
     align-items: start;
     padding: 18px 0;
     border-bottom: 1px solid var(--points-rule, var(--border));
@@ -41,16 +45,31 @@ const { items, class: className } = Astro.props;
     line-height: 1.6;
     color: var(--taupe);
   }
-  /* Centred on the first line: half its line-height (1.6em / 2). The
-     draw-on itself comes from the shared .draw rule in global.css. */
-  .dash {
-    display: block;
-    width: 22px;
-    height: 1px;
-    margin-top: 0.8em;
-    background: var(--ink);
+  /* A small disc with a tick, centred on the first line (1.6em / 2). */
+  .mark {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    margin-top: calc(0.8em - 13px);
+    border-radius: 50%;
+    background: rgba(16, 42, 67, 0.08);
+    color: var(--ink);
   }
-  :global([data-bg='dark']) .dash {
-    background: var(--cream);
+  :global([data-bg='dark']) .mark {
+    background: rgba(244, 244, 242, 0.12);
+    color: var(--cream);
+  }
+  :global([data-reveal-ready]) .mark {
+    transform: scale(0);
+    transition: transform 0.8s var(--ease-out) var(--reveal-delay, 0s);
+  }
+  :global([data-reveal-ready][data-visible]) .mark {
+    transform: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :global([data-reveal-ready]) .mark {
+      transform: none;
+    }
   }
 </style>

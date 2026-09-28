@@ -46,6 +46,8 @@ const checks = [
   // Light surfaces
   ['body text — taupe on cream', contrast(TAUPE, CREAM_BG), AA],
   ['headings — ink on cream', contrast(INK, CREAM_BG), AA],
+  // 2.0: the quieter second line of display headings is also used for text.
+  ['heading second line — ink-quiet on cream', contrast(hex(value('ink-quiet')), CREAM_BG), AA],
   ['accent rule — ink on linen', contrast(INK, hex(value('linen'))), AA_LARGE],
 
   // Dark surfaces — these are the values the prototype got wrong

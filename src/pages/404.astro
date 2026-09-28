@@ -99,20 +99,18 @@ import { COMPANY } from '~/config/company';
     letter-spacing: var(--ls-display);
     color: var(--ink);
   }
-  h1 em {
-    font-weight: var(--fw-light);
-  }
   .cols {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 48px;
     padding-top: 28px;
-    border-top: 1px solid var(--ink);
+    border-top: 1px solid var(--border);
   }
   .col-lang {
     margin-bottom: 12px;
-    font-size: var(--fs-eyebrow);
-    letter-spacing: var(--ls-eyebrow);
+    font-size: 0.75rem;
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.16em;
     text-transform: uppercase;
     color: var(--taupe);
   }

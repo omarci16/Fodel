@@ -79,20 +79,25 @@ const { eyebrow, title, titleEm, body, primary, secondary, alt = '' } = Astro.pr
 </script>
 
 <style>
+  /* 2.0: the window opens onto the cream page and comes to rest as a slab —
+     set in from the edges and rounded, like every other dark surface. */
   .parallax-cta {
     position: relative;
     display: grid;
     place-items: center;
     min-height: max(640px, 100svh);
     overflow: hidden;
-    background: var(--ink);
   }
 
   .frame {
     position: absolute;
     inset: 0;
     overflow: hidden;
-    clip-path: inset(calc((1 - var(--p, 1)) * 16%) calc((1 - var(--p, 1)) * 12%));
+    background: var(--ink);
+    clip-path: inset(
+      calc((1 - var(--p, 1)) * 14%) calc((1 - var(--p, 1)) * 11% + var(--slab-x))
+      round calc(var(--r-2xl) + (1 - var(--p, 1)) * 24px)
+    );
     will-change: clip-path;
   }
   .media {
@@ -128,7 +133,7 @@ const { eyebrow, title, titleEm, body, primary, secondary, alt = '' } = Astro.pr
 
   :global(.cta-eyebrow) {
     color: var(--on-dark-strong);
-    letter-spacing: 0.38em;
+    letter-spacing: 0.28em;
   }
 
   h2 {
@@ -140,8 +145,11 @@ const { eyebrow, title, titleEm, body, primary, secondary, alt = '' } = Astro.pr
     color: #f4f4f2;
     margin-bottom: 32px;
   }
-  h2 em {
-    font-weight: var(--fw-light);
+
+  /* Over a photograph the second line keeps the headline's own cream: a
+     quieter tone there would read as the picture showing through. */
+  h2 :global(em) {
+    color: inherit;
   }
 
   p {
@@ -155,7 +163,7 @@ const { eyebrow, title, titleEm, body, primary, secondary, alt = '' } = Astro.pr
 
   .actions {
     display: flex;
-    gap: 16px;
+    gap: 12px;
     justify-content: center;
     flex-wrap: wrap;
   }
@@ -165,7 +173,10 @@ const { eyebrow, title, titleEm, body, primary, secondary, alt = '' } = Astro.pr
       min-height: 560px;
     }
     .frame {
-      clip-path: inset(calc((1 - var(--p, 1)) * 8%) calc((1 - var(--p, 1)) * 6%));
+      clip-path: inset(
+        calc((1 - var(--p, 1)) * 8%) calc((1 - var(--p, 1)) * 6% + var(--slab-x))
+        round var(--r-2xl)
+      );
     }
     .content {
       padding: 88px var(--pad-x-mob);
@@ -173,6 +184,7 @@ const { eyebrow, title, titleEm, body, primary, secondary, alt = '' } = Astro.pr
     .actions {
       flex-direction: column;
       width: 100%;
+      max-width: 420px;
     }
     p {
       margin-bottom: 36px;

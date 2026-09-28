@@ -9,7 +9,6 @@
  */
 import Base from '~/layouts/Base.astro';
 import PageHeader from '~/components/PageHeader.astro';
-import GoldRule from '~/components/GoldRule.astro';
 import Button from '~/components/Button.astro';
 import PropertyCard from '~/components/PropertyCard.astro';
 import { UI, path, type Locale } from '~/i18n/ui';
@@ -65,7 +64,7 @@ const t = hu
         </div>
       ) : (
         <div class="empty">
-          <GoldRule center space="28px" />
+          <span class="empty-dot" aria-hidden="true"></span>
           <p class="empty-title">{t.empty}</p>
           <p class="empty-hint">{t.emptyHint}</p>
           <Button variant="dark" href={path(locale, 'properties')}>{ui.cta.allProperties}</Button>
@@ -77,35 +76,57 @@ const t = hu
 
 <style>
   .sold {
-    padding: 8px var(--pad-x) var(--section-y);
+    padding: 56px var(--pad-x) var(--section-y);
   }
   .grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 44px 36px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 56px 28px;
   }
   .empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     text-align: center;
-    padding: 60px 0 80px;
+    padding: 72px 24px 88px;
+    border-radius: var(--r-2xl);
+    background: var(--white);
+    border: 1px solid rgba(16, 42, 67, 0.06);
+  }
+  .empty-dot {
+    width: 10px;
+    height: 10px;
+    margin-bottom: 28px;
+    border-radius: 50%;
+    background: var(--ink);
   }
   .empty-title {
     font-family: var(--serif);
-    font-size: 24px;
+    font-weight: var(--fw-medium);
+    font-size: clamp(22px, 2.2vw, 30px);
+    letter-spacing: -0.015em;
     color: var(--ink);
     margin-bottom: 10px;
   }
   .empty-hint {
+    max-width: 48ch;
     font-size: var(--fs-body);
+    line-height: var(--lh-body);
     color: var(--taupe);
-    margin-bottom: 28px;
+    margin-bottom: 32px;
   }
-  @media (max-width: 900px) {
+  @media (max-width: 1000px) {
+    .grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (max-width: 700px) {
     .sold {
-      padding: 8px var(--pad-x-mob) var(--section-y-mob);
+      padding: 32px var(--pad-x-mob) var(--section-y-mob);
     }
     .grid {
       grid-template-columns: 1fr;
-      gap: 28px;
+      gap: 48px;
     }
   }
 </style>

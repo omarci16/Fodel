@@ -22,13 +22,14 @@ const { center = false, class: className, as: Tag = 'div', space }: Props = Astr
 </Tag>
 
 <style>
+  /* 2.0: a touch larger and one weight up, with less tracking — still the
+     site's small capitals, but they read at a glance. */
   .eyebrow {
     margin-bottom: var(--eyebrow-space, 0);
     font-family: var(--sans);
-    font-weight: var(--fw-regular);
-    /* ADJUSTED: 10px in the prototype. */
-    font-size: var(--fs-eyebrow);
-    letter-spacing: var(--ls-eyebrow);
+    font-weight: var(--fw-medium);
+    font-size: 0.75rem;
+    letter-spacing: 0.16em;
     line-height: 1.4;
     text-transform: uppercase;
     color: var(--accent);

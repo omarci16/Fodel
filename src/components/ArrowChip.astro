@@ -1,0 +1,29 @@
+---
+/**
+ * The arrow disc used on primary actions and on cards that lead somewhere.
+ * Styles live in global.css (.arrow-chip) because the hover that animates it
+ * belongs to whatever link or button it sits in, not to the chip itself.
+ */
+interface Props {
+  /** Disc size in px. */
+  size?: number;
+  dir?: 'right' | 'down';
+  class?: string;
+}
+
+const { size, dir = 'right', class: className } = Astro.props;
+---
+
+<span
+  class:list={['arrow-chip', className]}
+  style={size ? `--chip:${size}px` : undefined}
+  data-dir={dir === 'down' ? 'down' : undefined}
+  aria-hidden="true"
+>
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+    <path d="M1.5 7h10.5M7.75 2.75 12 7l-4.25 4.25" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+  </svg>
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+    <path d="M1.5 7h10.5M7.75 2.75 12 7l-4.25 4.25" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+  </svg>
+</span>

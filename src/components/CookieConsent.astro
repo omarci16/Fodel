@@ -55,8 +55,8 @@ const copy = {
     <a href={path(locale, 'cookies')}>{copy.more}</a>
   </p>
   <div class="actions">
-    <Button variant="outline" light id="cookie-reject">{copy.reject}</Button>
-    <Button variant="outline" light id="cookie-accept">{copy.accept}</Button>
+    <Button variant="outline" light size="sm" id="cookie-reject">{copy.reject}</Button>
+    <Button variant="outline" light size="sm" id="cookie-accept">{copy.accept}</Button>
   </div>
 </aside>
 
@@ -89,13 +89,14 @@ const copy = {
     bottom: 24px;
     z-index: calc(var(--z-cursor) - 50);
     width: min(420px, calc(100vw - 48px));
-    padding: 28px 28px 24px;
+    padding: 26px 26px 22px;
+    border-radius: var(--r-xl);
     background:
       radial-gradient(120% 90% at 100% 0%, var(--ink-soft) 0%, transparent 60%),
       var(--ink);
     color: var(--cream);
     border: 1px solid var(--on-dark-rule);
-    box-shadow: var(--shadow-lg);
+    box-shadow: var(--shadow-float);
     animation: fx-fade-up 0.9s var(--ease-out) both;
   }
   .cookie-consent[hidden] {
@@ -114,8 +115,9 @@ const copy = {
     color: var(--cream);
   }
   .rule {
-    width: 28px;
-    height: 1px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
     background: var(--cream);
   }
   p {
@@ -139,6 +141,7 @@ const copy = {
   }
   .actions :global(.btn) {
     padding-inline: 12px;
+    width: 100%;
   }
 
   @media (max-width: 600px) {

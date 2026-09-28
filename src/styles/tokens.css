@@ -33,6 +33,33 @@
   --shadow-sm: 0 1px 2px rgba(var(--shadow-ink), 0.06), 0 4px 12px rgba(var(--shadow-ink), 0.06);
   --shadow-lg: 0 2px 4px rgba(var(--shadow-ink), 0.04), 0 24px 64px -12px rgba(var(--shadow-ink), 0.28);
 
+  /* 2.0 — the softer system. Everything that was a hard box is now a shape
+     with a radius from this one scale, and every surface that floats does so
+     on the same ink-tinted shadows. */
+  --white: #ffffff;
+  --paper: #fafaf8;
+  /* The second line of a two-line display heading — the upright, same-weight
+     replacement for the old light italic. 4.9:1 on --cream, so it is legible
+     as text, not only as display. */
+  --ink-quiet: #5c6d7e;
+  --shadow-xs: 0 1px 2px rgba(var(--shadow-ink), 0.06);
+  --shadow-md: 0 1px 2px rgba(var(--shadow-ink), 0.05), 0 12px 32px -10px rgba(var(--shadow-ink), 0.18);
+  --shadow-float: 0 1px 1px rgba(var(--shadow-ink), 0.04), 0 8px 24px -6px rgba(var(--shadow-ink), 0.16),
+    0 32px 80px -24px rgba(var(--shadow-ink), 0.3);
+
+  --r-xs: 8px;
+  --r-sm: 12px;
+  --r-md: 16px;
+  --r-lg: 22px;
+  --r-xl: 28px;
+  --r-2xl: 36px;
+  --r-pill: 999px;
+
+  /* Dark and tinted sections are slabs set in from the viewport edge by this
+     much, so the page reads as a stack of rounded surfaces. Content inside a
+     slab subtracts it again and stays on the page grid. */
+  --slab-x: 12px;
+
   /* ── Typefaces (self-hosted; the prototype loaded these from Google) ── */
   /* 1.4: the variable cut of the same face, weight axis only. It carries a
      real italic (the static 400/500/700 files had none, so every <em> in a
@@ -116,10 +143,11 @@
   --field-padding-x: 18px;
 
   /* ── Layout ── */
-  --pad-x: 80px;
-  --pad-x-mob: 24px;
-  --section-y: 108px;
-  --section-y-mob: 52px;
+  --pad-x: clamp(40px, 5.6vw, 88px);
+  --pad-x-mob: 20px;
+  --section-y: clamp(96px, 9vw, 144px);
+  --section-y-mob: 72px;
+  --maxw: 1520px;
   --maxw-prose: 68ch;
   /* Measured, not assumed. The prototype reserved 80px for a bar that rendered
      at 111px, so the top of every page sat under the fixed nav. The bar shrinks
@@ -137,8 +165,10 @@
      value (min-height: var(--nav-h) - 1px border), so it is exact by
      construction. 96px: the bar lost the boxed login button and sits
      tighter; the content inside needs 48px. */
-  --nav-h: 96px;
-  --nav-h-mob: 66px;
+  /* 2.0: the bar is transparent at the top of the page and becomes a floating
+     rounded island once scrolled; this is the height reserved at the top. */
+  --nav-h: 88px;
+  --nav-h-mob: 68px;
 
   /* ── Motion ──
      --ease is the prototype's curve, kept for small UI transitions.
@@ -184,5 +214,8 @@
   :root {
     --pad-x: var(--pad-x-mob);
     --section-y: var(--section-y-mob);
+    --slab-x: 8px;
+    --r-2xl: 28px;
+    --r-xl: 22px;
   }
 }

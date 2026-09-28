@@ -16,7 +16,6 @@
  * consent is required for the form to work.
  */
 import Button from '~/components/Button.astro';
-import GoldRule from '~/components/GoldRule.astro';
 import { UI, path, type Locale } from '~/i18n/ui';
 import { getCompany } from '~/lib/runtime-config';
 
@@ -52,7 +51,11 @@ const contactPhone = locale === 'hu' ? (publicPhones.find((phone) => phone.href.
 
 <div class:list={['form-shell', { 'on-dark': onDark }]}>
   <div class="status" id={`${formId}-success`} role="status" hidden>
-    <GoldRule center space="28px" />
+    <span class="status-mark" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+        <path d="M5 11.5l4 4 8-9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+    </span>
     <h3>{successTitle ?? ui.form.successTitle}</h3>
     <p>{successBody ?? ui.form.successBody}</p>
   </div>
@@ -132,9 +135,11 @@ const contactPhone = locale === 'hu' ? (publicPhones.find((phone) => phone.href.
     const t = strings[locale];
     const formId = form.id;
     const submit = form.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+    // The label lives in its own span beside the arrow chip; only it changes.
+    const submitLabel = submit.querySelector<HTMLElement>('.label') ?? submit;
     const formError = document.getElementById(`${formId}-error`)!;
     const success = document.getElementById(`${formId}-success`)!;
-    const originalLabel = submit.textContent ?? '';
+    const originalLabel = submitLabel.textContent ?? '';
 
     const showFieldError = (input: HTMLElement, message: string) => {
       const wrap = input.closest('.field') ?? input.closest('.consent');
@@ -193,7 +198,7 @@ const contactPhone = locale === 'hu' ? (publicPhones.find((phone) => phone.href.
       }
 
       submit.disabled = true;
-      submit.textContent = t.sending;
+      submitLabel.textContent = t.sending;
 
       try {
         const response = await fetch(form.action, {
@@ -212,7 +217,7 @@ const contactPhone = locale === 'hu' ? (publicPhones.find((phone) => phone.href.
         formError.textContent = t.error;
         formError.hidden = false;
         submit.disabled = false;
-        submit.textContent = originalLabel;
+        submitLabel.textContent = originalLabel;
       }
     });
   });
@@ -225,7 +230,7 @@ const contactPhone = locale === 'hu' ? (publicPhones.find((phone) => phone.href.
   .fields {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    column-gap: 24px;
+    column-gap: 16px;
   }
 
   .hp {
@@ -239,15 +244,52 @@ const contactPhone = locale === 'hu' ? (publicPhones.find((phone) => phone.href.
   .consent {
     display: grid;
     grid-template-columns: auto 1fr;
-    gap: 10px 12px;
+    gap: 10px 14px;
     align-items: start;
-    margin: 6px 0 26px;
+    margin: 4px 0 26px;
   }
+  /* A rounded box of our own; the native one ignores the radius scale. */
   .consent input {
-    width: 18px;
-    height: 18px;
-    margin-top: 2px;
-    accent-color: var(--ink);
+    appearance: none;
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    margin-top: 1px;
+    border: 1px solid rgba(16, 42, 67, 0.3);
+    border-radius: 7px;
+    background: var(--white);
+    cursor: pointer;
+    transition:
+      background-color 0.3s var(--ease-out),
+      border-color 0.3s var(--ease-out);
+  }
+  .consent input::after {
+    content: '';
+    width: 10px;
+    height: 6px;
+    margin-top: -3px;
+    border-left: 1.6px solid var(--cream);
+    border-bottom: 1.6px solid var(--cream);
+    transform: rotate(-45deg) scale(0);
+    transition: transform 0.3s var(--ease-out);
+  }
+  .consent input:checked {
+    background: var(--ink);
+    border-color: var(--ink);
+  }
+  .consent input:checked::after {
+    transform: rotate(-45deg) scale(1);
+  }
+  .consent input:hover {
+    border-color: var(--ink);
+  }
+  .consent input:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: 3px;
+  }
+  .consent input[aria-invalid='true'] {
+    border-color: #b3261e;
   }
   .consent label {
     font-size: var(--fs-small);
@@ -272,9 +314,9 @@ const contactPhone = locale === 'hu' ? (publicPhones.find((phone) => phone.href.
     font-size: var(--fs-small);
     line-height: 1.6;
     color: #b3261e;
-    padding: 12px 14px;
-    border-left: 2px solid #b3261e;
-    background: rgba(179, 38, 30, 0.06);
+    padding: 12px 16px;
+    border-radius: var(--r-sm);
+    background: rgba(179, 38, 30, 0.07);
     margin-bottom: 18px;
   }
   .form-error[hidden] {
@@ -285,12 +327,27 @@ const contactPhone = locale === 'hu' ? (publicPhones.find((phone) => phone.href.
     text-align: center;
     padding: 24px 0;
   }
+  .status-mark {
+    display: inline-grid;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    margin-bottom: 24px;
+    border-radius: 50%;
+    background: var(--ink);
+    color: var(--cream);
+  }
+  .on-dark .status-mark {
+    background: var(--cream);
+    color: var(--ink);
+  }
   .status[hidden] {
     display: none;
   }
   .status h3 {
     font-family: var(--serif);
-    font-weight: var(--fw-display);
+    font-weight: var(--fw-medium);
+    letter-spacing: var(--ls-heading);
     font-size: clamp(28px, 4vw, 40px);
     color: var(--ink);
     margin-bottom: 14px;
@@ -316,7 +373,15 @@ const contactPhone = locale === 'hu' ? (publicPhones.find((phone) => phone.href.
     color: var(--on-dark-muted);
   }
   .on-dark .consent input {
-    accent-color: var(--cream);
+    background: var(--on-dark-field);
+    border-color: var(--on-dark-field-border);
+  }
+  .on-dark .consent input::after {
+    border-color: var(--ink);
+  }
+  .on-dark .consent input:checked {
+    background: var(--cream);
+    border-color: var(--cream);
   }
   .on-dark .status h3 {
     color: var(--cream);
@@ -326,8 +391,7 @@ const contactPhone = locale === 'hu' ? (publicPhones.find((phone) => phone.href.
   }
   .on-dark .form-error {
     color: #f0b4ae;
-    border-left-color: #f0b4ae;
-    background: rgba(240, 180, 174, 0.08);
+    background: rgba(240, 180, 174, 0.1);
   }
 
   @media (max-width: 640px) {

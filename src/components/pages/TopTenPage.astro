@@ -1,7 +1,6 @@
 ---
 import Base from '~/layouts/Base.astro';
-import Eyebrow from '~/components/Eyebrow.astro';
-import GoldRule from '~/components/GoldRule.astro';
+import PageHeader from '~/components/PageHeader.astro';
 import PropertyCard from '~/components/PropertyCard.astro';
 import { type Locale } from '~/i18n/ui';
 import { alternatesFor } from '~/lib/page';
@@ -22,12 +21,33 @@ const description = locale === 'hu'
   : 'Tien woningen aanbevolen door de redactie van FODEL, los van betaalde uitlichting.';
 ---
 <Base locale={locale} title={metaTitle} description={description} alternates={alternatesFor('top10')}>
-  <header class="head"><Eyebrow space="12px">FODEL</Eyebrow><h1>{heading}</h1><GoldRule space="24px" /><p>{description}</p></header>
+  <PageHeader eyebrow="FODEL" title={heading} body={description} compact />
   <section class="grid">
-    {properties.map((property, index) => <PropertyCard property={property} locale={locale} rank={index + 1} />)}
-    {properties.length === 0 && <p>{locale === 'hu' ? 'A válogatás hamarosan érkezik.' : 'De selectie volgt binnenkort.'}</p>}
+    {properties.map((property, index) => <PropertyCard property={property} locale={locale} rank={index + 1} ratio="4 / 5" />)}
+    {properties.length === 0 && <p class="empty">{locale === 'hu' ? 'A válogatás hamarosan érkezik.' : 'De selectie volgt binnenkort.'}</p>}
   </section>
 </Base>
 <style>
-  .head{padding:96px var(--pad-x) 48px;max-width:850px}.head p{max-width:65ch}.grid{padding:0 var(--pad-x) 110px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px}@media(max-width:900px){.grid{grid-template-columns:1fr}}
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 56px 28px;
+    padding: 56px var(--pad-x) var(--section-y);
+  }
+  .empty {
+    font-size: var(--fs-body);
+    color: var(--taupe);
+  }
+  @media (max-width: 1000px) {
+    .grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (max-width: 700px) {
+    .grid {
+      grid-template-columns: 1fr;
+      gap: 48px;
+      padding: 32px var(--pad-x-mob) var(--section-y-mob);
+    }
+  }
 </style>

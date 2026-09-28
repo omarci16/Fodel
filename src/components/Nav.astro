@@ -8,13 +8,16 @@
  * drawer reports aria-expanded, traps focus, and is removed from the tab
  * order when closed.
  *
- * 1.4: the bar sits on the page grid (--pad-x, same as every section below
- * it), links roll on hover, the login is a quiet text link beside the one
- * filled button, and the bottom hairline doubles as a reading-progress line.
- * The mobile drawer is a full-height sheet with large, numbered links.
+ * 2.0: at the top of a page the bar has no surface at all — it is the page's
+ * own header line. Once the page scrolls it lifts into a floating, rounded
+ * island of frosted cream. Links are set in sentence case at reading size,
+ * with one soft pill that glides to whichever link is pointed at and rests
+ * on the current page. The mobile menu is a rounded sheet that unfolds
+ * beneath the bar.
  */
 import Logo from './Logo.astro';
 import Button from './Button.astro';
+import ArrowChip from './ArrowChip.astro';
 import LanguageSwitcher from './LanguageSwitcher.astro';
 import { UI, path, type Locale } from '~/i18n/ui';
 import { getCompany } from '~/lib/runtime-config';
@@ -43,23 +46,19 @@ const isCurrent = (href: string) =>
 
 <nav class="nav" id="site-nav" aria-label={ui.a11y.mainNav}>
   <div class="nav-inner">
-    <Logo locale={locale} href={`/${locale}/`} />
+    <div class="nav-start">
+      <Logo locale={locale} href={`/${locale}/`} />
+    </div>
 
-    <ul class="nav-links">
+    <ul class="nav-links" data-nav-links>
+      <li class="nav-pill" aria-hidden="true"></li>
       {
         links.map((l) => {
           const href = path(locale, l.key);
           return (
             <li>
-              <a
-                class="nav-link"
-                href={href}
-                aria-current={isCurrent(href) ? 'page' : undefined}
-              >
-                <span class="roll">
-                  <span>{l.label}</span>
-                  <span aria-hidden="true">{l.label}</span>
-                </span>
+              <a class="nav-link" href={href} aria-current={isCurrent(href) ? 'page' : undefined}>
+                {l.label}
               </a>
             </li>
           );
@@ -71,13 +70,13 @@ const isCurrent = (href: string) =>
       <LanguageSwitcher locale={locale} alternates={alternates} align="right" />
 
       <a class="nav-login" href="/portal/login" rel="nofollow" aria-label={ui.cta.login}>
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-          <circle cx="7" cy="4.5" r="2.75" stroke="currentColor" stroke-width="1.1" />
-          <path d="M1.75 13c.6-2.7 2.7-4.25 5.25-4.25S11.65 10.3 12.25 13" stroke="currentColor" stroke-width="1.1" />
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <circle cx="8" cy="5.25" r="2.9" stroke="currentColor" stroke-width="1.3" />
+          <path d="M2.5 14.25c.65-2.85 2.85-4.5 5.5-4.5s4.85 1.65 5.5 4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
         </svg>
         <span>{ui.cta.login}</span>
       </a>
-      <Button variant="dark" href={path(locale, 'contact')} class="nav-cta">
+      <Button variant="dark" size="sm" href={path(locale, 'contact')} class="nav-cta">
         {ui.cta.contact}
       </Button>
     </div>
@@ -98,42 +97,35 @@ const isCurrent = (href: string) =>
       </button>
     </div>
   </div>
-  <span class="nav-progress" aria-hidden="true"></span>
 </nav>
 
 <div class="drawer" id="nav-drawer" inert>
-  <div class="drawer-clip">
-    <div class="drawer-panel">
-      <ul class="drawer-links">
-        {
-          links.map((l, i) => {
-            const href = path(locale, l.key);
-            return (
-              <li style={`--i:${i}`}>
-                <a href={href} aria-current={isCurrent(href) ? 'page' : undefined}>
-                  <span class="drawer-num" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
-                  {l.label}
-                </a>
-              </li>
-            );
-          })
-        }
-        <li style={`--i:${links.length}`}>
-          <a href={path(locale, 'contact')} aria-current={isCurrent(path(locale, 'contact')) ? 'page' : undefined}>
-            <span class="drawer-num" aria-hidden="true">{String(links.length + 1).padStart(2, '0')}</span>
-            {ui.nav.contact}
-          </a>
-        </li>
-      </ul>
+  <div class="drawer-scrim" data-drawer-close></div>
+  <div class="drawer-panel">
+    <ul class="drawer-links">
+      {
+        [...links, { key: 'contact', label: ui.nav.contact } as const].map((l, i) => {
+          const href = path(locale, l.key);
+          return (
+            <li style={`--i:${i}`}>
+              <a href={href} aria-current={isCurrent(href) ? 'page' : undefined}>
+                <span class="drawer-num num" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
+                <span class="drawer-label">{l.label}</span>
+                <ArrowChip size={36} />
+              </a>
+            </li>
+          );
+        })
+      }
+    </ul>
 
-      <div class="drawer-foot" style={`--i:${links.length + 1}`}>
-        <Button variant="dark" href={path(locale, 'contact')} block>{ui.cta.callback}</Button>
-        <Button variant="outline" href="/portal/login" rel="nofollow" block>{ui.cta.login}</Button>
-        <p class="drawer-contact">
-          {COMPANY.phones.filter((p) => p.public).slice(0, 2).map((p) => <a href={p.href}>{p.display}</a>)}
-          <a href={`mailto:${COMPANY.email.primary}`}>{COMPANY.email.primary}</a>
-        </p>
-      </div>
+    <div class="drawer-foot" style={`--i:${links.length + 1}`}>
+      <Button variant="dark" href={path(locale, 'contact')} block>{ui.cta.callback}</Button>
+      <Button variant="outline" href="/portal/login" rel="nofollow" block>{ui.cta.login}</Button>
+      <p class="drawer-contact">
+        {COMPANY.phones.filter((p) => p.public).slice(0, 2).map((p) => <a href={p.href}>{p.display}</a>)}
+        <a href={`mailto:${COMPANY.email.primary}`}>{COMPANY.email.primary}</a>
+      </p>
     </div>
   </div>
 </div>
@@ -143,15 +135,11 @@ const isCurrent = (href: string) =>
   const toggle = document.getElementById('nav-toggle')!;
   const drawer = document.getElementById('nav-drawer')!;
 
-  // Shrink on scroll, as the prototype did at 120px — and feed the hairline
-  // along the bottom edge, which fills as the page is read.
+  // The bar lifts into its island a little way down the page.
   let ticking = false;
   const onScroll = () => {
     ticking = false;
-    const y = window.scrollY;
-    nav.toggleAttribute('data-scrolled', y > 120);
-    const max = document.documentElement.scrollHeight - window.innerHeight;
-    nav.style.setProperty('--progress', max > 0 ? String(Math.min(1, y / max)) : '0');
+    nav.toggleAttribute('data-scrolled', window.scrollY > 24);
   };
   window.addEventListener(
     'scroll',
@@ -164,6 +152,46 @@ const isCurrent = (href: string) =>
   );
   onScroll();
 
+  /* ── The gliding pill ──
+     One element, moved under whichever link is pointed at or focused, and
+     returned to the current page's link (or faded out) when the pointer
+     leaves the list. */
+  const list = nav.querySelector<HTMLElement>('[data-nav-links]');
+  const pill = list?.querySelector<HTMLElement>('.nav-pill');
+  if (list && pill) {
+    const links = Array.from(list.querySelectorAll<HTMLElement>('.nav-link'));
+    const home = links.find((a) => a.getAttribute('aria-current') === 'page') ?? null;
+    const place = (target: HTMLElement | null, instant = false) => {
+      if (!target) {
+        pill.style.opacity = '0';
+        return;
+      }
+      if (instant) pill.style.transition = 'none';
+      pill.style.setProperty('--x', `${target.offsetLeft}px`);
+      pill.style.setProperty('--w', `${target.offsetWidth}px`);
+      pill.style.opacity = '1';
+      pill.toggleAttribute('data-current', target === home);
+      if (instant) {
+        pill.getBoundingClientRect();
+        pill.style.transition = '';
+      }
+    };
+    const settle = () => place(home, false);
+    // Fonts change the link widths once they load; measure after that.
+    document.fonts?.ready.then(() => place(home, true));
+    place(home, true);
+    links.forEach((a) => {
+      a.addEventListener('pointerenter', () => place(a));
+      a.addEventListener('focus', () => place(a));
+    });
+    list.addEventListener('pointerleave', settle);
+    list.addEventListener('focusout', () => requestAnimationFrame(() => {
+      if (!list.contains(document.activeElement)) settle();
+    }));
+    window.addEventListener('resize', () => place(home, true), { passive: true });
+  }
+
+  /* ── Mobile sheet ── */
   const focusable = () =>
     Array.from(drawer.querySelectorAll<HTMLElement>('a[href], button:not([disabled])'));
 
@@ -171,15 +199,19 @@ const isCurrent = (href: string) =>
     toggle.setAttribute('aria-expanded', String(open));
     drawer.toggleAttribute('data-open', open);
     nav.toggleAttribute('data-menu-open', open);
-    // inert (not `hidden`) so the drawer can still animate while it's
+    // inert (not `hidden`) so the sheet can still animate while it's
     // closing — `hidden` would rip it out of layout mid-transition.
     drawer.inert = !open;
-    document.body.style.overflow = open ? 'hidden' : '';
+    document.documentElement.style.overflow = open ? 'hidden' : '';
     if (open) focusable()[0]?.focus();
   };
 
   toggle.addEventListener('click', () => {
     setOpen(toggle.getAttribute('aria-expanded') !== 'true');
+  });
+  drawer.querySelectorAll('[data-drawer-close]').forEach((el) => el.addEventListener('click', () => setOpen(false)));
+  window.matchMedia('(min-width: 1081px)').addEventListener('change', (e) => {
+    if (e.matches && drawer.hasAttribute('data-open')) setOpen(false);
   });
 
   document.addEventListener('keydown', (e) => {
@@ -192,8 +224,7 @@ const isCurrent = (href: string) =>
     }
 
     if (e.key === 'Tab') {
-      const items = focusable();
-      if (!items.length) return;
+      const items = [toggle, ...focusable()];
       const first = items[0];
       const last = items[items.length - 1];
       if (e.shiftKey && document.activeElement === first) {
@@ -208,178 +239,230 @@ const isCurrent = (href: string) =>
 </script>
 
 <style>
+  /* ══ Bar ══════════════════════════════════════════════════════════════ */
   .nav {
     position: fixed;
     inset: 0 0 auto;
     z-index: var(--z-nav);
-    background: rgba(244, 244, 242, 0.9);
-    backdrop-filter: blur(18px) saturate(1.3);
-    -webkit-backdrop-filter: blur(18px) saturate(1.3);
-    border-bottom: 1px solid var(--border);
+    padding: 0;
     view-transition-name: site-nav;
+    transition: padding 0.7s var(--ease-out);
+    pointer-events: none;
   }
-  /* The bar's height IS --nav-h (minus its 1px border), rather than falling
-     out of padding + content and being measured afterwards. Eight sticky
-     offsets and every page's top padding read that token; tying the bar to
-     it means the two can no longer drift apart. */
   .nav-inner {
-    display: flex;
+    pointer-events: auto;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
-    justify-content: space-between;
     gap: 24px;
-    min-height: calc(var(--nav-h) - 1px);
+    min-height: var(--nav-h);
+    max-width: calc(var(--maxw) + 2 * var(--pad-x));
+    margin-inline: auto;
     padding: 0 var(--pad-x);
-    transition: min-height 0.6s var(--ease-out);
-  }
-  .nav[data-scrolled] .nav-inner {
-    min-height: 72px;
-  }
-
-  /* The bottom border, filling from the left as the page is read. */
-  .nav-progress {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: -1px;
-    height: 1px;
-    background: var(--ink);
-    transform: scaleX(var(--progress, 0));
-    transform-origin: left;
+    border-radius: 0;
+    background: rgba(244, 244, 242, 0);
+    border: 1px solid transparent;
+    transition:
+      min-height 0.7s var(--ease-out),
+      padding 0.7s var(--ease-out),
+      background-color 0.5s var(--ease-out),
+      border-color 0.5s var(--ease-out),
+      border-radius 0.7s var(--ease-out),
+      box-shadow 0.7s var(--ease-out),
+      max-width 0.7s var(--ease-out);
   }
 
-  .nav-links {
+  /* Scrolled: the island. The left padding is chosen so the logo moves by
+     only the inset — it stays over the page's own margin. */
+  .nav[data-scrolled] {
+    padding: 10px var(--slab-x);
+  }
+  .nav[data-scrolled] .nav-inner,
+  .nav[data-menu-open] .nav-inner {
+    min-height: 66px;
+    padding: 0 8px 0 calc(var(--pad-x) - var(--slab-x));
+    border-radius: var(--r-pill);
+    background: rgba(250, 250, 248, 0.88);
+    border-color: rgba(16, 42, 67, 0.07);
+    box-shadow:
+      0 1px 1px rgba(var(--shadow-ink), 0.03),
+      0 10px 30px -12px rgba(var(--shadow-ink), 0.22);
+    backdrop-filter: blur(24px) saturate(1.6);
+    -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  }
+
+  .nav-start {
     display: flex;
     align-items: center;
-    gap: clamp(22px, 2.6vw, 42px);
+    min-width: 0;
+  }
+
+  /* ══ Links + pill ═════════════════════════════════════════════════════ */
+  /* Beside the logo rather than centred on the page: the actions on the
+     right weigh more than the logo on the left, and a centred row looked
+     pushed against them. */
+  .nav-links {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: clamp(16px, 3.4vw, 56px);
     list-style: none;
   }
+  .nav-pill {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    height: 40px;
+    width: var(--w, 0px);
+    margin-top: -20px;
+    border-radius: var(--r-pill);
+    background: rgba(16, 42, 67, 0.065);
+    transform: translateX(var(--x, 0px));
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      transform 0.5s var(--ease-out),
+      width 0.5s var(--ease-out),
+      opacity 0.3s ease,
+      background-color 0.3s ease;
+  }
   .nav-link {
+    position: relative;
     display: block;
+    padding: 10px 17px;
+    border-radius: var(--r-pill);
     font-family: var(--sans);
     font-weight: var(--fw-regular);
-    /* ADJUSTED: 10.5px in the prototype. */
-    font-size: var(--fs-micro);
-    letter-spacing: 0.17em;
-    text-transform: uppercase;
+    font-size: 1rem;
+    letter-spacing: 0.005em;
+    line-height: 20px;
     color: var(--ink);
-    padding: 4px 0;
+    white-space: nowrap;
   }
   .nav-link[aria-current='page'] {
     font-weight: var(--fw-medium);
   }
-
-  /* Rolling label: the word slides up and its copy follows from below. */
-  .roll {
-    position: relative;
-    display: block;
-    overflow: hidden;
-    line-height: 1.5;
-  }
-  .roll > span {
-    display: block;
-    transition: transform 0.55s var(--ease-out);
-  }
-  .roll > span + span {
-    position: absolute;
-    inset: 0;
-    transform: translateY(100%);
-  }
-  .nav-link:hover .roll > span:first-child,
-  .nav-link:focus-visible .roll > span:first-child {
-    transform: translateY(-100%);
-  }
-  .nav-link:hover .roll > span + span,
-  .nav-link:focus-visible .roll > span + span {
-    transform: none;
+  /* The shared underline from global.css is not used on this bar. */
+  .nav-link::after {
+    content: none;
   }
 
+  /* ══ End ══════════════════════════════════════════════════════════════ */
   .nav-end {
     display: flex;
     align-items: center;
-    gap: 28px;
+    justify-content: flex-end;
+    gap: 6px;
   }
   .nav-login {
     display: inline-flex;
     align-items: center;
-    gap: 9px;
-    font-size: var(--fs-micro);
-    letter-spacing: 0.17em;
-    text-transform: uppercase;
-    color: var(--taupe);
-    transition: color var(--dur-fast) ease;
+    gap: 8px;
+    height: 44px;
+    padding: 0 16px;
+    border-radius: var(--r-pill);
+    font-size: 1rem;
+    color: var(--ink);
+    white-space: nowrap;
+    transition: background-color var(--dur-fast) ease;
   }
   .nav-login:hover {
-    color: var(--ink);
+    background: rgba(16, 42, 67, 0.065);
   }
   .nav-end :global(.nav-cta) {
-    padding: 13px 28px;
+    margin-left: 6px;
   }
 
   .nav-mobile-only {
     display: none;
     align-items: center;
-    gap: 8px;
+    justify-content: flex-end;
+    gap: 4px;
+    grid-column: 3;
   }
   .burger {
     position: relative;
-    width: 44px;
-    height: 44px;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--ink);
+    transition: transform 0.25s var(--ease-out);
+  }
+  .burger:active {
+    transform: scale(0.94);
   }
   .burger span {
     position: absolute;
-    left: 11px;
-    right: 11px;
+    left: 15px;
+    right: 15px;
     height: 1.5px;
-    background: var(--ink);
-    transition: transform 0.55s var(--ease-out), top 0.55s var(--ease-out);
+    border-radius: 2px;
+    background: var(--cream);
+    transition:
+      transform 0.55s var(--ease-out),
+      top 0.55s var(--ease-out),
+      left 0.55s var(--ease-out);
   }
   .burger span:nth-child(1) {
-    top: 18px;
+    top: 20px;
   }
   .burger span:nth-child(2) {
-    top: 25px;
-    left: 19px;
+    top: 27px;
+    left: 21px;
   }
   .burger[aria-expanded='true'] span:nth-child(1) {
-    top: 21.5px;
+    top: 23.5px;
     transform: rotate(45deg);
   }
   .burger[aria-expanded='true'] span:nth-child(2) {
-    top: 21.5px;
-    left: 11px;
+    top: 23.5px;
+    left: 15px;
     transform: rotate(-45deg);
   }
 
+  /* ══ Mobile sheet ═════════════════════════════════════════════════════ */
   .drawer {
     position: fixed;
-    inset: var(--nav-h-mob) 0 auto;
+    inset: 0;
     z-index: calc(var(--z-nav) - 2);
-    display: grid;
-    grid-template-rows: 0fr;
-    transition: grid-template-rows 0.7s var(--ease-in-out);
+    pointer-events: none;
   }
   .drawer[data-open] {
-    grid-template-rows: 1fr;
+    pointer-events: auto;
   }
-  /* Clips the panel while the grid track animates — and does NOTHING else.
-     Padding and borders do not shrink with the track: with border-box
-     sizing a used height of 0 still resolves to max(0, padding + border),
-     so any decoration put here survives the collapse as a permanent strip
-     welded under the navbar. Keep this element free of padding, border,
-     background and min-height, or the stray bar comes back. */
-  .drawer-clip {
-    overflow: hidden;
-    min-height: 0;
+  .drawer-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(10, 29, 48, 0.28);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    opacity: 0;
+    transition: opacity 0.6s var(--ease-out);
   }
-  /* Everything painted lives here, safely inside the clipper. */
+  .drawer[data-open] .drawer-scrim {
+    opacity: 1;
+  }
   .drawer-panel {
+    position: absolute;
+    top: calc(10px + 66px + 8px);
+    left: var(--slab-x);
+    right: var(--slab-x);
+    max-height: calc(100dvh - 10px - 66px - 8px - var(--slab-x));
+    overflow-y: auto;
+    overscroll-behavior: contain;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
-    background: var(--cream);
-    height: calc(100dvh - var(--nav-h-mob));
-    overflow-y: auto;
-    padding: 12px 0 28px;
+    gap: 24px;
+    padding: 10px 10px 20px;
+    border-radius: var(--r-xl);
+    background: var(--paper);
+    box-shadow: var(--shadow-float);
+    clip-path: inset(0 0 100% 0 round var(--r-xl));
+    transition: clip-path 0.75s var(--ease-in-out);
+  }
+  .drawer[data-open] .drawer-panel {
+    clip-path: inset(0 0 0 0 round var(--r-xl));
   }
   .drawer-links {
     list-style: none;
@@ -387,54 +470,62 @@ const isCurrent = (href: string) =>
   .drawer-links li,
   .drawer-foot {
     opacity: 0;
-    transform: translateY(24px);
+    transform: translateY(16px);
     transition:
-      opacity 0.3s ease,
-      transform 0.3s ease;
+      opacity 0.25s ease,
+      transform 0.25s ease;
   }
   .drawer[data-open] .drawer-links li,
   .drawer[data-open] .drawer-foot {
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
     transition:
-      opacity 0.8s var(--ease-out),
-      transform 0.9s var(--ease-out);
-    transition-delay: calc(0.18s + var(--i, 0) * 0.05s);
+      opacity 0.7s var(--ease-out),
+      transform 0.8s var(--ease-out);
+    transition-delay: calc(0.14s + var(--i, 0) * 0.045s);
   }
   .drawer-links a {
-    display: flex;
-    align-items: baseline;
-    gap: 16px;
-    padding: 12px 24px;
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 8px 12px 14px;
+    border-radius: var(--r-lg);
     font-family: var(--serif);
     font-weight: var(--fw-medium);
-    font-size: clamp(30px, 8.4vw, 44px);
-    letter-spacing: var(--ls-display);
+    font-size: clamp(26px, 7.4vw, 34px);
+    letter-spacing: -0.02em;
     line-height: 1.1;
     color: var(--ink);
-    border-bottom: 1px solid var(--border);
+    --chip-bg: rgba(16, 42, 67, 0.07);
+    --chip-fg: var(--ink);
+    transition: background-color 0.3s ease;
+  }
+  .drawer-links a:active,
+  .drawer-links a[aria-current='page'] {
+    background: rgba(16, 42, 67, 0.05);
   }
   .drawer-links a[aria-current='page'] {
-    font-style: italic;
-    font-weight: var(--fw-regular);
+    --chip-bg: var(--ink);
+    --chip-fg: var(--cream);
   }
   .drawer-num {
     font-family: var(--sans);
-    font-size: var(--fs-micro);
-    font-style: normal;
-    letter-spacing: 0.1em;
+    font-size: 13px;
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.04em;
     color: var(--taupe);
-    min-width: 22px;
   }
   .drawer-foot {
-    padding: 28px 24px 0;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
+    padding: 0 6px;
   }
   .drawer-contact {
     display: flex;
     flex-wrap: wrap;
+    justify-content: center;
     gap: 6px 18px;
     margin-top: 10px;
     font-size: var(--fs-small);
@@ -443,7 +534,7 @@ const isCurrent = (href: string) =>
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .drawer,
+    .drawer-panel,
     .drawer-links li,
     .drawer-foot {
       transition-duration: 0.01ms !important;
@@ -455,19 +546,29 @@ const isCurrent = (href: string) =>
     .nav-login span {
       display: none;
     }
-    .nav-end {
-      gap: 20px;
+    .nav-login {
+      width: 44px;
+      padding: 0;
+      justify-content: center;
+    }
+    .nav-link {
+      padding-inline: 13px;
     }
   }
 
   @media (max-width: 1080px) {
-    .nav-inner,
-    .nav[data-scrolled] .nav-inner {
-      min-height: calc(var(--nav-h-mob) - 1px);
-      /* On the page margin, like the content below. The burger's lines sit
-         11px inside its 44px hit area, so the right padding gives those
-         back and the lines end exactly on the margin too. */
-      padding: 0 calc(var(--pad-x) - 11px) 0 var(--pad-x);
+    .nav-inner {
+      grid-template-columns: minmax(0, 1fr) auto;
+      min-height: var(--nav-h-mob);
+      padding: 0 var(--pad-x);
+    }
+    .nav[data-scrolled] .nav-inner,
+    .nav[data-menu-open] .nav-inner {
+      min-height: 66px;
+      padding: 0 8px 0 calc(var(--pad-x) - var(--slab-x));
+    }
+    .nav[data-menu-open] {
+      padding: 10px var(--slab-x);
     }
     .nav-links,
     .nav-end {
@@ -475,6 +576,10 @@ const isCurrent = (href: string) =>
     }
     .nav-mobile-only {
       display: flex;
+      grid-column: 2;
+    }
+    .nav:not([data-scrolled]):not([data-menu-open]) .burger {
+      margin-right: -4px;
     }
   }
 </style>

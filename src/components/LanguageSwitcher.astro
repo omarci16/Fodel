@@ -41,7 +41,9 @@ const hrefFor = (code: keyof typeof LOCALE_META, status: (typeof SWITCHER_LOCALE
     <Flag code={current.flag} />
     <span aria-hidden="true">{current.short}</span>
     <span class="sr-only">{ui.a11y.langSwitch}</span>
-    <span class="switcher-caret" aria-hidden="true">▾</span>
+    <svg class="switcher-caret" width="10" height="6" viewBox="0 0 10 6" fill="none" aria-hidden="true">
+      <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
   </button>
   <ul class="switcher-menu" id={menuId} inert>
     {
@@ -125,23 +127,26 @@ const hrefFor = (code: keyof typeof LOCALE_META, status: (typeof SWITCHER_LOCALE
     display: inline-flex;
     align-items: center;
     gap: 8px;
+    height: 44px;
+    padding: 0 14px;
+    border-radius: var(--r-pill);
     font-family: var(--sans);
-    font-size: var(--fs-micro);
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
+    font-size: 0.9375rem;
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.04em;
     color: var(--ink);
     background: none;
     border: none;
-    padding: 6px 2px;
     cursor: pointer;
+    transition: background-color var(--dur-fast) ease;
   }
-  .switcher-toggle:hover {
-    color: var(--taupe);
+  .switcher-toggle:hover,
+  .switcher[data-open] .switcher-toggle {
+    background: rgba(16, 42, 67, 0.065);
   }
   .switcher-caret {
-    font-size: 10px;
     color: var(--taupe);
-    transition: transform var(--dur-fast) var(--ease);
+    transition: transform var(--dur-fast) var(--ease-out);
   }
   .switcher[data-open] .switcher-caret {
     transform: rotate(180deg);
@@ -150,29 +155,32 @@ const hrefFor = (code: keyof typeof LOCALE_META, status: (typeof SWITCHER_LOCALE
   .switcher-menu {
     position: absolute;
     top: calc(100% + 10px);
-    min-width: 200px;
-    background: var(--cream);
-    border: 1px solid var(--border);
-    box-shadow: 0 14px 34px rgba(16, 42, 67, 0.16);
+    min-width: 232px;
+    background: var(--paper);
+    border: 1px solid rgba(16, 42, 67, 0.08);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-float);
     list-style: none;
     padding: 6px;
     z-index: 1100;
     opacity: 0;
-    transform: translateY(-6px) scale(0.98);
+    transform: translateY(-6px) scale(0.97);
+    transform-origin: top right;
     pointer-events: none;
     transition:
-      opacity var(--dur-fast) var(--ease),
-      transform var(--dur-fast) var(--ease);
+      opacity 0.3s var(--ease-out),
+      transform 0.45s var(--ease-out);
   }
   .switcher[data-align='right'] .switcher-menu {
     right: 0;
   }
   .switcher[data-align='left'] .switcher-menu {
     left: 0;
+    transform-origin: top left;
   }
   .switcher[data-open] .switcher-menu {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: none;
     pointer-events: auto;
   }
 
@@ -180,17 +188,22 @@ const hrefFor = (code: keyof typeof LOCALE_META, status: (typeof SWITCHER_LOCALE
   .switcher-row-disabled {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 9px 10px;
+    gap: 12px;
+    min-height: 44px;
+    padding: 8px 12px;
+    border-radius: var(--r-sm);
     font-family: var(--sans);
     font-size: var(--fs-small);
     color: var(--ink);
   }
-  a.switcher-row:hover,
-  a.switcher-row.active {
-    background: var(--linen);
+  a.switcher-row {
+    transition: background-color 0.25s ease;
+  }
+  a.switcher-row:hover {
+    background: rgba(16, 42, 67, 0.06);
   }
   a.switcher-row.active {
+    background: rgba(16, 42, 67, 0.08);
     font-weight: var(--fw-medium);
   }
   .switcher-name {
@@ -198,7 +211,7 @@ const hrefFor = (code: keyof typeof LOCALE_META, status: (typeof SWITCHER_LOCALE
   }
   .switcher-code {
     color: var(--taupe);
-    font-size: var(--fs-micro);
+    font-size: 12px;
     letter-spacing: 0.08em;
   }
   .switcher-row-disabled {
@@ -206,12 +219,13 @@ const hrefFor = (code: keyof typeof LOCALE_META, status: (typeof SWITCHER_LOCALE
     cursor: default;
   }
   .switcher-soon {
-    font-size: var(--fs-micro);
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    background: var(--linen);
-    border-radius: 999px;
-    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.02em;
+    background: rgba(16, 42, 67, 0.07);
+    border-radius: var(--r-pill);
+    padding: 3px 9px;
+    white-space: nowrap;
   }
 
   .sr-only {

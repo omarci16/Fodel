@@ -5,7 +5,6 @@
  * Submits as a GET to the properties page, so a search produces a real,
  * shareable, indexable URL instead of React state.
  */
-import Button from './Button.astro';
 import { UI, path, type Locale } from '~/i18n/ui';
 import { termLabel, type TaxonomyTerm } from '~/lib/runtime-config';
 import { PRICE_BANDS, priceBandLabel } from '~/lib/properties';
@@ -30,8 +29,8 @@ const action = path(locale, 'properties');
   <label class="query-label" for="s-query">{ui.filters.search}</label>
   <div class="query-row">
     <svg class="query-icon" width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
-      <circle cx="9.5" cy="9.5" r="7.25" stroke="currentColor" stroke-width="1.2" />
-      <path d="M15 15l5.5 5.5" stroke="currentColor" stroke-width="1.2" />
+      <circle cx="9.5" cy="9.5" r="7.25" stroke="currentColor" stroke-width="1.4" />
+      <path d="M15 15l5.5 5.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
     </svg>
     <input
       class="query"
@@ -85,7 +84,13 @@ const action = path(locale, 'properties');
     </div>
 
     <div class="cell cell-action">
-      <Button variant="dark" type="submit" block>{ui.filters.search}</Button>
+      <button class="search-submit" type="submit">
+        <svg width="20" height="20" viewBox="0 0 22 22" fill="none" aria-hidden="true">
+          <circle cx="9.5" cy="9.5" r="7" stroke="currentColor" stroke-width="1.6" />
+          <path d="M15 15l5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+        </svg>
+        <span>{ui.filters.search}</span>
+      </button>
     </div>
   </div>
 </form>
@@ -102,107 +107,157 @@ const action = path(locale, 'properties');
     margin: 0;
     color: var(--ink);
     font-family: var(--serif);
-    font-size: clamp(32px, 4vw, 64px);
+    font-size: clamp(34px, 4.2vw, 64px);
     font-weight: var(--fw-hero);
     letter-spacing: var(--ls-display);
     line-height: 1.02;
     max-width: 14ch;
   }
+
+  /* 2.0: one floating, rounded panel — a soft field for the free-text search
+     above a row of segments that light up as they are pointed at, ending in
+     the one filled button on the panel. */
   .search {
-    /* A freestanding white panel on the section's cream ground. 1.4 adds the
-       one shadow the site uses — ink-tinted and very long — so the only tool
-       on the page is also the only thing that floats. */
-    background: #fff;
-    border: 1px solid var(--ink);
-    box-shadow: var(--shadow-lg);
+    display: grid;
+    gap: 6px;
+    padding: 8px;
+    border-radius: var(--r-2xl);
+    background: var(--white);
+    border: 1px solid rgba(16, 42, 67, 0.06);
+    box-shadow: var(--shadow-float);
   }
   .query-row {
     position: relative;
     display: flex;
     align-items: center;
-    border-bottom: 1px solid var(--border);
+    border-radius: calc(var(--r-2xl) - 8px);
+    background: var(--cream);
+    transition:
+      background-color 0.4s var(--ease-out),
+      box-shadow 0.4s var(--ease-out);
+  }
+  .query-row:hover {
+    background: #efefed;
+  }
+  .query-row:focus-within {
+    background: var(--white);
+    box-shadow: inset 0 0 0 1.5px var(--ink);
   }
   .query-icon {
     position: absolute;
-    left: 30px;
+    left: 28px;
     color: var(--ink);
     pointer-events: none;
   }
   .row {
     display: grid;
-    grid-template-columns: repeat(4, 1fr) auto;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+    align-items: stretch;
   }
   .cell {
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding: 22px 26px;
-    border-right: 1px solid var(--border);
+    justify-content: flex-start;
+    min-height: 80px;
+    padding: 17px 24px;
+    border-radius: calc(var(--r-2xl) - 8px);
     /* Grid items are min-width:auto by default; a <select> with a long option
        then refuses to shrink and widens the whole document. */
     min-width: 0;
-    transition: background 0.4s var(--ease-out);
+    transition: background-color 0.35s var(--ease-out);
   }
-  .cell:not(.cell-action):hover,
-  .cell:focus-within {
-    background: var(--cream);
-  }
-  /* The field in use is underlined in ink, drawn from the left. */
-  .cell:not(.cell-action)::after {
+  /* Hairline dividers between segments, hidden either side of a lit one. */
+  .cell + .cell::before {
     content: '';
     position: absolute;
     left: 0;
-    right: 0;
-    bottom: -1px;
-    height: 2px;
-    background: var(--ink);
-    transform: scaleX(0);
-    transform-origin: left;
-    transition: transform 0.6s var(--ease-out);
+    top: 22px;
+    bottom: 22px;
+    width: 1px;
+    background: var(--border);
+    transition: opacity 0.3s ease;
   }
-  .cell:focus-within::after {
-    transform: none;
+  .cell:not(.cell-action):hover,
+  .cell:not(.cell-action):focus-within {
+    background: var(--cream);
   }
-  .cell:last-child {
-    border-right: none;
+  .cell:hover::before,
+  .cell:focus-within::before,
+  .cell:hover + .cell::before,
+  .cell:focus-within + .cell::before,
+  .cell-action::before {
+    opacity: 0;
   }
   .cell-action {
-    padding: 0;
-    justify-content: stretch;
+    padding: 6px 4px 6px 12px;
   }
-  .cell-action :global(.btn) {
+  .search-submit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
     height: 100%;
-    padding-inline: 44px;
+    min-height: 64px;
+    padding: 0 34px 0 28px;
+    border-radius: var(--r-pill);
+    background: var(--ink);
+    color: var(--cream);
+    font-size: 1.0625rem;
+    font-weight: var(--fw-medium);
     white-space: nowrap;
+    transition:
+      background-color 0.4s var(--ease-out),
+      box-shadow 0.5s var(--ease-out),
+      transform 0.25s var(--ease-out);
+  }
+  .search-submit:hover,
+  .search-submit:focus-visible {
+    background: var(--ink-soft);
+    box-shadow: 0 16px 30px -14px rgba(var(--shadow-ink), 0.6);
+  }
+  .search-submit:active {
+    transform: scale(0.97);
+  }
+  .search-submit svg {
+    transition: transform 0.6s var(--ease-out);
+  }
+  .search-submit:hover svg {
+    transform: rotate(-12deg) scale(1.06);
   }
 
+  /* The label sits over the select, which is stretched across the whole
+     segment — anywhere in it opens the menu, not only the value's text. */
   label {
+    position: relative;
+    z-index: 1;
+    pointer-events: none;
     font-family: var(--sans);
-    font-size: var(--fs-eyebrow);
-    letter-spacing: var(--ls-label);
-    text-transform: uppercase;
+    font-size: 13px;
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.01em;
+    line-height: 18px;
     color: var(--taupe);
   }
-  select {
-    /* appearance:none alone leaves some browsers sizing the box by its
-       content instead of the flex stretch this needs — display:block plus an
-       explicit width is what makes it reliably fill the cell, arrow included. */
+  .row select {
+    position: absolute;
+    inset: 0;
     display: block;
     width: 100%;
     appearance: none;
     border: none;
+    border-radius: inherit;
     background: transparent;
     font-size: var(--fs-body-lg);
     font-weight: var(--fw-body);
+    line-height: 22px;
     color: var(--ink);
     cursor: pointer;
-    padding-right: 22px;
-    /* A single crisp SVG chevron instead of a two-gradient hack — the
-       gradient version rendered as only half a mark at this field size. */
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%233a464a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-    background-position: right 2px center;
-    background-size: 10px 6px;
+    padding: 39px 48px 17px 24px;
+    text-overflow: ellipsis;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1.5 1.75 6 6.25l4.5-4.5' fill='none' stroke='%23102a43' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-position: right 24px top 46px;
+    background-size: 12px 8px;
     background-repeat: no-repeat;
   }
   .query-label { position:absolute; inline-size:1px; block-size:1px; overflow:hidden; clip-path:inset(50%); }
@@ -212,21 +267,40 @@ const action = path(locale, 'properties');
     width: 100%;
     border: none;
     background: transparent;
-    padding: 30px 30px 30px 72px;
-    font-size: clamp(1.2rem, 2.2vw, 1.75rem);
+    padding: 26px 28px 26px 66px;
+    font-size: clamp(1.2rem, 1.9vw, 1.625rem);
     font-family: var(--serif);
-    letter-spacing: var(--ls-heading);
+    letter-spacing: -0.01em;
     color: var(--ink);
+    border-radius: inherit;
   }
-  .query::placeholder { color: var(--taupe); opacity: 0.65; }
+  .query::placeholder { color: var(--taupe); opacity: 0.7; }
   /* Last resort only — the short placeholder below keeps phones clear of it. */
   .query { text-overflow: ellipsis; }
-  .query:focus-visible, select:focus-visible {
-    outline: var(--focus-ring);
-    outline-offset: -2px;
+  .query:focus-visible {
+    outline: none;
   }
-  .query-row:focus-within {
-    background: var(--cream);
+  select:focus-visible {
+    outline: none;
+  }
+  .cell:has(select:focus-visible) {
+    box-shadow: inset 0 0 0 1.5px var(--ink);
+  }
+
+  @media (max-width: 1100px) {
+    .row {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .cell + .cell::before {
+      display: none;
+    }
+    .cell-action {
+      grid-column: 1 / -1;
+      padding: 4px 0 0;
+    }
+    .search-submit {
+      width: 100%;
+    }
   }
 
   @media (max-width: 900px) {
@@ -236,40 +310,43 @@ const action = path(locale, 'properties');
       gap: 24px;
       margin-bottom: 28px;
     }
+    .search {
+      padding: 6px;
+      border-radius: var(--r-xl);
+    }
+    .query-row,
+    .cell {
+      border-radius: calc(var(--r-xl) - 6px);
+    }
     .query-icon {
       left: 20px;
     }
     .query {
-      padding: 22px 20px 22px 56px;
-    }
-    .row {
-      grid-template-columns: 1fr 1fr;
+      padding: 20px 18px 20px 52px;
     }
     .cell {
-      border-bottom: 1px solid var(--border);
-      padding: 18px 20px;
+      min-height: 72px;
+      padding: 14px 16px;
     }
-    .cell:nth-child(2n) {
-      border-right: none;
+    .row select {
+      padding: 35px 36px 13px 16px;
+      background-position: right 16px top 42px;
     }
-    .cell-action {
-      grid-column: 1 / -1;
-      border-bottom: none;
-      padding: 0;
-    }
-    .cell-action :global(.btn) {
-      padding-block: 18px;
+    .search-submit {
+      min-height: 58px;
     }
   }
   /* Small phones: two cells a row leave ~150px each, so the cells tighten and
      the selects step down a size to keep "Egész ország" whole. */
   @media (max-width: 420px) {
     .cell {
-      padding: 16px 14px;
+      padding: 14px 14px;
     }
-    select {
+    .row select {
       font-size: var(--fs-body);
-      padding-right: 18px;
+      padding-left: 14px;
+      padding-right: 30px;
+      background-position: right 14px top 42px;
     }
     .query {
       font-size: 1.125rem;

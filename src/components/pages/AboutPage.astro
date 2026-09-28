@@ -56,7 +56,7 @@ const quote = splitOpeningQuote(c.origin.quote);
   />
 
   {/* ── Origin ── */}
-  <section class="origin" data-bg="dark">
+  <section class="origin slab surface-ink" data-bg="dark">
     <figure>
       <p class="origin-source reveal">
         <span class="origin-rule draw" aria-hidden="true"></span>
@@ -76,20 +76,20 @@ const quote = splitOpeningQuote(c.origin.quote);
   </section>
 
   {/* ── Figures ── */}
-  <section class="figures">
+  <section class="figures slab">
     <StatsBand stats={stats} />
   </section>
 
   {/* ── Approach + story ── */}
-  <div class="split">
-    <section class="approach reveal">
+  <div class="split duo">
+    <section class="approach duo-panel duo-paper reveal">
       <SectionHead eyebrow={c.approach.eyebrow} rule={false}>
         <Fragment slot="title">{c.approach.title}<br /><em>{c.approach.titleEm}</em></Fragment>
       </SectionHead>
       <PointsList items={c.approach.points} />
     </section>
 
-    <section class="story reveal">
+    <section class="story duo-panel duo-linen reveal">
       <SectionHead eyebrow={c.story.eyebrow} rule={false}>
         <Fragment slot="title">{c.story.title}<br /><em>{c.story.titleEm}</em></Fragment>
       </SectionHead>
@@ -127,10 +127,7 @@ const quote = splitOpeningQuote(c.origin.quote);
 <style>
   /* ── Origin ── */
   .origin {
-    padding: 152px var(--pad-x) 136px;
-    background:
-      radial-gradient(120% 80% at 85% 0%, var(--ink-soft) 0%, transparent 55%),
-      linear-gradient(180deg, var(--ink) 0%, var(--ink-deep) 100%);
+    padding: clamp(96px, 9vw, 144px) calc(var(--pad-x) - var(--slab-x)) clamp(88px, 8vw, 128px);
   }
   .origin figure {
     max-width: 1180px;
@@ -138,16 +135,17 @@ const quote = splitOpeningQuote(c.origin.quote);
   .origin-source {
     display: flex;
     align-items: center;
-    gap: 16px;
-    margin-bottom: 44px;
-    font-size: var(--fs-eyebrow);
-    letter-spacing: var(--ls-eyebrow);
+    gap: 14px;
+    margin-bottom: 40px;
+    font-size: 0.75rem;
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.16em;
     text-transform: uppercase;
     color: var(--on-dark-body);
   }
   .origin-rule {
     flex-shrink: 0;
-    width: 48px;
+    width: 32px;
     height: 1px;
     background: var(--cream);
   }
@@ -162,8 +160,9 @@ const quote = splitOpeningQuote(c.origin.quote);
   }
   .origin-cite {
     margin-top: 56px;
-    font-size: var(--fs-eyebrow);
-    letter-spacing: var(--ls-eyebrow);
+    font-size: 0.75rem;
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.16em;
     text-transform: uppercase;
     color: var(--on-dark-muted);
   }
@@ -178,7 +177,7 @@ const quote = splitOpeningQuote(c.origin.quote);
 
   /* ── Figures ── */
   .figures {
-    padding: 96px var(--pad-x) 104px;
+    padding: 88px calc(var(--pad-x) - var(--slab-x)) 96px;
     background: var(--linen);
   }
 
@@ -186,10 +185,8 @@ const quote = splitOpeningQuote(c.origin.quote);
      Subgrid, so the list and the story start on one line whatever the
      headings wrap to. No gold rule: the hairline under each head is the rule. */
   .split {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-template-rows: auto 1fr;
-    border-top: 1px solid var(--border);
+    margin-top: var(--slab-x);
   }
   .approach,
   .story {
@@ -198,14 +195,10 @@ const quote = splitOpeningQuote(c.origin.quote);
     grid-template-rows: subgrid;
     row-gap: 0;
     align-content: start;
-    padding: var(--section-y) var(--pad-x);
   }
   .split :global(.section-head-standard) {
     align-self: start;
     margin-bottom: 26px;
-  }
-  .story {
-    background: var(--linen);
   }
   .story-body {
     padding-top: 18px;
@@ -229,8 +222,9 @@ const quote = splitOpeningQuote(c.origin.quote);
   }
   .details dt {
     margin-bottom: 6px;
-    font-size: var(--fs-eyebrow);
-    letter-spacing: var(--ls-eyebrow);
+    font-size: 0.75rem;
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.14em;
     text-transform: uppercase;
     color: var(--taupe);
   }
@@ -253,7 +247,7 @@ const quote = splitOpeningQuote(c.origin.quote);
 
   @media (max-width: 900px) {
     .origin {
-      padding: 96px var(--pad-x-mob) 80px;
+      padding: 80px calc(var(--pad-x-mob) - var(--slab-x) + 4px) 64px;
     }
     .origin-source {
       margin-bottom: 32px;
@@ -268,7 +262,7 @@ const quote = splitOpeningQuote(c.origin.quote);
       margin-bottom: 32px;
     }
     .figures {
-      padding: 48px var(--pad-x-mob) 56px;
+      padding: 40px calc(var(--pad-x-mob) - var(--slab-x) + 4px) 48px;
     }
     .split {
       grid-template-columns: 1fr;
@@ -277,7 +271,6 @@ const quote = splitOpeningQuote(c.origin.quote);
     .approach,
     .story {
       display: block;
-      padding: var(--section-y-mob) var(--pad-x-mob);
     }
   }
 </style>

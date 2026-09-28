@@ -21,13 +21,21 @@ const subLabel = BRAND[locale].name.replace('FODEL', '').trim() || 'VASTGOED';
 </a>
 
 <style>
+  /* inline-block: the rule under the word is exactly as wide as the word,
+     wherever the logo sits. As a block inside a grid cell (the footer) it
+     stretched the rule across the whole column. */
   .logo {
-    display: block;
+    display: inline-block;
+    vertical-align: top;
     line-height: 1;
     user-select: none;
+    border-radius: var(--r-xs);
   }
+  /* The tracking is cancelled after the last letter, so the rule ends
+     under the L rather than a letter-space beyond it. */
   .word {
     display: block;
+    margin-right: -0.38em;
     font-family: var(--serif);
     font-weight: var(--fw-medium);
     font-size: 20px;
@@ -44,7 +52,7 @@ const subLabel = BRAND[locale].name.replace('FODEL', '').trim() || 'VASTGOED';
   .sub {
     display: block;
     font-family: var(--sans);
-    font-weight: 200;
+    font-weight: var(--fw-regular);
     /* ADJUSTED: 7.5px in the prototype — below the threshold of legibility. */
     font-size: 9px;
     letter-spacing: 0.42em;

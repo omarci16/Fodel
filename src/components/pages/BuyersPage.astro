@@ -86,7 +86,7 @@ const wants = hu
   />
 
   {/* ── Direct from the owner ── */}
-  <section class="direct" data-bg="dark">
+  <section class="direct slab surface-ink" data-bg="dark">
     <p class="direct-source reveal">
       <span class="direct-rule draw" aria-hidden="true"></span>
       {hu ? 'A FODEL-modell' : 'Het FODEL-model'}
@@ -117,8 +117,8 @@ const wants = hu
   </section>
 
   {/* ── What we handle + what buyers look for ── */}
-  <div class="split">
-    <section class="services reveal">
+  <div class="split duo">
+    <section class="services duo-panel duo-paper reveal">
       <SectionHead eyebrow={c.services.eyebrow} title={c.services.title} rule={false} />
       <div>
         <PointsList items={c.services.points} />
@@ -130,7 +130,7 @@ const wants = hu
       </div>
     </section>
 
-    <section class="wants reveal">
+    <section class="wants duo-panel duo-linen reveal">
       <SectionHead eyebrow={c.reasons.eyebrow} title={c.reasons.title} rule={false} />
       <PointsList items={wants} />
     </section>
@@ -165,7 +165,7 @@ const wants = hu
   {/* ── Featured ── */}
   {
     featured.length > 0 && (
-      <section class="featured">
+      <section class="featured slab">
         <SectionHead
           eyebrow={hu ? 'Válogatás' : 'Selectie'}
           title={hu ? 'Kiemelt ingatlanok' : 'Uitgelicht aanbod'}
@@ -187,7 +187,7 @@ const wants = hu
           ))}
         </div>
         <div class="feat-more">
-          <Button variant="outline" href={path(locale, 'properties')} block>
+          <Button variant="outline" href={path(locale, 'properties')} block arrow>
             {ui.cta.allProperties}
           </Button>
         </div>
@@ -221,23 +221,21 @@ const wants = hu
 <style>
   /* ── Direct from the owner ── */
   .direct {
-    padding: 152px var(--pad-x) 112px;
-    background:
-      radial-gradient(120% 80% at 85% 0%, var(--ink-soft) 0%, transparent 55%),
-      linear-gradient(180deg, var(--ink) 0%, var(--ink-deep) 100%);
+    padding: clamp(96px, 9vw, 144px) calc(var(--pad-x) - var(--slab-x)) clamp(72px, 7vw, 112px);
   }
   .direct-source {
     display: flex;
     align-items: center;
-    gap: 16px;
-    margin-bottom: 44px;
-    font-size: var(--fs-eyebrow);
-    letter-spacing: var(--ls-eyebrow);
+    gap: 14px;
+    margin-bottom: 40px;
+    font-size: 0.75rem;
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.16em;
     text-transform: uppercase;
     color: var(--on-dark-body);
   }
   .direct-rule {
-    width: 48px;
+    width: 32px;
     height: 1px;
     background: var(--cream);
   }
@@ -297,9 +295,8 @@ const wants = hu
      Subgrid, so both lists start on one line whatever the headings wrap to.
      No gold rule under these heads: the list's own hairline is the rule. */
   .split {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-template-rows: auto 1fr;
+    margin-top: var(--slab-x);
   }
   .services,
   .wants {
@@ -308,14 +305,10 @@ const wants = hu
     grid-template-rows: subgrid;
     row-gap: 0;
     align-content: start;
-    padding: var(--section-y) var(--pad-x);
   }
   .split :global(.section-head-standard) {
     align-self: start;
     margin-bottom: 26px;
-  }
-  .wants {
-    background: var(--linen);
   }
   .services-more {
     margin-top: 36px;
@@ -328,7 +321,6 @@ const wants = hu
     gap: 80px;
     align-items: center;
     padding: var(--section-y) var(--pad-x);
-    border-top: 1px solid var(--border);
   }
   .agri-figure {
     display: flex;
@@ -348,8 +340,9 @@ const wants = hu
     color: var(--ink);
   }
   .ha-unit {
-    font-size: var(--fs-eyebrow);
-    letter-spacing: var(--ls-eyebrow);
+    font-size: 0.75rem;
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.16em;
     text-transform: uppercase;
     color: var(--taupe);
   }
@@ -363,7 +356,7 @@ const wants = hu
 
   /* ── Featured ── */
   .featured {
-    padding: var(--section-y) var(--pad-x);
+    padding: var(--section-y) calc(var(--pad-x) - var(--slab-x));
     background: var(--linen);
   }
   .featured :global(.feat-head) {
@@ -372,7 +365,7 @@ const wants = hu
   .feat-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 32px;
+    gap: 28px;
   }
   .feat-more {
     display: none;
@@ -387,7 +380,7 @@ const wants = hu
 
   @media (max-width: 900px) {
     .direct {
-      padding: 96px var(--pad-x-mob) 64px;
+      padding: 80px calc(var(--pad-x-mob) - var(--slab-x) + 4px) 56px;
     }
     .direct-source {
       margin-bottom: 32px;
@@ -409,7 +402,6 @@ const wants = hu
     .services,
     .wants {
       display: block;
-      padding: var(--section-y-mob) var(--pad-x-mob);
     }
 
     .agri {
@@ -419,7 +411,7 @@ const wants = hu
     }
 
     .featured {
-      padding: var(--section-y-mob) var(--pad-x-mob);
+      padding: var(--section-y-mob) calc(var(--pad-x-mob) - var(--slab-x) + 4px);
     }
     .featured :global(.feat-head) {
       margin-bottom: 36px;

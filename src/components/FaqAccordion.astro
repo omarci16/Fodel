@@ -67,18 +67,36 @@ const { eyebrow, title, entries, moreHref, moreLabel } = Astro.props;
   }
   .faq-aside {
     position: sticky;
-    top: 112px;
+    top: calc(var(--nav-h) + 24px);
   }
   .faq-more {
-    margin-top: 8px;
+    margin-top: 4px;
   }
 
+  /* 2.0: every question is its own rounded row; the open one lifts onto a
+     white surface. */
   .faq-list {
-    border-top: 1px solid var(--ink);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
   }
   .faq-item {
-    border-bottom: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    background: rgba(16, 42, 67, 0.035);
+    border: 1px solid transparent;
     interpolate-size: allow-keywords;
+    transition:
+      background-color 0.5s var(--ease-out),
+      box-shadow 0.6s var(--ease-out),
+      border-color 0.5s var(--ease-out);
+  }
+  .faq-item:hover {
+    background: rgba(16, 42, 67, 0.06);
+  }
+  .faq-item[open] {
+    background: var(--white);
+    border-color: rgba(16, 42, 67, 0.06);
+    box-shadow: var(--shadow-md);
   }
   .faq-item::details-content {
     block-size: 0;
@@ -93,10 +111,11 @@ const { eyebrow, title, entries, moreHref, moreLabel } = Astro.props;
 
   summary {
     display: grid;
-    grid-template-columns: 44px minmax(0, 1fr) 20px;
-    align-items: baseline;
+    grid-template-columns: 36px minmax(0, 1fr) 36px;
+    align-items: center;
     gap: 12px;
-    padding: 26px 0;
+    padding: 20px 20px 20px 24px;
+    border-radius: var(--r-lg);
     cursor: pointer;
     list-style: none;
   }
@@ -105,55 +124,68 @@ const { eyebrow, title, entries, moreHref, moreLabel } = Astro.props;
   }
   summary:focus-visible {
     outline: var(--focus-ring);
-    outline-offset: 4px;
+    outline-offset: 2px;
   }
   .q-num {
-    font-size: var(--fs-micro);
-    letter-spacing: 0.08em;
+    font-size: 13px;
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.04em;
     color: var(--taupe);
   }
   .q {
     font-family: var(--serif);
     font-weight: var(--fw-medium);
-    font-size: clamp(18px, 1.5vw, 22px);
-    letter-spacing: var(--ls-heading);
+    font-size: clamp(18px, 1.4vw, 21px);
+    letter-spacing: -0.005em;
     line-height: 1.35;
     color: var(--ink);
-    transition: color 0.3s ease;
-  }
-  summary:hover .q {
-    color: var(--taupe);
   }
 
-  /* A plus drawn in two rules; the upright one turns flat when open. */
+  /* A plus in a disc; the upright stroke turns flat when open. */
   .icon {
     position: relative;
-    align-self: center;
-    width: 14px;
-    height: 14px;
-    justify-self: end;
+    display: block;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--white);
+    box-shadow: inset 0 0 0 1px rgba(16, 42, 67, 0.1);
+    transition:
+      background-color 0.4s var(--ease-out),
+      transform 0.6s var(--ease-out);
+  }
+  .faq-item[open] .icon {
+    background: var(--ink);
+    transform: rotate(180deg);
   }
   .icon::before,
   .icon::after {
     content: '';
     position: absolute;
-    left: 0;
-    right: 0;
+    left: 50%;
     top: 50%;
-    height: 1px;
-    margin-top: -0.5px;
+    width: 12px;
+    height: 1.5px;
+    margin: -0.75px 0 0 -6px;
+    border-radius: 1px;
     background: var(--ink);
-    transition: transform 0.5s var(--ease-out);
+    transition:
+      transform 0.5s var(--ease-out),
+      background-color 0.4s var(--ease-out);
   }
   .icon::after {
     transform: rotate(90deg);
+  }
+  .faq-item[open] .icon::before,
+  .faq-item[open] .icon::after {
+    background: var(--cream);
   }
   .faq-item[open] .icon::after {
     transform: rotate(0deg);
   }
 
   .answer {
-    padding: 0 32px 30px 56px;
+    padding: 0 32px 28px 72px;
   }
   .answer p {
     max-width: 62ch;
@@ -172,10 +204,11 @@ const { eyebrow, title, entries, moreHref, moreLabel } = Astro.props;
   .bullet::before {
     content: '';
     position: absolute;
-    left: 0;
-    top: 0.85em;
-    width: 10px;
-    height: 1px;
+    left: 2px;
+    top: 0.72em;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
     background: var(--ink);
   }
 
@@ -194,12 +227,19 @@ const { eyebrow, title, entries, moreHref, moreLabel } = Astro.props;
       margin-top: 0;
     }
     summary {
-      grid-template-columns: 32px minmax(0, 1fr) 16px;
-      gap: 10px;
-      padding: 22px 0;
+      grid-template-columns: minmax(0, 1fr) 32px;
+      gap: 12px;
+      padding: 18px 16px 18px 20px;
+    }
+    .q-num {
+      display: none;
+    }
+    .icon {
+      width: 32px;
+      height: 32px;
     }
     .answer {
-      padding: 0 0 24px 42px;
+      padding: 0 20px 22px;
     }
   }
 </style>

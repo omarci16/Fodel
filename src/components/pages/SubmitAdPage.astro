@@ -228,11 +228,13 @@ const packageSchema = listingServiceSchema(locale, {
   <div class="layout">
     <div class="marketing">
       <header class="intro">
-        <Eyebrow space="16px">{t.eyebrow}</Eyebrow>
+        <p class="s-eyebrow">
+          <span class="s-eyebrow-rule" aria-hidden="true"></span>
+          <span>{t.eyebrow}</span>
+        </p>
         <h1>
-          {t.title}
-          <br />
-          <em>{t.titleEm}</em>
+          <span class="line"><span>{t.title}</span></span>
+          <span class="line" style="--i:1"><span><em>{t.titleEm}</em></span></span>
         </h1>
         <p class="intro-body">{t.body}</p>
       </header>
@@ -287,6 +289,7 @@ const packageSchema = listingServiceSchema(locale, {
                   data-months="1"
                   data-label={LOCALE_META[lang].label}
                 />
+                <span class="box" aria-hidden="true"></span>
                 <span class="chip-name">{LOCALE_META[lang].label}</span>
                 <span class="chip-price">{formatCents(translationExtra.priceEur * 100)}</span>
               </label>
@@ -299,6 +302,7 @@ const packageSchema = listingServiceSchema(locale, {
               data-price-cents={categoryHighlight.priceEur * 100}
               data-months={categoryHighlight.minMonths}
             />
+                <span class="box" aria-hidden="true"></span>
             <span class="chip-name">{t.extraCategoryHighlight}</span>
             <span class="chip-price">
               {formatCents(categoryHighlight.priceEur * 100)} {t.perMonth} · {t.minMonths(categoryHighlight.minMonths!)}
@@ -311,6 +315,7 @@ const packageSchema = listingServiceSchema(locale, {
               data-price-cents={homepageHighlight.priceEur * 100}
               data-months={homepageHighlight.minMonths}
             />
+                <span class="box" aria-hidden="true"></span>
             <span class="chip-name">{t.extraHomepageHighlight}</span>
             <span class="chip-price">
               {formatCents(homepageHighlight.priceEur * 100)} {t.perMonth} · {t.minMonths(homepageHighlight.minMonths!)}
@@ -318,14 +323,18 @@ const packageSchema = listingServiceSchema(locale, {
           </label>
           <label class="chip">
             <input type="checkbox" data-extra="video" data-price-cents={videoExtra.priceEur * 100} data-months="1" />
+                <span class="box" aria-hidden="true"></span>
             <span class="chip-name">{t.extraVideo}</span>
             <span class="chip-price">{formatCents(videoExtra.priceEur * 100)} {t.once}</span>
           </label>
         </div>
-        <p class="total">
-          {t.totalLabel}: <strong id="order-total-amount">{formatCents(defaultPackage.priceCents)}</strong>
-          <span class="total-note">({t.totalNote})</span>
-        </p>
+        <div class="total" aria-live="polite">
+          <p class="total-copy">
+            <span class="total-label">{t.totalLabel}</span>
+            <span class="total-note">({t.totalNote})</span>
+          </p>
+          <strong id="order-total-amount" class="num">{formatCents(defaultPackage.priceCents)}</strong>
+        </div>
       </section>
     </div>
 
@@ -534,163 +543,250 @@ const packageSchema = listingServiceSchema(locale, {
 </script>
 
 <style>
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 460px;
+    gap: clamp(48px, 5vw, 80px);
+    align-items: start;
+    padding: 64px var(--pad-x) var(--section-y);
+  }
+
   .intro {
     max-width: 62ch;
-    margin-bottom: 48px;
+    margin-bottom: 64px;
+  }
+  .s-eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 28px;
+    font-size: 0.75rem;
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink);
+    animation: fx-fade-up 1.2s var(--ease-out) 0.3s both;
+  }
+  .s-eyebrow-rule {
+    width: 32px;
+    height: 1px;
+    background: var(--ink);
+    transform-origin: left;
+    animation: fx-draw 1.2s var(--ease-out) 0.4s both;
   }
   .intro h1 {
     font-family: var(--serif);
-    font-weight: var(--fw-display);
-    font-size: clamp(34px, 4vw, 56px);
-    line-height: 1.04;
+    font-weight: var(--fw-hero);
+    font-size: clamp(38px, 4.6vw, 72px);
+    letter-spacing: var(--ls-display);
+    line-height: 1.02;
     color: var(--ink);
-    margin-bottom: 24px;
+    margin-bottom: 28px;
   }
-  .intro h1 em {
-    font-style: italic;
+  .intro h1 .line > span {
+    animation: fx-rise 1.4s var(--ease-out) both;
+    animation-delay: calc(0.35s + var(--i, 0) * 0.11s);
   }
   .intro-body {
     font-size: var(--fs-body-lg);
-    line-height: var(--lh-lead);
+    line-height: 1.65;
     color: var(--taupe);
     max-width: 52ch;
+    animation: fx-fade-up 1.3s var(--ease-out) 0.7s both;
   }
 
-  .layout {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 420px;
-    gap: 64px;
-    align-items: start;
-    padding: 72px var(--pad-x) var(--section-y);
-  }
-
-  .process {
-    padding-bottom: 56px;
-    border-bottom: 1px solid var(--border);
+  .process,
+  .packages,
+  .extras {
+    margin-bottom: 56px;
   }
   .process ol {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 28px 32px;
+    gap: 10px;
     list-style: none;
-    counter-reset: step;
   }
   .process li {
-    border-top: 2px solid var(--accent);
-    padding-top: 20px;
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr);
+    column-gap: 16px;
+    padding: 22px 24px 24px 20px;
+    border-radius: var(--r-lg);
+    background: var(--white);
+    border: 1px solid rgba(16, 42, 67, 0.07);
   }
   .n {
-    display: block;
-    font-family: var(--serif);
-    font-weight: var(--fw-light);
-    font-size: 30px;
+    grid-row: span 2;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(16, 42, 67, 0.07);
+    font-family: var(--sans);
+    font-size: 13.5px;
+    font-weight: var(--fw-medium);
     line-height: 1;
-    color: var(--accent);
-    opacity: 0.62;
-    margin-bottom: 12px;
+    color: var(--ink);
   }
   .process h2 {
+    margin-top: 2px;
     font-family: var(--serif);
-    font-weight: var(--fw-display);
-    font-size: 18px;
+    font-weight: var(--fw-medium);
+    font-size: 19px;
+    letter-spacing: -0.01em;
     color: var(--ink);
     margin-bottom: 6px;
   }
   .process p {
     font-size: var(--fs-small);
-    line-height: var(--lh-body);
+    line-height: 1.6;
     color: var(--taupe);
   }
 
-  .packages {
-    padding: 56px 0;
-    border-bottom: 1px solid var(--border);
-  }
   .package-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 24px;
+    gap: 12px;
   }
 
-  .extras {
-    padding-top: 56px;
-  }
+  /* Extras: pills that fill when chosen, with a drawn tick. */
   .chips {
     display: flex;
     flex-wrap: wrap;
-    gap: 12px;
-    margin-bottom: 24px;
+    gap: 8px;
+    margin-bottom: 20px;
   }
   .chip {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 10px;
-    border: 1px solid var(--border);
-    padding: 12px 18px;
+    min-height: 48px;
+    padding: 8px 18px 8px 10px;
+    border-radius: var(--r-pill);
+    background: var(--white);
+    border: 1px solid rgba(16, 42, 67, 0.12);
     cursor: pointer;
     transition:
-      border-color 0.25s,
-      background 0.25s;
+      border-color 0.3s var(--ease-out),
+      background-color 0.3s var(--ease-out),
+      color 0.3s var(--ease-out);
+  }
+  .chip:hover {
+    border-color: rgba(16, 42, 67, 0.34);
+  }
+  .chip input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+    pointer-events: none;
+  }
+  .box {
+    position: relative;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(16, 42, 67, 0.07);
+    transition: background-color 0.3s var(--ease-out);
+  }
+  .box::after {
+    content: '';
+    width: 9px;
+    height: 5px;
+    margin-top: -2px;
+    border-left: 1.6px solid var(--ink);
+    border-bottom: 1.6px solid var(--ink);
+    transform: rotate(-45deg) scale(0);
+    transition: transform 0.35s var(--ease-out);
   }
   .chip:has(input:checked) {
+    background: var(--ink);
     border-color: var(--ink);
-    background: var(--linen);
+  }
+  .chip:has(input:checked) .box {
+    background: var(--cream);
+  }
+  .chip:has(input:checked) .box::after {
+    transform: rotate(-45deg) scale(1);
+  }
+  .chip:has(input:checked) :is(.chip-name, .chip-price) {
+    color: var(--cream);
   }
   .chip:has(input:focus-visible) {
     outline: var(--focus-ring);
-    outline-offset: 2px;
-  }
-  .chip:hover {
-    border-color: var(--taupe);
-  }
-  .chip input {
-    width: 16px;
-    height: 16px;
-    accent-color: var(--ink);
-    flex-shrink: 0;
+    outline-offset: 3px;
   }
   .chip-name {
     font-size: var(--fs-small);
+    font-weight: var(--fw-medium);
     color: var(--ink);
   }
   .chip-price {
-    font-size: var(--fs-micro);
+    font-size: 13px;
     color: var(--taupe);
     white-space: nowrap;
   }
 
   .total {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 24px;
+    padding: 20px 28px;
+    border-radius: var(--r-xl);
+    background: var(--white);
+    border: 1px solid rgba(16, 42, 67, 0.07);
+    box-shadow: var(--shadow-sm);
+  }
+  .total-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .total-label {
     font-size: var(--fs-body);
+    font-weight: var(--fw-medium);
     color: var(--ink);
   }
-  .total strong {
-    font-family: var(--serif);
-    font-size: var(--fs-lead);
-  }
   .total-note {
-    display: block;
-    font-size: var(--fs-micro);
+    font-size: 13px;
+    line-height: 1.45;
     color: var(--taupe);
-    margin-top: 4px;
+  }
+  .total strong {
+    flex-shrink: 0;
+    font-family: var(--serif);
+    font-weight: var(--fw-medium);
+    font-size: clamp(28px, 2.6vw, 38px);
+    letter-spacing: -0.02em;
+    color: var(--ink);
   }
 
   .form-col {
     display: flex;
     flex-direction: column;
-    gap: 28px;
-    position: sticky;
-    top: calc(var(--nav-h) + 24px);
+    gap: 12px;
   }
   .form-card {
-    background: var(--ink);
-    border-top: 3px solid var(--accent);
-    box-shadow: 0 24px 60px rgba(16, 42, 67, 0.22);
-    padding: 40px;
+    padding: 40px 36px 36px;
+    border-radius: var(--r-2xl);
+    background:
+      radial-gradient(90% 60% at 100% 0%, var(--ink-soft) 0%, transparent 65%),
+      var(--ink);
+    box-shadow: var(--shadow-float);
+  }
+  .form-card :global(.eyebrow) {
+    color: var(--on-dark-strong);
   }
   .form-note {
     font-size: var(--fs-small);
     line-height: var(--lh-body);
-    color: var(--taupe);
+    color: var(--on-dark-body);
   }
   .form-note + .form-note {
     margin-top: 10px;
@@ -701,13 +797,14 @@ const packageSchema = listingServiceSchema(locale, {
     text-underline-offset: 3px;
   }
   .form-card :global(.fields) {
-    margin-top: 24px;
+    margin-top: 28px;
   }
 
   .bank {
-    background: var(--cream);
-    border: 1px solid var(--border);
-    padding: 28px;
+    padding: 28px 30px;
+    border-radius: var(--r-xl);
+    background: var(--white);
+    border: 1px solid rgba(16, 42, 67, 0.07);
   }
   .bank-note {
     font-size: var(--fs-small);
@@ -715,23 +812,28 @@ const packageSchema = listingServiceSchema(locale, {
     color: var(--taupe);
     margin-bottom: 20px;
   }
+  .bank dl {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 24px;
+  }
   .bank dl > div {
-    padding-bottom: 14px;
-    margin-bottom: 14px;
-    border-bottom: 1px solid var(--border);
+    padding: 14px 18px;
+    border-radius: var(--r-md);
+    background: rgba(16, 42, 67, 0.04);
   }
   .bank dt {
-    font-size: var(--fs-eyebrow);
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
+    font-size: 13px;
+    font-weight: var(--fw-medium);
     color: var(--taupe);
-    margin-bottom: 6px;
+    margin-bottom: 4px;
   }
   .bank dd {
     font-family: var(--serif);
     font-size: var(--fs-body-lg);
     color: var(--ink);
     font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
   }
   .bic {
     font-size: var(--fs-small);
@@ -741,21 +843,22 @@ const packageSchema = listingServiceSchema(locale, {
   .help {
     display: flex;
     flex-direction: column;
+    align-items: flex-start;
     gap: 6px;
   }
   .help p {
-    font-size: var(--fs-eyebrow);
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
+    font-size: 13px;
+    font-weight: var(--fw-medium);
     color: var(--taupe);
-    margin-bottom: 6px;
+    margin-bottom: 4px;
   }
-  .help a {
+  .help a:not(:global(.btn)) {
     font-family: var(--serif);
     font-size: var(--fs-lead);
     color: var(--ink);
+    font-variant-numeric: tabular-nums;
   }
-  .help a:hover {
+  .help a:not(:global(.btn)):hover {
     text-decoration: underline;
     text-underline-offset: 4px;
   }
@@ -765,16 +868,13 @@ const packageSchema = listingServiceSchema(locale, {
       grid-template-columns: 1fr;
       gap: 40px;
     }
-    .form-col {
-      position: static;
-    }
   }
   @media (max-width: 700px) {
     .intro {
-      margin-bottom: 32px;
+      margin-bottom: 40px;
     }
     .layout {
-      padding: 44px var(--pad-x-mob) var(--section-y-mob);
+      padding: 40px var(--pad-x-mob) var(--section-y-mob);
     }
     .process ol {
       grid-template-columns: 1fr;
@@ -783,7 +883,11 @@ const packageSchema = listingServiceSchema(locale, {
       grid-template-columns: 1fr;
     }
     .form-card {
-      padding: 28px 24px;
+      padding: 28px 20px;
+      border-radius: var(--r-xl);
+    }
+    .total {
+      padding: 18px 20px;
     }
   }
 </style>

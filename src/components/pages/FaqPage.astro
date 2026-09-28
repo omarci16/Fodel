@@ -76,10 +76,10 @@ const grouped = t.groups
       {
         grouped.map((group) => (
           <div class="toc-group">
-            <Eyebrow space="12px">{group.label}</Eyebrow>
+            <Eyebrow space="10px" class="toc-label">{group.label}</Eyebrow>
             <ol>
               {group.items.map((e) => (
-                <li><a href={`#${e.id}`}>{e.question}</a></li>
+                <li><a href={`#${e.id}`} data-toc={e.id}>{e.question}</a></li>
               ))}
             </ol>
           </div>
@@ -91,7 +91,10 @@ const grouped = t.groups
       {
         grouped.map((group) => (
           <section class="group">
-            <h2 class="group-head">{group.label}</h2>
+            <h2 class="group-head">
+              {group.label}
+              <span class="group-count num">{group.items.length}</span>
+            </h2>
             {group.items.map((entry) => (
               <article class="entry" id={entry.id}>
                 <h3>{entry.question}</h3>
@@ -106,12 +109,12 @@ const grouped = t.groups
         ))
       }
 
-      <aside class="still">
-        <Eyebrow space="10px">{t.stillHead}</Eyebrow>
+      <aside class="still" data-bg="dark">
+        <h2 class="still-head">{t.stillHead}</h2>
         <p>{t.stillBody}</p>
         <div class="still-actions">
-          <Button variant="dark" href={path(locale, 'contact')}>{ui.cta.callback}</Button>
-          <Button variant="outline" href={path(locale, hu ? 'submitAd' : 'searchRequest')}>
+          <Button variant="dark" light href={path(locale, 'contact')}>{ui.cta.callback}</Button>
+          <Button variant="outline" light href={path(locale, hu ? 'submitAd' : 'searchRequest')}>
             {hu ? ui.cta.submitAd : ui.cta.searchRequest}
           </Button>
         </div>
@@ -120,67 +123,136 @@ const grouped = t.groups
   </div>
 </Base>
 
+<script>
+  /* Scroll-spy: the question being read is marked in the list beside it,
+     and the list keeps it in view. */
+  const links = Array.from(document.querySelectorAll<HTMLAnchorElement>('[data-toc]'));
+  const toc = document.querySelector<HTMLElement>('.toc');
+  if (links.length && 'IntersectionObserver' in window) {
+    const byId = new Map(links.map((a) => [a.dataset.toc!, a]));
+    let current: HTMLAnchorElement | null = null;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const link = byId.get(entry.target.id);
+          if (!link || link === current) continue;
+          current?.removeAttribute('aria-current');
+          link.setAttribute('aria-current', 'true');
+          current = link;
+          if (toc && getComputedStyle(toc).position === 'sticky') {
+            const top = link.offsetTop - toc.clientHeight / 2;
+            toc.scrollTo({ top, behavior: 'smooth' });
+          }
+        }
+      },
+      { rootMargin: '-30% 0px -60% 0px' }
+    );
+    document.querySelectorAll('.entry').forEach((el) => io.observe(el));
+  }
+</script>
+
 <style>
   .faq-page {
     display: grid;
-    grid-template-columns: 300px 1fr;
-    gap: 72px;
-    padding: 24px var(--pad-x) var(--section-y);
+    grid-template-columns: 320px minmax(0, 1fr);
+    gap: 56px;
+    padding: 56px var(--pad-x) var(--section-y);
     align-items: start;
   }
 
   .toc {
     position: sticky;
-    top: calc(var(--nav-h) + 20px);
-    max-height: calc(100vh - var(--nav-h) - 60px);
+    top: calc(var(--nav-h) + 16px);
+    max-height: calc(100vh - var(--nav-h) - 40px);
     overflow-y: auto;
-    border-left: 1px solid var(--border);
-    padding-left: 24px;
+    overscroll-behavior: contain;
+    padding: 22px 12px 22px 16px;
+    border-radius: var(--r-xl);
+    background: var(--white);
+    border: 1px solid rgba(16, 42, 67, 0.07);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .toc :global(.toc-label) {
+    padding-left: 12px;
+    color: var(--taupe);
   }
   .toc-group + .toc-group {
-    margin-top: 28px;
+    margin-top: 22px;
   }
   .toc ol {
     list-style: none;
   }
-  .toc li {
-    margin-bottom: 9px;
-  }
   .toc a {
-    font-size: var(--fs-small);
-    line-height: 1.55;
-    color: var(--taupe);
     display: block;
+    padding: 8px 12px;
+    border-radius: var(--r-sm);
+    font-size: 14.5px;
+    line-height: 1.45;
+    color: var(--taupe);
+    transition:
+      background-color 0.3s var(--ease-out),
+      color 0.3s var(--ease-out);
   }
   .toc a:hover {
+    background: rgba(16, 42, 67, 0.05);
     color: var(--ink);
+  }
+  .toc a[aria-current] {
+    background: var(--ink);
+    color: var(--cream);
   }
 
   .group + .group {
-    margin-top: 64px;
+    margin-top: 72px;
   }
   .group-head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
     font-family: var(--serif);
-    font-weight: var(--fw-regular);
-    font-size: clamp(24px, 2.6vw, 36px);
+    font-weight: var(--fw-medium);
+    font-size: clamp(28px, 2.8vw, 40px);
+    letter-spacing: -0.02em;
     color: var(--ink);
-    padding-bottom: 16px;
-    border-bottom: 2px solid var(--accent);
-    margin-bottom: 8px;
+    margin-bottom: 20px;
+  }
+  .group-count {
+    display: inline-grid;
+    place-items: center;
+    min-width: 34px;
+    height: 34px;
+    padding: 0 10px;
+    border-radius: var(--r-pill);
+    background: rgba(16, 42, 67, 0.07);
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: var(--fw-medium);
+    letter-spacing: 0;
   }
 
   .entry {
-    padding: 32px 0;
-    border-bottom: 1px solid var(--border);
+    padding: 30px 34px 32px;
+    border-radius: var(--r-xl);
+    background: var(--white);
+    border: 1px solid rgba(16, 42, 67, 0.06);
     scroll-margin-top: calc(var(--nav-h) + 20px);
+  }
+  .entry + .entry {
+    margin-top: 10px;
+  }
+  .entry:target {
+    box-shadow: 0 0 0 2px var(--ink);
   }
   .entry h3 {
     font-family: var(--serif);
-    font-weight: var(--fw-display);
-    font-size: clamp(19px, 1.8vw, 23px);
-    line-height: 1.4;
+    font-weight: var(--fw-medium);
+    font-size: clamp(19px, 1.7vw, 23px);
+    letter-spacing: -0.01em;
+    line-height: 1.35;
     color: var(--ink);
-    margin-bottom: 16px;
+    margin-bottom: 14px;
   }
   .answer p {
     font-size: var(--fs-body);
@@ -193,33 +265,48 @@ const grouped = t.groups
     margin-bottom: 0;
   }
   .bullet {
-    padding-left: 20px;
+    padding-left: 22px;
     position: relative;
     margin-bottom: 8px;
   }
   .bullet::before {
-    content: '·';
+    content: '';
     position: absolute;
-    left: 5px;
-    color: var(--accent);
+    left: 4px;
+    top: 0.72em;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--ink);
   }
 
   .still {
-    margin-top: 64px;
-    background: var(--linen);
-    border-left: 2px solid var(--accent);
-    padding: 36px 40px;
+    margin-top: 72px;
+    padding: clamp(32px, 4vw, 56px);
+    border-radius: var(--r-2xl);
+    background:
+      radial-gradient(110% 90% at 100% 0%, var(--ink-soft) 0%, transparent 60%),
+      var(--ink);
+  }
+  .still-head {
+    font-family: var(--serif);
+    font-weight: var(--fw-medium);
+    font-size: clamp(26px, 2.6vw, 38px);
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    color: var(--cream);
+    margin-bottom: 14px;
   }
   .still p {
     font-size: var(--fs-body);
     line-height: var(--lh-body);
-    color: var(--taupe);
-    margin-bottom: 24px;
+    color: var(--on-dark-body);
+    margin-bottom: 28px;
     max-width: 56ch;
   }
   .still-actions {
     display: flex;
-    gap: 16px;
+    gap: 12px;
     flex-wrap: wrap;
   }
 
@@ -227,31 +314,21 @@ const grouped = t.groups
     .faq-page {
       grid-template-columns: 1fr;
       gap: 32px;
-      padding: 16px var(--pad-x-mob) var(--section-y-mob);
+      padding: 32px var(--pad-x-mob) var(--section-y-mob);
     }
     .toc {
       position: static;
       max-height: none;
       overflow: visible;
-      border-left: none;
-      border-top: 1px solid var(--border);
-      padding: 24px 0 0;
     }
-    .still {
-      padding: 28px 24px;
+    .entry {
+      padding: 24px 22px;
     }
     .still-actions {
       flex-direction: column;
     }
-  }
-  /* Phones: the panel runs to the screen edges, so its buttons get the full
-     width a button has everywhere else and their labels stay on one line. */
-  @media (max-width: 600px) {
     .still {
-      margin-inline: calc(-1 * var(--pad-x-mob));
-      padding: 32px var(--pad-x-mob);
-      border-left: none;
-      border-top: 2px solid var(--accent);
+      border-radius: var(--r-xl);
     }
   }
 </style>

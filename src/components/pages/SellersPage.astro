@@ -61,13 +61,13 @@ const sellerFaq = faqFor(locale, 'seller').slice(0, 8);
   />
 
   {/* ── Benefits + buyer personas ── */}
-  <div class="split">
-    <section class="benefits reveal">
+  <div class="split duo">
+    <section class="benefits duo-panel duo-paper reveal">
       <SectionHead eyebrow={c.benefits.eyebrow} title={c.benefits.title} rule={false} />
       <PointsList items={c.benefits.points} />
     </section>
 
-    <section class="personas reveal">
+    <section class="personas duo-panel duo-linen reveal">
       <SectionHead eyebrow={c.personas.eyebrow} title={c.personas.title} rule={false} />
       <dl class="persona-list">
         {
@@ -90,7 +90,7 @@ const sellerFaq = faqFor(locale, 'seller').slice(0, 8);
   </section>
 
   {/* ── Commission band ── */}
-  <section class="commission" data-bg="dark">
+  <section class="commission slab surface-ink" data-bg="dark">
     <div class="commission-copy reveal">
       <SectionHead eyebrow={c.commission.eyebrow} title={c.commission.title} rule={false} />
       <p>{c.commission.body}</p>
@@ -104,7 +104,7 @@ const sellerFaq = faqFor(locale, 'seller').slice(0, 8);
   </section>
 
   {/* ── Pricing summary ── */}
-  <section class="pricing">
+  <section class="pricing slab">
     <SectionHead
       eyebrow={locale === 'hu' ? 'Hirdetési csomagok' : 'Advertentiepakketten'}
       title={locale === 'hu' ? `Hirdetés már ${cheapest} €-tól` : `Adverteren vanaf € ${cheapest}`}
@@ -141,10 +141,8 @@ const sellerFaq = faqFor(locale, 'seller').slice(0, 8);
      Subgrid, so both lists start on one line whatever the headings wrap to.
      No gold rule under these heads: the list's own hairline is the rule. */
   .split {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-template-rows: auto 1fr;
-    border-top: 1px solid var(--border);
+    margin-top: var(--slab-x);
   }
   .benefits,
   .personas {
@@ -153,14 +151,10 @@ const sellerFaq = faqFor(locale, 'seller').slice(0, 8);
     grid-template-rows: subgrid;
     row-gap: 0;
     align-content: start;
-    padding: var(--section-y) var(--pad-x);
   }
   .split :global(.section-head-standard) {
     align-self: start;
     margin-bottom: 26px;
-  }
-  .personas {
-    background: var(--linen);
   }
   .persona-list {
     border-top: 1px solid var(--border);
@@ -174,9 +168,10 @@ const sellerFaq = faqFor(locale, 'seller').slice(0, 8);
   }
   .persona-num {
     grid-row: span 2;
-    padding-top: 5px;
-    font-size: var(--fs-micro);
-    letter-spacing: 0.08em;
+    padding-top: 4px;
+    font-size: 13px;
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.04em;
     color: var(--taupe);
   }
   .persona dt {
@@ -197,7 +192,6 @@ const sellerFaq = faqFor(locale, 'seller').slice(0, 8);
   /* ── Three-step model ── */
   .how {
     padding: var(--section-y) var(--pad-x);
-    border-top: 1px solid var(--border);
   }
   .how :global(.how-head) {
     margin-bottom: 72px;
@@ -209,11 +203,12 @@ const sellerFaq = faqFor(locale, 'seller').slice(0, 8);
     grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
     gap: 64px;
     align-items: end;
-    padding: var(--section-y) var(--pad-x);
+    margin-top: var(--slab-x);
+    padding: var(--section-y) calc(var(--pad-x) - var(--slab-x));
     background: var(--linen);
   }
   .pricing-side {
-    padding-bottom: 46px;
+    padding-bottom: 12px;
   }
   .pricing-side p {
     max-width: 48ch;
@@ -235,10 +230,7 @@ const sellerFaq = faqFor(locale, 'seller').slice(0, 8);
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 80px;
     align-items: center;
-    padding: var(--section-y) var(--pad-x);
-    background:
-      radial-gradient(80% 90% at 100% 50%, var(--ink-soft) 0%, transparent 60%),
-      var(--ink);
+    padding: var(--section-y) calc(var(--pad-x) - var(--slab-x));
   }
   .commission p {
     max-width: 56ch;
@@ -287,12 +279,12 @@ const sellerFaq = faqFor(locale, 'seller').slice(0, 8);
     .personas {
       display: block;
     }
-    .benefits,
-    .personas,
-    .how,
+    .how {
+      padding: var(--section-y-mob) var(--pad-x-mob);
+    }
     .pricing,
     .commission {
-      padding: var(--section-y-mob) var(--pad-x-mob);
+      padding: var(--section-y-mob) calc(var(--pad-x-mob) - var(--slab-x) + 4px);
     }
     .how :global(.how-head) {
       margin-bottom: 32px;

@@ -9,7 +9,6 @@
 import { Image, getImage } from 'astro:assets';
 import Base from '~/layouts/Base.astro';
 import Eyebrow from '~/components/Eyebrow.astro';
-import GoldRule from '~/components/GoldRule.astro';
 import PropertyCard from '~/components/PropertyCard.astro';
 import Map from '~/components/Map.astro';
 import VideoEmbed from '~/components/VideoEmbed.astro';
@@ -173,16 +172,16 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
           <div class="hero-gallery no-print">
             <div class="property-detail-gallery-controls">
               <button class="property-detail-nav" type="button" id="gal-prev" aria-label={ui.property.prevImage} aria-controls="gallery">
-                <svg width="18" height="10" viewBox="0 0 18 10" fill="none" aria-hidden="true">
-                  <path d="M18 5H1.5M5.5 1l-4 4 4 4" stroke="currentColor" stroke-width="1.1" />
+                <svg width="16" height="12" viewBox="0 0 16 12" fill="none" aria-hidden="true">
+                  <path d="M15 6H2M6.5 1.5 2 6l4.5 4.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
                 </svg>
               </button>
               <p class="property-detail-gallery-count num" id="gal-count" role="status">
                 01 / {String(gallery.length).padStart(2, '0')}
               </p>
               <button class="property-detail-nav" type="button" id="gal-next" aria-label={ui.property.nextImage} aria-controls="gallery">
-                <svg width="18" height="10" viewBox="0 0 18 10" fill="none" aria-hidden="true">
-                  <path d="M0 5h16.5M12.5 1l4 4-4 4" stroke="currentColor" stroke-width="1.1" />
+                <svg width="16" height="12" viewBox="0 0 16 12" fill="none" aria-hidden="true">
+                  <path d="M1 6h13M9.5 1.5 14 6l-4.5 4.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
                 </svg>
               </button>
             </div>
@@ -206,6 +205,10 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
       <p class="location">
         {d.location.settlement}, {d.location.county}
         <a class="map-link no-print" href={mapUrl} target="_blank" rel="noopener">
+          <svg width="14" height="14" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path d="M10 18s6-5.2 6-10a6 6 0 1 0-12 0c0 4.8 6 10 6 10Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+            <circle cx="10" cy="8" r="2.2" stroke="currentColor" stroke-width="1.6" />
+          </svg>
           {locale === 'hu' ? 'OpenStreetMap-en' : 'Op OpenStreetMap'}
         </a>
       </p>
@@ -232,6 +235,9 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
       <div class="ref-row">
         <span>{ui.property.reference} <strong>{d.ref}</strong></span>
         <button type="button" class="print-btn no-print" id="print-btn">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M4 6V1.75h8V6M4 12H2.25A1.25 1.25 0 0 1 1 10.75v-3.5A1.25 1.25 0 0 1 2.25 6h11.5A1.25 1.25 0 0 1 15 7.25v3.5A1.25 1.25 0 0 1 13.75 12H12M4 9.5h8v4.75H4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
+          </svg>
           {locale === 'hu' ? 'Nyomtatás' : 'Afdrukken'}
         </button>
       </div>
@@ -262,8 +268,6 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
         )
       }
 
-      <GoldRule class="prose-rule" />
-
       <div class="detail-map no-print">
         <Map mode="pin" lat={d.location.lat} lng={d.location.lng} precision={d.location.precision} locale={locale} id={`map-${d.ref}`} />
       </div>
@@ -277,7 +281,14 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
             <p class="owner-name">{d.seller.name}</p>
             {d.seller.phone && (
               <p class="owner-phone">
-                <a href={`tel:${d.seller.phone.replace(/\s/g, '')}`}>{d.seller.phone}</a>
+                <a href={`tel:${d.seller.phone.replace(/\s/g, '')}`}>
+                  <span class="owner-phone-icon" aria-hidden="true">
+                    <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                      <path d="M6.2 2.5 7.9 6.4 5.9 7.8a10.6 10.6 0 0 0 6.3 6.3l1.4-2 3.9 1.7-.6 3a1.8 1.8 0 0 1-1.9 1.4C8.7 17.8 2.2 11.3 1.8 5a1.8 1.8 0 0 1 1.4-1.9l3-.6Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+                    </svg>
+                  </span>
+                  <span class="num">{d.seller.phone}</span>
+                </a>
               </p>
             )}
             {d.seller.speaks.length > 0 && (
@@ -344,7 +355,7 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
   {/* ── Similar ── */}
   {
     similar.length > 0 && (
-      <section class="similar no-print">
+      <section class="similar slab no-print">
         <Eyebrow space="12px">{ui.property.similar}</Eyebrow>
         <h2>{ui.property.similarInRegion}</h2>
         <div class="sim-grid">
@@ -430,40 +441,46 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
 </script>
 
 <style>
-  /* ── Breadcrumb, laid over the top of the photograph ── */
+  /* ── The photograph: a rounded stage set in from the edges ── */
   .detail-top {
     position: relative;
+    margin: 0 var(--slab-x);
   }
   .crumbs {
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
+    top: 20px;
+    left: 20px;
     z-index: 4;
-    padding: 28px var(--pad-x);
+    max-width: calc(100% - 40px);
+    padding: 9px 18px;
+    border-radius: var(--r-pill);
+    background: rgba(10, 29, 48, 0.32);
+    border: 1px solid rgba(244, 244, 242, 0.14);
+    backdrop-filter: blur(16px) saturate(1.3);
+    -webkit-backdrop-filter: blur(16px) saturate(1.3);
     animation: fx-fade-up 1.2s var(--ease-out) 0.5s both;
   }
   .crumbs ol {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px 12px;
+    gap: 4px 10px;
     list-style: none;
-    font-size: var(--fs-micro);
-    letter-spacing: 0.06em;
+    font-size: 13.5px;
     line-height: 1.5;
     color: var(--on-dark-body);
   }
   .crumbs li {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
   }
   .crumbs li + li::before {
     content: '';
-    width: 16px;
-    height: 1px;
-    background: rgba(244, 244, 242, 0.45);
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: rgba(244, 244, 242, 0.5);
   }
   .crumbs a {
     transition: color var(--dur-fast) ease;
@@ -478,10 +495,11 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
     outline-color: var(--cream);
   }
 
-  /* ── Gallery hero ──
-     Exactly the visible viewport under the nav, within sane bounds. */
+  /* Exactly the visible viewport under the nav, within sane bounds. */
   .property-detail-hero {
-    height: clamp(560px, calc(100svh - var(--nav-h)), 1040px);
+    height: clamp(540px, calc(100svh - var(--nav-h) - var(--slab-x)), 1000px);
+    border-radius: var(--r-2xl);
+    isolation: isolate;
   }
   .gallery-slide[hidden] {
     display: none;
@@ -521,23 +539,23 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
 
   .hero-tag {
     align-self: flex-start;
-    background: rgba(10, 29, 48, 0.5);
-    border: 1px solid rgba(244, 244, 242, 0.22);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    color: var(--cream);
+    display: inline-flex;
+    align-items: center;
+    height: 32px;
+    padding: 0 14px;
+    border-radius: var(--r-pill);
+    background: rgba(250, 250, 248, 0.92);
+    color: var(--ink);
     font-family: var(--sans);
-    font-size: var(--fs-eyebrow);
-    letter-spacing: 0.22em;
-    text-transform: uppercase;
-    padding: 8px 16px;
-    margin-bottom: 8px;
+    font-size: 13px;
+    font-weight: var(--fw-medium);
+    margin-bottom: 4px;
   }
   .hero-foot {
     position: absolute;
-    left: var(--pad-x);
-    right: var(--pad-x);
-    bottom: 48px;
+    left: calc(var(--pad-x) - var(--slab-x));
+    right: 28px;
+    bottom: 36px;
     z-index: 3;
     display: flex;
     align-items: flex-end;
@@ -547,14 +565,15 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
   .hero-title {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 14px;
     min-width: 0;
     color: var(--cream);
     animation: fx-fade-up 1.4s var(--ease-out) 0.45s both;
   }
   .hero-kicker {
-    font-size: var(--fs-eyebrow);
-    letter-spacing: var(--ls-eyebrow);
+    font-size: 0.75rem;
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.16em;
     line-height: 1.4;
     text-transform: uppercase;
     color: var(--on-dark-strong);
@@ -562,7 +581,7 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
   .hero-name {
     font-family: var(--serif);
     font-weight: var(--fw-hero);
-    font-size: clamp(34px, 5.4vw, 92px);
+    font-size: clamp(34px, 5.2vw, 88px);
     letter-spacing: var(--ls-display);
     line-height: 0.98;
     max-width: 14ch;
@@ -573,7 +592,7 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    gap: 14px;
+    gap: 12px;
     flex-shrink: 0;
     animation: fx-fade-up 1.2s var(--ease-out) 0.7s both;
   }
@@ -582,11 +601,13 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
     display: flex;
     gap: 4px;
     width: 100%;
-    max-width: 260px;
+    max-width: 240px;
+    padding: 0 12px;
   }
   .gal-bar span {
     flex: 1;
-    height: 2px;
+    height: 3px;
+    border-radius: 3px;
     background: rgba(244, 244, 242, 0.28);
     position: relative;
     overflow: hidden;
@@ -595,6 +616,7 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
     content: '';
     position: absolute;
     inset: 0;
+    border-radius: inherit;
     background: var(--cream);
     transform: scaleX(0);
     transform-origin: left;
@@ -607,16 +629,16 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
   /* ── Body ── */
   .body {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 440px;
-    gap: 104px;
-    padding: 104px var(--pad-x) 120px;
+    grid-template-columns: minmax(0, 1fr) 460px;
+    gap: clamp(56px, 6vw, 104px);
+    padding: 88px var(--pad-x) 120px;
     align-items: start;
   }
 
   h1 {
     font-family: var(--serif);
     font-weight: var(--fw-hero);
-    font-size: clamp(38px, 4.4vw, 72px);
+    font-size: clamp(38px, 4.2vw, 68px);
     letter-spacing: var(--ls-display);
     line-height: 1.02;
     color: var(--ink);
@@ -631,44 +653,45 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
   .location {
     display: flex;
     flex-wrap: wrap;
-    align-items: baseline;
-    gap: 6px 16px;
+    align-items: center;
+    gap: 10px 16px;
     font-size: var(--fs-body);
     color: var(--taupe);
-    margin-bottom: 40px;
+    margin-bottom: 36px;
   }
   .map-link {
-    font-size: var(--fs-micro);
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 36px;
+    padding: 0 14px;
+    border-radius: var(--r-pill);
+    background: rgba(16, 42, 67, 0.06);
+    font-size: 14px;
+    font-weight: var(--fw-medium);
     color: var(--ink);
-    background-image: linear-gradient(currentColor, currentColor);
-    background-size: 100% 1px;
-    background-position: 0 100%;
-    background-repeat: no-repeat;
-    padding-bottom: 3px;
-    transition: background-size 0.6s var(--ease-out);
+    transition: background-color 0.3s var(--ease-out);
   }
   .map-link:hover {
-    background-size: 0% 1px;
-    background-position: 100% 100%;
+    background: rgba(16, 42, 67, 0.11);
   }
 
   .price-row {
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: 10px 28px;
-    padding: 28px 0;
-    border-top: 1px solid var(--ink);
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 0;
+    gap: 10px 24px;
+    padding: 28px 28px;
+    border-radius: var(--r-xl) var(--r-xl) 0 0;
+    background: var(--white);
+    border: 1px solid rgba(16, 42, 67, 0.07);
+    border-bottom: 0;
   }
   .price {
     font-family: var(--serif);
     font-weight: var(--fw-medium);
-    font-size: clamp(38px, 3.4vw, 56px);
-    letter-spacing: -0.015em;
+    font-size: clamp(38px, 3.4vw, 54px);
+    letter-spacing: -0.02em;
     line-height: 1;
     color: var(--ink);
     font-variant-numeric: tabular-nums lining-nums;
@@ -679,34 +702,41 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
     font-variant-numeric: tabular-nums;
   }
   .price-asof {
-    font-size: var(--fs-micro);
-    letter-spacing: 0.04em;
+    font-size: 13px;
     color: var(--taupe);
     margin-left: auto;
   }
 
-  /* Hairline grid: rules between, not boxes around. */
+  /* The figures, as one card joined to the price above it. */
   .specs {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    margin-bottom: 28px;
+    gap: 1px;
+    margin-bottom: 20px;
+    overflow: hidden;
+    border-radius: 0 0 var(--r-xl) var(--r-xl);
+    background: rgba(16, 42, 67, 0.07);
+    border: 1px solid rgba(16, 42, 67, 0.07);
   }
   .spec {
     display: flex;
     flex-direction: column-reverse;
     justify-content: flex-end;
     gap: 10px;
-    padding: 26px 24px 26px 0;
-    border-bottom: 1px solid var(--border);
+    padding: 22px 24px;
+    background: var(--paper);
   }
-  .spec:not(:nth-child(3n + 1)) {
-    padding-left: 24px;
-    border-left: 1px solid var(--border);
+  /* A short last row closes the card instead of leaving an empty cell. */
+  .spec:last-child:nth-child(3n + 1) {
+    grid-column: span 3;
+  }
+  .spec:last-child:nth-child(3n + 2) {
+    grid-column: span 2;
   }
   .spec dd {
     font-family: var(--serif);
     font-weight: var(--fw-regular);
-    font-size: clamp(24px, 2vw, 32px);
+    font-size: clamp(24px, 2vw, 30px);
     letter-spacing: -0.02em;
     line-height: 1;
     color: var(--ink);
@@ -714,10 +744,9 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
   }
   .spec dt {
     font-family: var(--sans);
-    font-size: var(--fs-eyebrow);
-    letter-spacing: 0.16em;
+    font-size: 13px;
+    font-weight: var(--fw-medium);
     line-height: 1.4;
-    text-transform: uppercase;
     color: var(--taupe);
   }
 
@@ -726,6 +755,7 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
     justify-content: space-between;
     align-items: center;
     gap: 16px;
+    padding: 0 4px;
     font-size: var(--fs-small);
     color: var(--taupe);
     margin-bottom: 56px;
@@ -738,15 +768,21 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
   .print-btn {
     display: inline-flex;
     align-items: center;
-    gap: 10px;
-    font-size: var(--fs-micro);
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--taupe);
-    transition: color var(--dur-fast) ease;
+    gap: 8px;
+    height: 38px;
+    padding: 0 16px;
+    border-radius: var(--r-pill);
+    border: 1px solid rgba(16, 42, 67, 0.16);
+    font-size: 14px;
+    font-weight: var(--fw-medium);
+    color: var(--ink);
+    transition:
+      background-color var(--dur-fast) ease,
+      border-color var(--dur-fast) ease;
   }
   .print-btn:hover {
-    color: var(--ink);
+    background: var(--white);
+    border-color: rgba(16, 42, 67, 0.3);
   }
 
   .sr-heading {
@@ -776,16 +812,12 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
     margin-bottom: 18px;
   }
   .prose :global(blockquote) {
-    border-left: 1px solid var(--ink);
+    border-left: 2px solid var(--ink);
     padding: 4px 0 4px 24px;
     margin: 32px 0;
     font-family: var(--serif);
-    font-style: italic;
     font-size: var(--fs-lead);
     color: var(--ink);
-  }
-  :global(.prose-rule) {
-    margin: 48px 0;
   }
 
   .features {
@@ -799,12 +831,16 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
     list-style: none;
   }
   .features li {
+    display: inline-flex;
+    align-items: center;
+    height: 40px;
+    padding: 0 16px;
+    border-radius: var(--r-pill);
+    background: var(--white);
+    border: 1px solid rgba(16, 42, 67, 0.1);
     font-size: var(--fs-small);
     line-height: 1.3;
     color: var(--ink);
-    border: 1px solid var(--border);
-    background: rgba(255, 255, 255, 0.4);
-    padding: 9px 16px;
   }
   .video {
     margin-bottom: 40px;
@@ -816,57 +852,72 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
   }
 
   .detail-map {
-    height: 340px;
-    margin-bottom: 40px;
-    border: 1px solid var(--border);
+    height: 360px;
+    margin: 48px 0 16px;
+    overflow: hidden;
+    border-radius: var(--r-xl);
+    border: 1px solid rgba(16, 42, 67, 0.08);
+    isolation: isolate;
   }
 
   .owner,
   .guarantee {
     position: relative;
-    background: var(--linen);
-    padding: 32px 36px;
-  }
-  .owner::before,
-  .guarantee::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 48px;
-    height: 2px;
-    background: var(--ink);
+    border-radius: var(--r-xl);
+    padding: 30px 32px;
   }
   .owner {
-    margin-bottom: 16px;
+    margin-bottom: 12px;
+    background: var(--white);
+    border: 1px solid rgba(16, 42, 67, 0.08);
+    box-shadow: var(--shadow-sm);
+  }
+  .guarantee {
+    background: var(--linen);
   }
   .owner-note {
     font-size: var(--fs-small);
     line-height: var(--lh-body);
     color: var(--taupe);
-    margin-bottom: 18px;
+    margin-bottom: 20px;
   }
   .owner-name {
     font-family: var(--serif);
     font-weight: var(--fw-medium);
-    font-size: 22px;
+    font-size: 24px;
     letter-spacing: var(--ls-heading);
     color: var(--ink);
-    margin-bottom: 4px;
+    margin-bottom: 12px;
   }
   .owner-phone a {
-    font-size: var(--fs-lead);
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    height: 48px;
+    padding: 0 22px 0 6px;
+    border-radius: var(--r-pill);
+    background: var(--ink);
+    color: var(--cream);
+    font-size: var(--fs-body);
+    font-weight: var(--fw-medium);
+    transition: background-color 0.4s var(--ease-out);
+  }
+  .owner-phone a:hover {
+    background: var(--ink-soft);
+  }
+  .owner-phone-icon {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--cream);
     color: var(--ink);
-    font-variant-numeric: tabular-nums;
-    text-decoration: underline;
-    text-decoration-thickness: 1px;
-    text-underline-offset: 5px;
   }
   .owner-speaks {
-    font-size: var(--fs-micro);
-    letter-spacing: 0.1em;
+    font-size: 13px;
     color: var(--taupe);
-    margin-top: 10px;
+    margin-top: 14px;
   }
   .guarantee p {
     font-size: var(--fs-small);
@@ -877,12 +928,13 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
   /* ── Enquiry ── */
   .enquiry {
     position: sticky;
-    top: calc(var(--nav-h) + 24px);
+    top: calc(var(--nav-h) + 16px);
+    border-radius: var(--r-2xl);
     background:
       radial-gradient(90% 70% at 100% 0%, var(--ink-soft) 0%, transparent 65%),
       var(--ink);
-    padding: 48px 44px 40px;
-    box-shadow: var(--shadow-lg);
+    padding: 44px 40px 36px;
+    box-shadow: var(--shadow-float);
   }
   .enq-title {
     font-family: var(--serif);
@@ -891,15 +943,15 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
     letter-spacing: var(--ls-heading);
     line-height: 1.2;
     color: var(--cream);
-    margin-bottom: 32px;
+    margin-bottom: 28px;
   }
   .enq-alt {
     font-size: var(--fs-small);
     line-height: 1.9;
     color: var(--on-dark-muted);
     text-align: center;
-    margin-top: 28px;
-    padding-top: 24px;
+    margin-top: 24px;
+    padding-top: 22px;
     border-top: 1px solid var(--on-dark-rule);
   }
   .enq-alt a {
@@ -914,8 +966,8 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
 
   /* ── Similar ── */
   .similar {
-    padding: 120px var(--pad-x) 136px;
-    border-top: 1px solid var(--border);
+    padding: var(--section-y) calc(var(--pad-x) - var(--slab-x)) calc(var(--section-y) * 0.9);
+    background: var(--linen);
   }
   .similar h2 {
     font-family: var(--serif);
@@ -924,27 +976,27 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
     letter-spacing: var(--ls-display);
     line-height: 1.04;
     color: var(--ink);
-    margin-bottom: 64px;
+    margin-bottom: 56px;
   }
   .sim-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 40px 32px;
+    gap: 40px 28px;
   }
 
   @media (max-width: 1200px) {
     .body {
       grid-template-columns: minmax(0, 1fr) 380px;
-      gap: 64px;
+      gap: 56px;
     }
     .enquiry {
-      padding: 40px 32px 32px;
+      padding: 36px 28px 28px;
     }
   }
   @media (max-width: 1100px) {
     .body {
       grid-template-columns: 1fr;
-      gap: 56px;
+      gap: 48px;
     }
     .enquiry {
       position: static;
@@ -952,18 +1004,22 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
   }
   @media (max-width: 768px) {
     .crumbs {
-      padding: 16px var(--pad-x-mob);
+      top: 12px;
+      left: 12px;
+      max-width: calc(100% - 24px);
+      padding: 7px 14px;
     }
     .crumbs li:not(:last-child):not(:first-child) {
       display: none;
     }
     .property-detail-hero {
-      height: clamp(380px, 68svh, 580px);
+      height: clamp(380px, 66svh, 580px);
+      border-radius: var(--r-xl);
     }
     .hero-foot {
-      left: var(--pad-x-mob);
-      right: var(--pad-x-mob);
-      bottom: 20px;
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
       gap: 16px;
       flex-direction: column;
       align-items: stretch;
@@ -984,22 +1040,27 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
     .gal-bar {
       max-width: 40%;
     }
-    .property-detail-gallery-controls {
+    :global(.property-detail-gallery-controls) {
       height: 50px;
     }
     .body {
-      padding: 40px var(--pad-x-mob) 64px;
+      padding: 36px var(--pad-x-mob) 64px;
+    }
+    .price-row {
+      padding: 22px 20px;
     }
     .specs {
       grid-template-columns: repeat(2, 1fr);
     }
-    .spec:not(:nth-child(3n + 1)) {
-      padding-left: 0;
-      border-left: 0;
+    .spec {
+      padding: 18px 20px;
     }
-    .spec:nth-child(even) {
-      padding-left: 20px;
-      border-left: 1px solid var(--border);
+    .spec:last-child:nth-child(3n + 1),
+    .spec:last-child:nth-child(3n + 2) {
+      grid-column: auto;
+    }
+    .spec:last-child:nth-child(odd) {
+      grid-column: span 2;
     }
     .price-asof {
       margin-left: 0;
@@ -1007,15 +1068,14 @@ const videoId = d.media.videoUrl ? extractYouTubeId(d.media.videoUrl) : null;
     }
     .owner,
     .guarantee {
-      padding: 28px 24px;
+      padding: 24px 20px;
     }
     .enquiry {
-      padding: 36px var(--pad-x-mob) 32px;
-      margin-inline: calc(var(--pad-x-mob) * -1);
-      box-shadow: none;
+      padding: 32px 20px 28px;
+      border-radius: var(--r-xl);
     }
     .similar {
-      padding: 64px var(--pad-x-mob) 72px;
+      padding: 64px calc(var(--pad-x-mob) - var(--slab-x) + 4px) 72px;
     }
     .similar h2 {
       margin-bottom: 36px;

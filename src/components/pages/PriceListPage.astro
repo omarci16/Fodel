@@ -202,7 +202,7 @@ const packageSchema = listingServiceSchema(locale, {
   </section>
 
   {/* ── Extras ── */}
-  <section class="extras">
+  <section class="extras slab">
     <Eyebrow space="24px">{t.extrasHead}</Eyebrow>
     <table>
       <tbody>
@@ -220,8 +220,8 @@ const packageSchema = listingServiceSchema(locale, {
   </section>
 
   {/* ── Contracts + services ── */}
-  <div class="two-col">
-    <section class="contracts">
+  <div class="two-col duo">
+    <section class="contracts duo-panel duo-paper">
       <Eyebrow space="24px">{t.contractsHead}</Eyebrow>
       <table>
         <tbody>
@@ -240,13 +240,15 @@ const packageSchema = listingServiceSchema(locale, {
       <p class="note">{t.contractNote}</p>
     </section>
 
-    <section class="services">
+    <section class="services duo-panel duo-paper">
       <Eyebrow space="24px">{t.servicesHead}</Eyebrow>
       <ul>
         {
           t.services.map((s: string) => (
             <li>
-              <span class="dash" aria-hidden="true" />
+              <span class="tick" aria-hidden="true">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.25 5 8.75l4.5-5.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+              </span>
               <span>{s}</span>
             </li>
           ))
@@ -257,7 +259,7 @@ const packageSchema = listingServiceSchema(locale, {
   </div>
 
   {/* ── Commission ── */}
-  <section class="commission" data-bg="dark">
+  <section class="commission slab surface-ink" data-bg="dark">
     <div class="commission-copy">
       <Eyebrow space="24px">{t.commissionHead}</Eyebrow>
       <h2>
@@ -277,63 +279,52 @@ const packageSchema = listingServiceSchema(locale, {
 </Base>
 
 <style>
-
   .packages {
-    padding: 24px var(--pad-x) 64px;
+    padding: 48px var(--pad-x) 72px;
   }
   .package-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 32px;
-  }
-  .services ul {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    list-style: none;
-    margin-bottom: 32px;
-    flex: 1;
-  }
-  .services li {
-    display: flex;
-    gap: 14px;
-    align-items: flex-start;
-    font-size: var(--fs-body);
-    line-height: var(--lh-body);
-    color: var(--taupe);
-  }
-  .dash {
-    width: 16px;
-    height: 1px;
-    background: var(--accent);
-    margin-top: 13px;
-    flex-shrink: 0;
+    gap: 16px;
   }
   .vat {
     font-size: var(--fs-small);
     color: var(--taupe);
-    margin-top: 24px;
+    margin-top: 20px;
   }
 
+  /* ── Extras: a tinted slab; each row lights as it is read ── */
   .extras {
-    padding: 64px var(--pad-x);
+    padding: 72px calc(var(--pad-x) - var(--slab-x)) 64px;
     background: var(--linen);
-    border-block: 1px solid var(--border);
   }
   table {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0 6px;
   }
   th,
   td {
     text-align: left;
     padding: 18px 0;
-    border-bottom: 1px solid var(--border);
     font-weight: var(--fw-body);
     font-size: var(--fs-body);
-    line-height: 1.6;
+    line-height: 1.5;
     color: var(--taupe);
-    vertical-align: baseline;
+    vertical-align: middle;
+    background: rgba(255, 255, 255, 0.6);
+    transition: background-color 0.3s var(--ease-out);
+  }
+  tr > :first-child {
+    padding-left: 24px;
+    border-radius: var(--r-md) 0 0 var(--r-md);
+  }
+  tr > :last-child {
+    padding-right: 24px;
+    border-radius: 0 var(--r-md) var(--r-md) 0;
+  }
+  tr:hover > * {
+    background: var(--white);
   }
   th {
     color: var(--ink);
@@ -355,75 +346,131 @@ const packageSchema = listingServiceSchema(locale, {
     width: 1%;
   }
 
+  /* ── Contracts + services ── */
   .two-col {
+    margin-top: var(--slab-x);
+  }
+  .two-col .duo-panel {
+    padding-block: 64px;
+  }
+  .contracts table {
+    border-spacing: 0 6px;
+  }
+  .contracts th,
+  .contracts td {
+    background: rgba(16, 42, 67, 0.04);
+  }
+  .contracts tr:hover > * {
+    background: rgba(16, 42, 67, 0.07);
+  }
+  .services ul {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    list-style: none;
+  }
+  .services li {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    font-size: var(--fs-body);
+    line-height: 1.55;
+    color: var(--ink);
+  }
+  .tick {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 64px;
-    padding: 64px var(--pad-x);
+    place-items: center;
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    margin-top: 1px;
+    border-radius: 50%;
+    background: rgba(16, 42, 67, 0.08);
+    color: var(--ink);
   }
   .note {
     font-size: var(--fs-small);
     line-height: var(--lh-body);
     color: var(--taupe);
-    margin-top: 16px;
+    margin-top: 20px;
   }
 
+  /* ── Commission ── */
   .commission {
-    background: var(--ink);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 48px;
-    padding: 80px var(--pad-x);
+    gap: 56px;
+    margin-top: var(--slab-x);
+    padding: 88px calc(var(--pad-x) - var(--slab-x));
   }
   .commission h2 {
     font-family: var(--serif);
-    font-weight: var(--fw-display);
-    font-size: clamp(28px, 3.2vw, 46px);
+    font-weight: var(--fw-hero);
+    font-size: clamp(32px, 3.6vw, 56px);
+    letter-spacing: var(--ls-display);
+    line-height: 1.05;
     color: var(--cream);
-    margin-bottom: 16px;
+    margin-bottom: 20px;
   }
-  .commission p {
+  .commission-copy p {
     font-size: var(--fs-body);
     line-height: var(--lh-body);
     color: var(--on-dark-body);
     max-width: 62ch;
   }
   .commission-cta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
     flex-shrink: 0;
     text-align: right;
   }
   .cta-note {
-    font-size: var(--fs-micro);
+    font-size: 13.5px;
+    line-height: 1.55;
     color: var(--on-dark-muted);
-    margin-top: 12px;
-    max-width: 28ch;
+    margin-top: 14px;
+    max-width: 30ch;
   }
 
   @media (max-width: 900px) {
     .packages {
-      padding: 16px var(--pad-x-mob) 44px;
+      padding: 32px var(--pad-x-mob) 48px;
     }
-    .package-grid,
-    .two-col {
+    .package-grid {
       grid-template-columns: 1fr;
-      gap: 28px;
+      gap: 12px;
     }
-    .extras,
-    .two-col,
-    .commission {
-      padding: 44px var(--pad-x-mob);
+    .extras {
+      padding: 48px calc(var(--pad-x-mob) - var(--slab-x) + 4px);
+    }
+    tr > :first-child {
+      padding-left: 16px;
+    }
+    tr > :last-child {
+      padding-right: 16px;
+    }
+    .two-col .duo-panel {
+      padding-block: 44px;
     }
     .commission {
       flex-direction: column;
       align-items: stretch;
-      gap: 28px;
+      gap: 32px;
+      padding: 56px calc(var(--pad-x-mob) - var(--slab-x) + 4px);
     }
     .commission-cta {
+      align-items: flex-start;
       text-align: left;
     }
     .unit {
       display: none;
+    }
+    /* With the unit hidden, the amount closes the row. */
+    .extras .amount {
+      padding-right: 16px;
+      border-radius: 0 var(--r-md) var(--r-md) 0;
     }
   }
 </style>
