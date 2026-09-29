@@ -41,15 +41,22 @@ const SOURCE_NOTE = {
       <select id="locale" name="locale" required>
         <option value="" selected disabled>Válasszon nyelvet…</option>
         {languages.map((language) => (
-          <option value={language.locale} disabled={!language.sendable}>
-            {LOCALE_LABEL[language.locale]} — {SOURCE_NOTE[language.source]}
+          <option
+            value={language.locale}
+            disabled={language.owner === 'missing'}
+            data-owner={language.owner}
+            data-admin={language.admin}
+            data-name={LOCALE_LABEL[language.locale]}
+          >
+            {LOCALE_LABEL[language.locale]} — {SOURCE_NOTE[language.owner]}
           </option>
         ))}
       </select>
       <p class="hint">
-        A nyelvet Ön választja ki — az e-mail címből nem következtetünk rá. Angol és német meghívó
-        csak jóváhagyott szöveggel küldhető; a szövegek a
-        <a href="/portal/settings/templates">Meghívólevelek</a> oldalon szerkeszthetők.
+        A nyelvet Ön választja ki — az e-mail címből nem következtetünk rá. Hirdetői meghívó
+        angolul és németül csak jóváhagyott szöveggel küldhető; a szövegek a
+        <a href="/portal/settings/templates">Meghívólevelek</a> oldalon szerkeszthetők. Admin
+        meghívó mindig a beépített admin szöveggel megy ki, magyarul vagy hollandul.
       </p>
     </div>
     <div class="field" id="free-field">
@@ -69,8 +76,15 @@ const SOURCE_NOTE = {
 </Portal>
 
 <script>
-  // A free listing only means something for a seller account.
+  // A free listing only means something for a seller account, and the
+  // wording (so which languages can be sent) depends on the role.
+  const NOTE: Record<string, string> = {
+    approved: 'jóváhagyott sablon',
+    'built-in': 'alapértelmezett szöveg',
+    missing: 'nincs jóváhagyott szöveg',
+  };
   const role = document.getElementById('role') as HTMLSelectElement | null;
+  const locale = document.getElementById('locale') as HTMLSelectElement | null;
   const free = document.getElementById('free-field');
   const sync = () => {
     if (!role || !free) return;
@@ -78,6 +92,12 @@ const SOURCE_NOTE = {
     free.hidden = !owner;
     const box = free.querySelector('input');
     if (box && !owner) box.checked = false;
+    for (const option of locale?.querySelectorAll<HTMLOptionElement>('option[data-owner]') ?? []) {
+      const source = (owner ? option.dataset.owner : option.dataset.admin) ?? 'missing';
+      option.disabled = source === 'missing';
+      option.textContent = `${option.dataset.name} — ${owner ? NOTE[source] : source === 'missing' ? 'admin meghívó nem érhető el' : 'admin szöveg'}`;
+      if (option.disabled && option.selected && locale) locale.value = '';
+    }
   };
   role?.addEventListener('change', sync);
   sync();

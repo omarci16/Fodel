@@ -41,6 +41,12 @@ export const EVENT_LABEL: Record<string, string> = {
   'invite.sent': 'Meghívó elküldve',
   'activity.exported': 'Napló exportálva',
   'payments.exported': 'Pénzügyi lista exportálva',
+  'service.requested': 'Helyszíni szolgáltatást kértek',
+  'service.cancelled': 'Helyszíni szolgáltatás visszavonva',
+  'service.updated': 'Helyszíni szolgáltatás módosítva',
+  'valuation.judicial_requested': 'Hivatalos értékbecslést kértek',
+  'valuation.instant_shown': 'Azonnali becslés megjelenítve',
+  'estimate.settings': 'Becslési beállítások módosítva',
 };
 
 /** Unknown kinds (a future call site, an old row) still read as Hungarian, with the key kept for support. */
@@ -105,7 +111,7 @@ export function friendlyError(raw: string | null | undefined): string {
     [/violates check constraint.*whatsapp/i, 'A WhatsApp-számot nemzetközi formátumban adja meg, szóközök nélkül (pl. +36301234567).'],
     [/violates check constraint/i, 'Az egyik megadott érték nem megengedett.'],
     [/violates foreign key/i, 'Az elem máshol használatban van, ezért nem módosítható így.'],
-    [/column .* does not exist|could not find the .* column|relation .* does not exist/i, 'Az adatbázis még nincs frissítve — futtassa le a legújabb migrációt (0014).'],
+    [/column .* does not exist|could not find the .* column|relation .* does not exist/i, 'Az adatbázis még nincs frissítve — futtassa le a legújabb migrációt (0015).'],
     [/fetch failed|network|timeout|ECONN/i, 'Az adatbázis most nem érhető el. Próbálja újra néhány perc múlva.'],
   ];
   for (const [pattern, text] of rules) if (pattern.test(message)) return text;

@@ -29,6 +29,7 @@
 import type { APIRoute } from 'astro';
 import { deliver, localeOf, templates, adminRecipients } from '~/lib/email/send';
 import { createSupabaseAdminClient } from '~/lib/supabase-server';
+import { getCompany } from '~/lib/runtime-config';
 import { publishProperty, listingTitle, publicUrl } from '~/lib/portal/publish';
 import { deleteImage } from '~/lib/media';
 import { logEvent } from '~/lib/activity';
@@ -513,7 +514,8 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
     const owner = await ownerContact(supabase, property.owner_id);
     if (owner) {
       const title = await listingTitle(supabase, property.id, owner.locale, property.ref);
-      await deliver(owner.email, templates.rejected(owner.locale, { ref: property.ref, title, note, refundRequired }));
+      const refundPolicy = refundRequired ? (await getCompany()).services.refundPolicy?.[owner.locale]?.trim() : undefined;
+      await deliver(owner.email, templates.rejected(owner.locale, { ref: property.ref, title, note, refundRequired, refundPolicy }));
     }
 
     await logEvent({

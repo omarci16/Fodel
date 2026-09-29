@@ -13,6 +13,7 @@
 import type { ContentPageData } from '~/lib/content-sections';
 import type { Locale } from '~/i18n/ui';
 import { COMPANY, COMMISSION } from '~/config/company';
+import { SITE_HOST } from '~/config/site.mjs';
 
 const UPDATED = { hu: '2026. július 27.', nl: '27 juli 2026' };
 
@@ -53,7 +54,7 @@ export const LEGAL: Record<Locale, Record<string, ContentPageData>> = {
           type: 'prose',
           title: 'Tárhelyszolgáltató',
           paragraphs: [
-            'A weboldal statikus oldalakként kerül kiszolgálásra. A tárhelyszolgáltató adatai a szolgáltatóváltáskor frissülnek — kérdés esetén forduljon hozzánk az info@fodel.nl címen.',
+            `A weboldal statikus oldalakként kerül kiszolgálásra. A tárhelyszolgáltató adatai a szolgáltatóváltáskor frissülnek — kérdés esetén forduljon hozzánk az ${COMPANY.email.primary} címen.`,
           ],
         },
         {
@@ -147,7 +148,7 @@ export const LEGAL: Record<Locale, Record<string, ContentPageData>> = {
     cookies: {
       metaTitle: 'Cookie-tájékoztató',
       metaDescription:
-        'Milyen sütiket használ a fodel.nl, és hogyan módosíthatja a hozzájárulását.',
+        `Milyen sütiket használ a ${SITE_HOST}, és hogyan módosíthatja a hozzájárulását.`,
       eyebrow: 'Sütik',
       title: 'Cookie-',
       titleEm: 'tájékoztató',
@@ -268,7 +269,7 @@ export const LEGAL: Record<Locale, Record<string, ContentPageData>> = {
     accessibility: {
       metaTitle: 'Akadálymentesítési nyilatkozat',
       metaDescription:
-        'A fodel.nl akadálymentességi szintje, a vállalt szabvány és a visszajelzés módja.',
+        `A ${SITE_HOST} akadálymentességi szintje, a vállalt szabvány és a visszajelzés módja.`,
       eyebrow: 'Akadálymentesítés',
       title: 'Akadálymentesítési',
       titleEm: 'nyilatkozat',
@@ -432,7 +433,7 @@ export const LEGAL: Record<Locale, Record<string, ContentPageData>> = {
 
     cookies: {
       metaTitle: 'Cookieverklaring',
-      metaDescription: 'Welke cookies fodel.nl gebruikt en hoe u uw keuze wijzigt.',
+      metaDescription: `Welke cookies ${SITE_HOST} gebruikt en hoe u uw keuze wijzigt.`,
       eyebrow: 'Cookies',
       title: 'Cookie',
       titleEm: 'verklaring',
@@ -553,7 +554,7 @@ export const LEGAL: Record<Locale, Record<string, ContentPageData>> = {
     accessibility: {
       metaTitle: 'Toegankelijkheidsverklaring',
       metaDescription:
-        'Het toegankelijkheidsniveau van fodel.nl, de gehanteerde standaard en hoe u ons bereikt met feedback.',
+        `Het toegankelijkheidsniveau van ${SITE_HOST}, de gehanteerde standaard en hoe u ons bereikt met feedback.`,
       eyebrow: 'Toegankelijkheid',
       title: 'Toegankelijkheids',
       titleEm: 'verklaring',

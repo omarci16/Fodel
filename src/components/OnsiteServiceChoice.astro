@@ -1,0 +1,245 @@
+---
+/**
+ * The optional on-site service, as three radio cards: "Nem kérem" (default),
+ * €150 photo/video/drone, €200 Gábor's visit (brief 3 §F.2). Prices and
+ * contents come from ONSITE_SERVICES — the one catalogue — so this card, the
+ * price list, the order and the invoice always agree. Posts `service` = '' or
+ * a catalogue id; the server validates it again.
+ *
+ * `formId` lets the radios live outside the <form> they post with (the
+ * submit page keeps its choices in the marketing column).
+ */
+import { ONSITE_SERVICES } from '~/config/company';
+import { formatCents } from '~/lib/orders';
+
+interface Props {
+  locale: 'hu' | 'nl';
+  formId?: string;
+  name?: string;
+  /** Pre-selected service id ('' = none). */
+  selected?: string;
+  /** Hide the `onsite-media` option (the valuation offers only Gábor's visit). */
+  only?: 'onsite-visit';
+  heading?: string;
+  intro?: string;
+}
+
+const { locale, formId, name = 'service', selected = '', only, heading, intro } = Astro.props;
+const hu = locale === 'hu';
+const t = hu
+  ? {
+      heading: 'Szívesebben bízná szakemberre?',
+      intro: 'Nem kötelező. Ha kéri, munkatársunk felveszi Önnel a kapcsolatot az időpont egyeztetéséhez, és ekkor tájékoztatja a díj rendezéséről. Most nem kell fizetnie semmit.',
+      none: 'Nem kérem',
+      noneBody: 'A fotókat én készítem el.',
+      once: 'egyszeri díj',
+    }
+  : {
+      heading: 'Laat u het liever aan een vakman over?',
+      intro: 'Optioneel. Kiest u hiervoor, dan neemt onze medewerker contact met u op om een afspraak te maken en informeert u dan over de betaling. U betaalt nu niets.',
+      none: 'Nee, dank u',
+      noneBody: 'Ik maak de foto’s zelf.',
+      once: 'eenmalig',
+    };
+const services = ONSITE_SERVICES.filter((service) => !only || service.id === only);
+const uid = `${name}-${Math.random().toString(36).slice(2, 8)}`;
+---
+
+<fieldset class="onsite" aria-describedby={`${uid}-intro`}>
+  <legend class="onsite-head">{heading ?? t.heading}</legend>
+  <p class="onsite-intro" id={`${uid}-intro`}>{intro ?? t.intro}</p>
+
+  <div class="onsite-grid">
+    <label class="card card-none">
+      <input type="radio" name={name} value="" form={formId} checked={!selected} data-price-cents="0" />
+      <span class="dot" aria-hidden="true"></span>
+      <span class="card-body">
+        <span class="card-name">{t.none}</span>
+        <span class="card-note">{t.noneBody}</span>
+      </span>
+    </label>
+
+    {services.map((service) => (
+      <label class="card">
+        <input
+          type="radio"
+          name={name}
+          value={service.id}
+          form={formId}
+          checked={selected === service.id}
+          data-price-cents={service.priceEur * 100}
+        />
+        <span class="dot" aria-hidden="true"></span>
+        <span class="card-body">
+          <span class="card-price">
+            <strong class="num">{formatCents(service.priceEur * 100)}</strong>
+            <span>{t.once}</span>
+          </span>
+          <span class="card-name">{service.names[locale]}</span>
+          <ul class="card-list">
+            {service.includes[locale].map((item) => (
+              <li>
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2.5 6.25 5 8.75l4.5-5.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </span>
+      </label>
+    ))}
+  </div>
+</fieldset>
+
+<style>
+  .onsite {
+    border: 0;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+    container-type: inline-size;
+  }
+  .onsite-head {
+    float: left;
+    width: 100%;
+    font-family: var(--serif);
+    font-weight: var(--fw-medium);
+    font-size: clamp(20px, 2vw, 24px);
+    letter-spacing: -0.01em;
+    color: var(--ink);
+    margin-bottom: 8px;
+  }
+  .onsite-intro {
+    clear: both;
+    font-size: var(--fs-small);
+    line-height: 1.6;
+    color: var(--taupe);
+    max-width: 62ch;
+    margin-bottom: 18px;
+  }
+  .onsite-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  @container (min-width: 620px) {
+    .onsite-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .card-none {
+      grid-column: 1 / -1;
+    }
+  }
+
+  .card {
+    position: relative;
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: 14px;
+    align-items: start;
+    padding: 20px 22px;
+    border-radius: var(--r-lg);
+    background: var(--white);
+    border: 1px solid rgba(16, 42, 67, 0.12);
+    cursor: pointer;
+    transition:
+      border-color 0.3s var(--ease-out),
+      box-shadow 0.3s var(--ease-out);
+  }
+  .card-none {
+    align-items: center;
+    padding-block: 14px;
+  }
+  .card:hover {
+    border-color: rgba(16, 42, 67, 0.34);
+  }
+  .card input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+    pointer-events: none;
+  }
+  .card:has(input:checked) {
+    border-color: var(--ink);
+    box-shadow: 0 0 0 1px var(--ink);
+  }
+  .card:has(input:focus-visible) {
+    outline: var(--focus-ring);
+    outline-offset: 3px;
+  }
+  .dot {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    margin-top: 1px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(16, 42, 67, 0.3);
+    transition: border-color 0.3s var(--ease-out);
+  }
+  .dot::after {
+    content: '';
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--ink);
+    transform: scale(0);
+    transition: transform 0.3s var(--ease-out);
+  }
+  .card:has(input:checked) .dot {
+    border-color: var(--ink);
+  }
+  .card:has(input:checked) .dot::after {
+    transform: scale(1);
+  }
+  .card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+  }
+  .card-price {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--taupe);
+  }
+  .card-price strong {
+    font-family: var(--serif);
+    font-weight: var(--fw-medium);
+    font-size: 26px;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+  .card-name {
+    font-size: var(--fs-body);
+    font-weight: var(--fw-medium);
+    line-height: 1.4;
+    color: var(--ink);
+  }
+  .card-note {
+    font-size: var(--fs-small);
+    color: var(--taupe);
+  }
+  .card-list {
+    list-style: none;
+    display: grid;
+    gap: 4px;
+    margin: 4px 0 0;
+    padding: 0;
+  }
+  .card-list li {
+    display: grid;
+    grid-template-columns: 12px 1fr;
+    gap: 8px;
+    align-items: baseline;
+    font-size: var(--fs-small);
+    line-height: 1.5;
+    color: var(--taupe);
+  }
+  .card-list svg {
+    color: var(--ink);
+    transform: translateY(1px);
+  }
+</style>

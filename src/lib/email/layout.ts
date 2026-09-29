@@ -35,6 +35,7 @@
  * because an email cannot reference a stylesheet. They are the only place in
  * the codebase where these hex values are legitimately repeated.
  */
+import { SITE_URL } from '~/config/site.mjs';
 import { COMPANY } from '~/config/company';
 import { BRAND } from '~/i18n/ui';
 
@@ -61,7 +62,7 @@ const BORDER = '#d0d4d6';
 const DISPLAY = "'DM Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif";
 const SANS = "'Jost', 'Helvetica Neue', Helvetica, Arial, sans-serif";
 
-const SITE = 'https://fodel.nl';
+const SITE = SITE_URL;
 
 /** Escapes text interpolated into an email. Owner-supplied strings (titles, review notes) reach these templates. */
 export function esc(value: string): string {
@@ -93,8 +94,14 @@ export function p(text: string): string {
 }
 
 /** Body copy that carries weight — the sentence the whole email exists to deliver. */
+/** A blank line starts a new paragraph; a single line break stays a <br>. */
 export function lead(text: string): string {
-  return `<p style="margin:0 0 18px;font-family:${SANS};font-size:16px;line-height:1.7;color:${INK};">${paragraphs(text)}</p>`;
+  return text
+    .split(/\n\s*\n/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => `<p style="margin:0 0 18px;font-family:${SANS};font-size:16px;line-height:1.7;color:${INK};">${paragraphs(part)}</p>`)
+    .join('');
 }
 
 /**

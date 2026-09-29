@@ -15,8 +15,7 @@ export const prerender = false;
 import type { APIRoute } from 'astro';
 import { activeProperties, url as propertyUrl } from '~/lib/properties';
 import { LOCALES } from '~/i18n/ui';
-
-const SITE = 'https://fodel.nl';
+import { SITE_URL as SITE } from '~/config/site.mjs';
 
 export const GET: APIRoute = async () => {
   const properties = await activeProperties();

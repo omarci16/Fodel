@@ -13,6 +13,7 @@
 
 import type { Locale } from '~/i18n/ui';
 import { COMPANY, formatHours, foundedInLabel } from '~/config/company';
+import { SITE_HOST } from '~/config/site.mjs';
 
 const REACH_COUNTRIES = COMPANY.reach.countries;
 const REACH_LANGUAGES = COMPANY.reach.languages;
@@ -69,7 +70,7 @@ export const COPY: Record<Locale, any> = {
       featured: { eyebrow: 'Válogatás', title: 'Kiemelt Ingatlanok' },
       // Verbatim FODEL, from their own editorial copy.
       quote: '„A hollandok gyakran nem hisznek a szemüknek, amikor megtudják, hogy Magyarországon mit és milyen áron vásárolhatnak.”',
-      quoteSource: 'FODEL INGATLAN — fodel.nl',
+      quoteSource: `FODEL INGATLAN — ${SITE_HOST}`,
       how: { eyebrow: 'Egyedülálló modell', title: 'Így működik a FODEL' },
       cta: {
         eyebrow: 'Lépjen kapcsolatba velünk',
@@ -328,7 +329,7 @@ export const COPY: Record<Locale, any> = {
       featured: { eyebrow: 'Selectie', title: 'Uitgelicht aanbod' },
       quote:
         '“Nederlanders geloven hun ogen vaak niet wanneer ze zien wat je in Hongarije voor welk bedrag kunt kopen.”',
-      quoteSource: 'FODEL VASTGOED — fodel.nl',
+      quoteSource: `FODEL VASTGOED — ${SITE_HOST}`,
       how: { eyebrow: 'Hoe het werkt', title: 'Zo werkt FODEL' },
       cta: {
         eyebrow: 'Neem contact op',

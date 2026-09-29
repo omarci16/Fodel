@@ -22,6 +22,9 @@ import { getTaxonomy, termLabel } from '~/lib/runtime-config';
 import { resolveImage } from '~/lib/property-images';
 import { catalogue, suggestSelection, isAboveThreshold, REFERRAL_DISCOUNT_PERCENT } from '~/lib/orders';
 import { eur, huf } from '~/lib/format';
+import { readRequestedExtras, describeRequestedExtras } from '~/lib/portal/requested-extras';
+import { CHECKLIST, CHECKLIST_GROUP_LABEL, CHECKLIST_WRAP, MIN_PHOTOS, isPortrait, isLowResolution, photoHints } from '~/config/review-checklist';
+import { serviceName, servicePrice, SERVICE_STATUS_LABEL, type ServiceStatus } from '~/lib/portal/service-requests';
 
 function mediaSrc(storagePath: string): string {
   if (storagePath.startsWith('http')) return storagePath;
@@ -45,10 +48,27 @@ const { data: notes } = await supabase
   .eq('property_id', id)
   .order('created_at', { ascending: false });
 
+// What the owner asked for on the submit form (0015), plus any on-site
+// service requested for this listing from the editor. Both pre-tick the order;
+// the admin still confirms every line. Absent before 0015 — reads as `{}`.
+const requested = readRequestedExtras(property.requested_extras);
+const { data: openService } = await supabase
+  .from('service_requests')
+  .select('service_id, status, created_at')
+  .eq('property_id', property.id)
+  .in('status', ['requested', 'scheduled'])
+  .order('created_at', { ascending: false })
+  .limit(1)
+  .maybeSingle()
+  .then((result) => result, () => ({ data: null }));
+if (openService?.service_id && !requested.service) requested.service = openService.service_id;
+const requestLines = describeRequestedExtras(requested);
+
 // The order the owner will be asked to pay. Prices come from
 // src/config/company.ts via the catalogue — never typed in here.
 const cat = catalogue('hu');
 const suggested = suggestSelection({
+  requested,
   package: property.package,
   price_huf: property.price_huf,
   video_url: property.video_url,
@@ -71,6 +91,31 @@ const { data: openOrder } = await supabase
   .order('created_at', { ascending: false })
   .limit(1)
   .maybeSingle();
+
+// The owner's language decides the language of the change request (the
+// email goes to them in it). Admins may read every profile.
+const { data: ownerProfile } = property.owner_id
+  ? await supabase.from('profiles').select('locale').eq('id', property.owner_id).maybeSingle()
+  : { data: null };
+const ownerLocale: 'hu' | 'nl' = ownerProfile?.locale === 'nl' ? 'nl' : 'hu';
+
+// Automatic hints (brief 3 §G.2) — pre-tick what can be measured; everything
+// else (people in photos, darkness, sharpness) stays a human judgement.
+const hints = photoHints(property.media);
+const huText = property.translations.find((t) => t.locale === 'hu');
+const autoFailed = new Set<string>([
+  ...(hints.tooFew ? ['photos-count'] : []),
+  ...(hints.portrait > 0 ? ['photos-horizontal'] : []),
+  ...(property.price_eur <= 1 || property.price_huf <= 1 ? ['data-price'] : []),
+  ...(!property.settlement || !property.county ? ['data-settlement'] : []),
+  ...(!property.floor_m2 && !['land', 'agricultural'].includes(property.category) ? ['data-area'] : []),
+  ...(!huText?.description?.trim() ? ['data-description'] : []),
+]);
+const checklistPayload = {
+  locale: ownerLocale,
+  lead: CHECKLIST_WRAP[ownerLocale].lead,
+  asks: Object.fromEntries(CHECKLIST.map((item) => [item.id, item.ask[ownerLocale]])),
+};
 
 /** Photos with no description fail the site's own accessibility check once published. */
 const missingCaptions = property.media.filter(
@@ -128,10 +173,35 @@ const { data: creditableReferral } = property.owner_id
       <div><dt>Település</dt><dd>{property.settlement}, {property.county}</dd></div>
       <div><dt>Ár</dt><dd>{eur(property.price_eur)} / {huf(property.price_huf, 'hu')}</dd></div>
       <div><dt>Alapterület</dt><dd>{property.floor_m2 ?? '—'} m² / {property.plot_m2} m² telek</dd></div>
-      <div><dt>Fotók</dt><dd>{property.media.length} db{missingCaptions > 0 && <span class="flag"> · {missingCaptions} leírás nélkül</span>}</dd></div>
+      <div><dt>Fotók</dt><dd>
+        {property.media.length} db
+        {hints.tooFew && <span class="flag"> · kevesebb, mint {MIN_PHOTOS}</span>}
+        {hints.portrait > 0 && <span class="flag"> · {hints.portrait} álló</span>}
+        {hints.lowResolution > 0 && <span class="flag"> · {hints.lowResolution} kis felbontású</span>}
+        {missingCaptions > 0 && <span class="flag"> · {missingCaptions} leírás nélkül</span>}
+      </dd></div>
       <div><dt>Nyelvek</dt><dd>{property.translations.map((t) => t.locale.toUpperCase()).join(', ')}</dd></div>
     </dl>
     <p class="description">{hu?.description}</p>
+    {property.media.length > 1 && (
+      <ul class="strip" aria-label="Az összes fénykép">
+        {property.media.map((m, i) => (
+          <li>
+            <img src={mediaSrc(m.storage_path)} alt={`${i + 1}. kép`} loading="lazy" />
+            {(isPortrait(m) || isLowResolution(m)) && (
+              <span class="strip-flags">
+                {isPortrait(m) && <span>Álló</span>}
+                {isLowResolution(m) && <span>Kis felbontás</span>}
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+    )}
+    <p class="hint">
+      Az „Álló” és „Kis felbontás” jelzés automatikus figyelmeztetés, nem akadály. Hogy van-e ember a
+      képen, sötét vagy életlen-e, azt a gép nem vizsgálja — azt Önnek kell megnéznie.
+    </p>
   </div>
 
   {notes && notes.length > 0 && (
@@ -146,10 +216,32 @@ const { data: creditableReferral } = property.owner_id
     </section>
   )}
 
+  {(requestLines.length > 0 || requested.service || requested.package) && (
+    <section class="requested">
+      <h2>A hirdető kérése</h2>
+      <p class="hint">
+        {requested.source === 'submit_form' ? 'A hirdetésfeladási űrlapon választotta' : 'A hirdető választása'}
+        {requested.at ? ` (${new Date(requested.at).toLocaleDateString('hu-HU')})` : ''}. Az alábbi díjtételek
+        ennek alapján vannak előre bejelölve.
+      </p>
+      <ul>
+        {requested.package && <li>Csomag: {cat.packages.find((pkg) => pkg.id === requested.package)?.label ?? requested.package}</li>}
+        {requestLines.map((line) => <li>{line}</li>)}
+        {requested.service && (
+          <li>
+            Helyszíni szolgáltatás: {serviceName(requested.service)} — {servicePrice(requested.service)}
+            {openService && <> · <a href="/portal/services">{SERVICE_STATUS_LABEL[openService.status as ServiceStatus] ?? openService.status}</a></>}
+          </li>
+        )}
+      </ul>
+    </section>
+  )}
+
   {reviewable && property.free_listing && (
     <p class="notice ok">
       Ingyenes hirdetés — a hirdető admin által küldött, ingyenes feltöltésre jogosító meghívóval
       regisztrált. Jóváhagyáskor nem készül díjbekérő, a hirdetés azonnal élesedik.
+      {requested.service && ' A kért helyszíni szolgáltatás díját ezért külön kell egyeztetni.'}
     </p>
   )}
 
@@ -196,6 +288,7 @@ const { data: creditableReferral } = property.owner_id
                 value={extra.id}
                 checked={suggestedExtras.has(extra.id)}
                 data-price={extra.priceEur}
+                data-exclusive={extra.exclusive ? 'onsite' : undefined}
               />
               <span>{extra.label} — {eur(extra.priceEur)}{extra.unit ? ` / ${extra.unit}` : ''}</span>
             </label>
@@ -255,6 +348,28 @@ const { data: creditableReferral } = property.owner_id
         <button type="button" class="btn" id="publish-btn">Átutalás megérkezett — élesítés</button>
       )}
 
+      <fieldset class="checklist" id="checklist">
+        <legend>Ellenőrzőlista</legend>
+        <p class="hint">
+          Jelölje be, ami <strong>nem</strong> megfelelő. A jelölésekből a rendszer megírja a javítási
+          kérést a hirdető nyelvén ({ownerLocale === 'nl' ? 'hollandul' : 'magyarul'}) — küldés előtt
+          szabadon átírhatja. Az automatikusan felismert hiányosságok előre be vannak jelölve.
+        </p>
+        <div class="checklist-groups">
+          {(['photos', 'data'] as const).map((group) => (
+            <div>
+              <p class="checklist-group">{CHECKLIST_GROUP_LABEL[group]}</p>
+              {CHECKLIST.filter((item) => item.group === group).map((item) => (
+                <label class="checkbox">
+                  <input type="checkbox" data-check={item.id} checked={autoFailed.has(item.id)} />
+                  <span>{item.label}{autoFailed.has(item.id) && <span class="auto"> · automatikus jelzés</span>}</span>
+                </label>
+              ))}
+            </div>
+          ))}
+        </div>
+      </fieldset>
+
       <div class="changes-form">
         <label for="note">Javítási megjegyzés (ha visszaküldi)</label>
         <textarea id="note" rows="4" placeholder="Mit kell javítani?"></textarea>
@@ -276,6 +391,32 @@ const { data: creditableReferral } = property.owner_id
     </section>
   )}
 </Portal>
+
+<script define:vars={{ checklist: checklistPayload }}>
+  // Compose the change request from the failed criteria, in the owner's
+  // language. Only rewrites the note while it still holds generated text, so
+  // an admin's own edits are never thrown away by ticking one more box.
+  (() => {
+    const note = document.getElementById('note');
+    const boxes = [...document.querySelectorAll('input[data-check]')];
+    if (!note || boxes.length === 0) return;
+    let generated = '';
+    const compose = () => {
+      const asks = boxes.filter((box) => box.checked).map((box) => `– ${checklist.asks[box.dataset.check]}`);
+      return asks.length ? `${checklist.lead}\n\n${asks.join('\n')}` : '';
+    };
+    const sync = () => {
+      if (note.value.trim() !== '' && note.value !== generated) return;
+      generated = compose();
+      note.value = generated;
+    };
+    boxes.forEach((box) => box.addEventListener('change', sync));
+    note.addEventListener('input', () => {
+      if (note.value.trim() === '') generated = '';
+    });
+    sync();
+  })();
+</script>
 
 <script define:vars={{ propertyId: property.id, aboveThreshold, referralDiscountPercent: REFERRAL_DISCOUNT_PERCENT }}>
   const statusEl = document.getElementById('action-status');
@@ -341,12 +482,26 @@ const { data: creditableReferral } = property.owner_id
         'not-reviewable': 'Ez a hirdetés ebben az állapotban nem bírálható el — frissítse az oldalt.',
         'unknown-extra': 'Ismeretlen kiegészítő — frissítse az oldalt.',
         'bad-quantity': 'A mennyiség 1 és 60 között lehet.',
+        exclusive: 'A két helyszíni szolgáltatás közül csak az egyik választható.',
       };
       statusEl.textContent = messages[json.error] || 'Nem sikerült végrehajtani.';
       return;
     }
     location.href = '/portal/properties?status=submitted';
   }
+
+  // The two on-site services exclude each other — ticking one clears the other.
+  document.querySelectorAll('input[data-exclusive]').forEach((box) => {
+    box.addEventListener('change', () => {
+      if (!box.checked) return;
+      document.querySelectorAll(`input[data-exclusive="${box.dataset.exclusive}"]`).forEach((other) => {
+        if (other !== box && other.checked) {
+          other.checked = false;
+          other.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      });
+    });
+  });
 
   document.getElementById('approve-btn')?.addEventListener('click', (event) => {
     if (event.currentTarget.dataset.free === 'yes') {
@@ -401,6 +556,20 @@ const { data: creditableReferral } = property.owner_id
   .flag { color: #96700b; }
   .description { font-size: var(--fs-body); line-height: var(--lh-body); color: var(--taupe); max-width: 68ch; }
 
+  .strip { list-style: none; padding: 0; margin: 20px 0 8px; display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 8px; }
+  .strip li { position: relative; }
+  .strip img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block; border-radius: 6px; }
+  .strip-flags { position: absolute; left: 6px; bottom: 6px; display: flex; gap: 4px; flex-wrap: wrap; }
+  .strip-flags span { font-size: 11px; padding: 2px 7px; border-radius: 999px; background: #fff7e0; color: #6b4f08; border: 1px solid #96700b; }
+  .checklist { margin: 0 0 24px; padding: 20px 0 0; border-top: 1px solid var(--border); }
+  .checklist-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 32px; }
+  .checklist-group { font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; color: var(--taupe); margin: 6px 0 10px; }
+  .checklist .auto { color: #96700b; font-size: var(--fs-micro); }
+  @media (max-width: 700px) { .checklist-groups { grid-template-columns: 1fr; } }
+  .requested { padding: 24px 0; border-top: 1px solid var(--border); }
+  .requested h2 { font-family: var(--serif); font-size: 17px; color: var(--ink); margin-bottom: 8px; }
+  .requested ul { padding-left: 18px; font-size: var(--fs-small); line-height: 1.8; color: var(--ink); }
+  .requested a { text-decoration: underline; text-underline-offset: 2px; }
   .notes { padding: 24px 0; border-top: 1px solid var(--border); }
   .notes h2 { font-size: 16px; margin-bottom: 12px; }
   .note { font-size: var(--fs-small); line-height: 1.7; color: var(--taupe); padding: 10px 14px; background: var(--linen); margin-bottom: 8px; }

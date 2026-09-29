@@ -10,6 +10,23 @@
 import type { ContentPageData } from '~/lib/content-sections';
 import type { Locale } from '~/i18n/ui';
 import { AGRI_HECTARE_LIMIT, COMMISSION } from '~/config/company';
+import { TOP_TIPS, GUIDE_SECTIONS, WHY_IT_MATTERS, onsiteServiceLines, type TipLocale } from '~/data/photo-tips';
+import type { Section } from '~/lib/content-sections';
+
+
+/** The photo guide is built from src/data/photo-tips.ts — the one source the
+ *  listing editor and the submit page read too (brief 3 §E). */
+function photoGuideSections(
+  locale: TipLocale,
+  t: { topTitle: string; calloutTitle: string; calloutBody: (lines: string[]) => string; ctaTitle: string; primary: string; secondary: string }
+): Section[] {
+  return [
+    { type: 'list', title: t.topTitle, intro: WHY_IT_MATTERS[locale], items: TOP_TIPS.map((tip) => `${tip.title[locale]} — ${tip.body[locale]}`), ordered: true },
+    ...GUIDE_SECTIONS.map((section): Section => ({ type: 'list', title: section.title[locale], items: section.items[locale] })),
+    { type: 'callout', title: t.calloutTitle, body: t.calloutBody(onsiteServiceLines(locale)) },
+    { type: 'cta', title: t.ctaTitle, primary: { label: t.primary, to: 'submitAd' }, secondary: { label: t.secondary, to: 'priceList' } },
+  ];
+}
 
 export const CONTENT: Record<Locale, Record<string, ContentPageData>> = {
   hu: {
@@ -144,75 +161,15 @@ export const CONTENT: Record<Locale, Record<string, ContentPageData>> = {
       titleEm: 'útmutató',
       intro:
         'A külföldi érdeklődő először a képeket látja — sokszor csak azokat. Ez a néhány szabály többet ér, mint bármilyen hirdetési szöveg.',
-      sections: [
-        {
-          type: 'list',
-          title: 'Előkészület',
-          items: [
-            'Fényképezés előtt mindig rakjon rendet, és teljesen világosítsa ki a lakást.',
-            'Pakolja el a személyes holmikat minden helyiségből.',
-            'A kertben nyírja le a füvet a fotózás előtt.',
-            'Kapcsolja ki a készüléken a dátumbélyegzőt.',
-          ],
-        },
-        {
-          type: 'list',
-          title: 'Megvilágítás',
-          items: [
-            'Napsütéses időben fényképezzen — kívül és belül egyaránt.',
-            'Borult, alkonyati vagy sötétedés utáni fotózást kerülje.',
-            'Kapcsolja fel a belső világítást minden helyiségben.',
-            'Húzza fel a sötétítőket és a redőnyöket.',
-            'A vaku használatát mindenképpen kerülje el.',
-          ],
-        },
-        {
-          type: 'list',
-          title: 'Géptartás és kompozíció',
-          items: [
-            'Mindig vízszintesen tartsa a készüléket — függőleges tájolású képet ne készítsen.',
-            'A vízszintes síkokat igazítsa párhuzamosan a kijelző felső szélével.',
-            'Ha szűk a látószög, lépjen hátrébb.',
-            'Kertes ház esetén készítsen felülnézeti, madártávlati képet is.',
-            'Homlokzatnál mutassa be a teljes épületet.',
-            'Kerülje, hogy nagy felületet foglaljon el az aszfalt, a mennyezet vagy a kerítés.',
-          ],
-        },
-        {
-          type: 'list',
-          title: 'Képminőség',
-          items: [
-            'Mindig aktuális képeket töltsön fel, ne elavultakat.',
-            'Használjon eredeti, nagyfelbontású fájlokat — legalább 3 megapixel, legalább 1500 pixel szélesség.',
-            'Ne e-mailben továbbküldött, tömörített változatot töltsön fel.',
-            'Exponálás előtt vegyen mély levegőt, és tartsa vissza egy másodpercig — így nem mozdul be a kép.',
-            'A feldolgozás után egyesével ellenőrizze a képek élességét.',
-          ],
-        },
-        {
-          type: 'list',
-          title: 'A leggyakoribb hibák',
-          items: [
-            'Borús időben készült, lehangoló hatású képek',
-            'Túl sötét beltéri felvételek',
-            'Ferde, csálé kompozíció',
-            'Életlen, bemozdult vagy homályos fotók',
-            'Alacsony felbontású vagy függőleges tájolású képek',
-            'Ismétlődő, felesleges felvételek',
-          ],
-        },
-        {
-          type: 'callout',
-          title: 'Nincs kedve bajlódni vele?',
-          body: 'Professzionális ingatlanfotózást és drónfelvételt is vállalunk. Kérjen rá árajánlatot a hirdetésfeladáskor.',
-        },
-        {
-          type: 'cta',
-          title: 'Készen áll a hirdetésre?',
-          primary: { label: 'Hirdetés feladása', to: 'submitAd' },
-          secondary: { label: 'Árlista', to: 'priceList' },
-        },
-      ],
+      sections: photoGuideSections('hu', {
+        topTitle: 'A hat legfontosabb szabály',
+        calloutTitle: 'Nincs kedve bajlódni vele?',
+        calloutBody: (lines) =>
+          `Kérje szakember segítségét — a hirdetés feladásakor egy kattintással kiválaszthatja: ${lines.join('; ')}. Mindkettő választható, nem kötelező; munkatársunk az időpont egyeztetéséhez felveszi Önnel a kapcsolatot.`,
+        ctaTitle: 'Készen áll a hirdetésre?',
+        primary: 'Hirdetés feladása',
+        secondary: 'Árlista',
+      }),
     },
 
     buyingGuide: {
@@ -556,63 +513,15 @@ export const CONTENT: Record<Locale, Record<string, ContentPageData>> = {
       titleEm: 'gids',
       intro:
         'De buitenlandse geïnteresseerde ziet eerst de foto’s — vaak alleen de foto’s. Deze regels doen meer dan welke advertentietekst ook.',
-      sections: [
-        {
-          type: 'list',
-          title: 'Voorbereiding',
-          items: [
-            'Ruim op en doe overal het licht aan voordat u fotografeert.',
-            'Haal persoonlijke spullen uit beeld.',
-            'Maai het gras voordat u de tuin fotografeert.',
-            'Zet de datumstempel op uw toestel uit.',
-          ],
-        },
-        {
-          type: 'list',
-          title: 'Licht',
-          items: [
-            'Fotografeer bij zonnig weer, binnen én buiten.',
-            'Vermijd bewolking, schemer en avond.',
-            'Doe in elke ruimte het licht aan.',
-            'Trek gordijnen open en rolluiken omhoog.',
-            'Gebruik in geen geval de flitser.',
-          ],
-        },
-        {
-          type: 'list',
-          title: 'Compositie',
-          items: [
-            'Houd het toestel altijd horizontaal — maak geen staande foto’s.',
-            'Lijn horizontale vlakken uit met de bovenrand van het scherm.',
-            'Doe een stap achteruit als de ruimte niet in beeld past.',
-            'Maak bij een vrijstaand huis ook een opname van bovenaf.',
-            'Breng bij de gevel het hele gebouw in beeld.',
-            'Vermijd dat asfalt, plafond of schutting het beeld domineert.',
-          ],
-        },
-        {
-          type: 'list',
-          title: 'Beeldkwaliteit',
-          items: [
-            'Gebruik actuele foto’s, geen oude.',
-            'Upload de originele bestanden — minimaal 3 megapixel en 1500 pixels breed.',
-            'Stuur geen via e-mail gecomprimeerde versies door.',
-            'Adem in en houd één seconde uw adem in voordat u afdrukt; dat scheelt bewegingsonscherpte.',
-            'Controleer achteraf elke foto op scherpte.',
-          ],
-        },
-        {
-          type: 'callout',
-          title: 'Liever uitbesteden?',
-          body: 'Wij verzorgen ook professionele vastgoedfotografie en drone-opnamen. Vraag er bij uw aanmelding naar.',
-        },
-        {
-          type: 'cta',
-          title: 'Klaar om te adverteren?',
-          primary: { label: 'Advertentie plaatsen', to: 'submitAd' },
-          secondary: { label: 'Tarieven', to: 'priceList' },
-        },
-      ],
+      sections: photoGuideSections('nl', {
+        topTitle: 'De zes belangrijkste regels',
+        calloutTitle: 'Liever uitbesteden?',
+        calloutBody: (lines) =>
+          `Schakel een vakman in — u kiest dit met één klik bij het plaatsen van uw advertentie: ${lines.join('; ')}. Beide zijn optioneel; onze medewerker neemt contact met u op om een afspraak te maken.`,
+        ctaTitle: 'Klaar om te adverteren?',
+        primary: 'Advertentie plaatsen',
+        secondary: 'Tarieven',
+      }),
     },
   },
 };

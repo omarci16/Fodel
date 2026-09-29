@@ -80,10 +80,15 @@ export const COMPANY = {
     },
   ],
 
+  /**
+   * fodel.eu is the company domain from 2026-09-29 (client decision). The old
+   * addresses stay listed until Gábor and Éva decide whether they are kept,
+   * forwarded or retired — the live values come from site_settings.emails.
+   */
   email: {
-    primary: 'info@fodel.nl',
-    hu: 'info@fodel.hu',
-    all: ['info@fodel.nl', 'info@fodel.hu', 'info@ingatlan.nl'],
+    primary: 'info@fodel.eu',
+    hu: 'info@fodel.eu',
+    all: ['info@fodel.eu', 'info@fodel.nl', 'info@fodel.hu', 'info@ingatlan.nl'],
   },
 
   /**
@@ -164,6 +169,53 @@ export const LISTING_EXTRAS = [
   { id: 'retro-images', priceEur: 30, unit: 'once' },
   { id: 'renewal-6m', priceEur: 25, unit: 'once' },
 ] as const;
+
+/**
+ * On-site services (client decision 2026-09-29, brief 3 §F). Prices are the
+ * client's own figures, with the same VAT assumption as every price above —
+ * see LISTING_VAT_PERCENT's warning. Whether they are gross, which regions are
+ * covered and whether travel is extra are still open questions.
+ *
+ * The two are mutually exclusive: a listing or valuation carries at most one.
+ * `onsite-visit` is also the "personal valuation by Gábor" offered on the
+ * valuation result — one catalogue item, never two prices (brief 3 §D.5).
+ *
+ * Not to be confused with the €36 `video` extra above, which is FODEL placing
+ * a video the owner supplies (a YouTube/Vimeo link) on the listing; these two
+ * send someone to the property to shoot it.
+ */
+export const ONSITE_SERVICES = [
+  {
+    id: 'onsite-media',
+    priceEur: 150,
+    names: {
+      hu: 'Helyszíni profi fotózás, videó és drónfelvétel',
+      nl: 'Professionele foto’s, video en dronebeelden ter plaatse',
+    },
+    includes: {
+      hu: ['Profi fotók az ingatlanról', 'Videós bemutató', 'Drónfelvétel'],
+      nl: ['Professionele foto’s van de woning', 'Videopresentatie', 'Dronebeelden'],
+    },
+  },
+  {
+    id: 'onsite-visit',
+    priceEur: 200,
+    names: {
+      hu: 'Gábor helyszíni látogatása: profi fotózás és videó, részletes személyes értékbecslés',
+      nl: 'Bezoek van Gábor ter plaatse: professionele foto’s en video, uitgebreide persoonlijke waardebepaling',
+    },
+    includes: {
+      hu: ['Profi fotók az ingatlanról', 'Videós bemutató', 'Részletes, személyes értékbecslés'],
+      nl: ['Professionele foto’s van de woning', 'Videopresentatie', 'Uitgebreide persoonlijke waardebepaling'],
+    },
+  },
+] as const;
+
+export type OnsiteServiceId = (typeof ONSITE_SERVICES)[number]['id'];
+
+export function isOnsiteServiceId(value: unknown): value is OnsiteServiceId {
+  return ONSITE_SERVICES.some((service) => service.id === value);
+}
 
 /** Recommended translation order, from FAQ Q7. */
 export const TRANSLATION_LANGUAGES = ['nl', 'de', 'en', 'fr'] as const;

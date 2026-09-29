@@ -18,7 +18,22 @@
  *    changed twice. Re-deriving a 2026 total from the 2029 price list would
  *    quietly rewrite history.
  */
-import { LISTING_PACKAGES, LISTING_EXTRAS } from '~/config/company';
+import { LISTING_PACKAGES, LISTING_EXTRAS, ONSITE_SERVICES } from '~/config/company';
+import type { RequestedExtras } from '~/lib/portal/requested-extras';
+
+/**
+ * Everything that can be a line after the package: the listing extras plus
+ * the two on-site services (brief 3 §F). Until the advance-payment decision
+ * is made, an on-site service is charged the existing way — on the listing's
+ * order at approval — so it lives in the same catalogue.
+ */
+const ORDER_EXTRAS: readonly { id: string; priceEur: number; unit?: string; minMonths?: number }[] = [
+  ...LISTING_EXTRAS,
+  ...ONSITE_SERVICES.map((service) => ({ id: service.id, priceEur: service.priceEur, unit: 'once' })),
+];
+
+/** The on-site services exclude each other: one visit per listing. */
+const EXCLUSIVE = new Set<string>(ONSITE_SERVICES.map((service) => service.id));
 
 export type OrderLocale = 'hu' | 'nl';
 
@@ -53,6 +68,7 @@ const EXTRA_LABEL: Record<string, Record<OrderLocale, string>> = {
   video: { hu: 'Videós bemutató', nl: 'Videopresentatie' },
   'retro-images': { hu: 'Fotóretusálás', nl: 'Fotobewerking' },
   'renewal-6m': { hu: 'Hosszabbítás — 6 hónap', nl: 'Verlenging — 6 maanden' },
+  ...Object.fromEntries(ONSITE_SERVICES.map((service) => [service.id, service.names])),
 };
 
 /**
@@ -80,6 +96,8 @@ const EXTRA_UNIT: Record<string, Record<OrderLocale, { one: string; many: string
   video: { hu: { one: '', many: '' }, nl: { one: '', many: '' } },
   'retro-images': { hu: { one: '', many: '' }, nl: { one: '', many: '' } },
   'renewal-6m': { hu: { one: '', many: '' }, nl: { one: '', many: '' } },
+  'onsite-media': { hu: { one: '', many: '' }, nl: { one: '', many: '' } },
+  'onsite-visit': { hu: { one: '', many: '' }, nl: { one: '', many: '' } },
 };
 
 /* ── Formatting ──────────────────────────────────────────────────────────── */
@@ -111,18 +129,19 @@ export function catalogue(locale: OrderLocale) {
       thresholdHuf: 'thresholdHuf' in pkg ? pkg.thresholdHuf : undefined,
       months: pkg.months,
     })),
-    extras: LISTING_EXTRAS.map((extra) => ({
+    extras: ORDER_EXTRAS.map((extra) => ({
       id: extra.id,
       label: EXTRA_LABEL[extra.id]?.[locale] ?? extra.id,
       unit: EXTRA_UNIT[extra.id]?.[locale]?.one ?? '',
       priceEur: extra.priceEur,
       minMonths: 'minMonths' in extra ? extra.minMonths : undefined,
+      exclusive: EXCLUSIVE.has(extra.id),
     })),
   };
 }
 
 export class OrderError extends Error {
-  constructor(public code: 'unknown-package' | 'unknown-extra' | 'bad-quantity') {
+  constructor(public code: 'unknown-package' | 'unknown-extra' | 'bad-quantity' | 'exclusive') {
     super(code);
   }
 }
@@ -150,8 +169,12 @@ export function buildOrderLines(selection: OrderSelection, locale: OrderLocale):
     },
   ];
 
+  if (selection.extras.filter((chosen) => EXCLUSIVE.has(chosen.id)).length > 1) {
+    throw new OrderError('exclusive');
+  }
+
   for (const chosen of selection.extras) {
-    const extra = LISTING_EXTRAS.find((e) => e.id === chosen.id);
+    const extra = ORDER_EXTRAS.find((e) => e.id === chosen.id);
     if (!extra) throw new OrderError('unknown-extra');
 
     const quantity = Math.floor(chosen.quantity);
@@ -233,17 +256,26 @@ export type SuggestInput = {
   featured: boolean;
   /** Locales the listing actually has text for. Hungarian is not an extra. */
   locales: string[];
+  /** What the owner asked for when placing the ad (brief 3 item 14). */
+  requested?: RequestedExtras;
 };
 
 export function suggestSelection(property: SuggestInput): OrderSelection {
-  const extraLanguages = property.locales.filter((locale) => locale !== 'hu').length;
+  const requested = property.requested ?? {};
+  // Languages written, or asked to be translated — whichever is more; a
+  // language counts once even when both apply.
+  const languages = new Set([
+    ...property.locales.filter((locale) => locale !== 'hu'),
+    ...(requested.translations ?? []),
+  ]);
   const extras: { id: string; quantity: number }[] = [];
 
-  if (extraLanguages > 0) extras.push({ id: 'translation', quantity: extraLanguages });
-  if (property.video_url) extras.push({ id: 'video', quantity: 1 });
+  if (languages.size > 0) extras.push({ id: 'translation', quantity: languages.size });
+  if (property.video_url || requested.video) extras.push({ id: 'video', quantity: 1 });
   // FODEL's own minimum for highlighting is three months.
-  if (property.homepage_featured) extras.push({ id: 'homepage-highlight', quantity: 3 });
-  if (property.featured) extras.push({ id: 'category-highlight', quantity: 3 });
+  if (property.homepage_featured || requested.homepageHighlight) extras.push({ id: 'homepage-highlight', quantity: 3 });
+  if (property.featured || requested.categoryHighlight) extras.push({ id: 'category-highlight', quantity: 3 });
+  if (requested.service) extras.push({ id: requested.service, quantity: 1 });
 
   return {
     packageId: property.package,

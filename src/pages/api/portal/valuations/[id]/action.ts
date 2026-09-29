@@ -13,6 +13,9 @@ import { logEvent } from '~/lib/activity';
 import { SITE_URL } from '~/config/site.mjs';
 import { path } from '~/i18n/ui';
 import { friendlyError } from '~/lib/portal/labels';
+import { estimateValuation } from '~/lib/valuation/estimate';
+import { getCompany } from '~/lib/runtime-config';
+import places from '~/data/market/hu-settlements.json';
 
 export const prerender = false;
 
@@ -61,6 +64,25 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
   }
 
   if (action === 'compute') {
+    if ('baseline' in valuation && valuation.floor_m2) {
+      const company = await getCompany();
+      const estimate = await estimateValuation(admin, { category: valuation.category, county: valuation.county,
+        floorM2: valuation.floor_m2, kshCode: valuation.ksh_code,
+        countyCode: (places as [string,string,string,number][]).find((entry) => entry[0] === valuation.ksh_code)?.[2]
+          ?? (places as [string,string,string,number][]).find((entry) => entry[3] === 0 && entry[1].replace(' vármegye','') === valuation.county)?.[0],
+        wallType: valuation.answers?.falazat, bandPercent: company.services.valuationBandPercent });
+      const rate = company.services.eurHufRateDate ? company.services.eurHufRate : null;
+      const { error } = await admin.from('valuations').update({
+        status: estimate.midHuf ? 'needs_review' : 'insufficient_data',
+        low_huf: estimate.lowHuf, mid_huf: estimate.midHuf, high_huf: estimate.highHuf,
+        low_eur: rate && estimate.lowHuf ? Math.round(estimate.lowHuf / rate) : null,
+        mid_eur: rate && estimate.midHuf ? Math.round(estimate.midHuf / rate) : null,
+        high_eur: rate && estimate.highHuf ? Math.round(estimate.highHuf / rate) : null,
+        baseline: estimate.baseline, comp_count: estimate.baseline?.kind === 'comps' ? estimate.baseline.count : 0,
+        ai_adjustment_percent: null,
+      }).eq('id', id);
+      return error ? json(500, { ok: false, error: friendlyError(error.message) }) : json(200, { ok: true, status: estimate.midHuf ? 'needs_review' : 'insufficient_data' });
+    }
     const subject = {
       category: valuation.category,
       county: valuation.county,
@@ -107,6 +129,10 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
   }
 
   if (action === 'approve' || action === 'reject') {
+    const hasHuf = 'low_huf' in valuation;
+    const lowHuf = typeof body.lowHuf === 'number' ? body.lowHuf : valuation.low_huf;
+    const midHuf = typeof body.midHuf === 'number' ? body.midHuf : valuation.mid_huf;
+    const highHuf = typeof body.highHuf === 'number' ? body.highHuf : valuation.high_huf;
     const lowEur = typeof body.lowEur === 'number' ? body.lowEur : valuation.low_eur;
     const midEur = typeof body.midEur === 'number' ? body.midEur : valuation.mid_eur;
     const highEur = typeof body.highEur === 'number' ? body.highEur : valuation.high_eur;
@@ -114,8 +140,9 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
 
     // Nothing goes out without a price band a person has looked at.
     if (action === 'approve') {
-      const valid = [lowEur, midEur, highEur].every((n) => typeof n === 'number' && Number.isFinite(n) && n > 0);
-      if (!valid || lowEur > midEur || midEur > highEur) {
+      const values = hasHuf ? [lowHuf, midHuf, highHuf] : [lowEur, midEur, highEur];
+      const valid = values.every((n) => typeof n === 'number' && Number.isFinite(n) && n > 0);
+      if (!valid || values[0] > values[1] || values[1] > values[2]) {
         return json(422, { ok: false, error: 'Jóváhagyás előtt adjon meg érvényes ár-sávot (alsó ≤ közép ≤ felső, mind nagyobb nullánál).' });
       }
     }
@@ -127,6 +154,7 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
         low_eur: lowEur,
         mid_eur: midEur,
         high_eur: highEur,
+        ...(hasHuf ? { low_huf: lowHuf, mid_huf: midHuf, high_huf: highHuf } : {}),
         admin_note: note,
         reviewed_by: user?.id ?? null,
         reviewed_at: new Date().toISOString(),
@@ -149,12 +177,29 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
     // decision, not a message to the seller.
     if (isLead) {
       if (action === 'approve') {
+        const company = await getCompany();
+        const rate = company.services.eurHufRateDate ? company.services.eurHufRate : null;
+        const display = (huf: number, euro: number) => leadLocale === 'nl' && rate && hasHuf && huf > 0
+          ? eur(Math.round(huf / rate)) : hasHuf ? new Intl.NumberFormat('hu-HU', { style: 'currency', currency: 'HUF', maximumFractionDigits: 0 }).format(huf) : eur(euro);
+        const baseline = valuation.baseline as { kind?: string; count?: number; year?: number; level?: string; url?: string; retrievedAt?: string } | null;
+        const basis = baseline?.kind === 'ksh'
+          ? leadLocale === 'nl' ? `KSH Ingatlanadattár, ${baseline.year} (${baseline.level === 'county' ? 'provincie' : 'plaats'}, ${baseline.count} gegevens)`
+            : `KSH Ingatlanadattár, ${baseline.year} (${baseline.level === 'county' ? 'vármegye' : 'település'}, ${baseline.count} adat)`
+          : baseline?.kind === 'comps' ? leadLocale === 'nl' ? `${baseline.count} vergelijkbare FODEL-advertenties` : `${baseline.count} hasonló FODEL-hirdetés` : undefined;
         await deliver(
           valuation.contact_email,
           templates.valuationReady(leadLocale, {
-            range: `${eur(lowEur)} – ${eur(highEur)}`,
+            range: `${display(lowHuf, lowEur)} – ${display(highHuf, highEur)}`,
+            mid: display(midHuf, midEur), basis,
+            sourceUrl: baseline?.kind === 'ksh' ? baseline.url : undefined,
+            sourceDate: baseline?.kind === 'ksh' ? `${baseline.year}, ${leadLocale === 'nl' ? 'opgehaald' : 'letöltve'} ${baseline.retrievedAt ?? '—'}` : undefined,
+            rateDate: leadLocale === 'nl' && rate ? company.services.eurHufRateDate ?? undefined : undefined,
+            factors: Array.isArray(valuation.factors) ? valuation.factors : [],
+            notice: company.services.valuationNotice?.[leadLocale],
             compCount: valuation.comp_count ?? 0,
             submitAdUrl: `${SITE_URL}${path(leadLocale, 'submitAd')}`,
+            visitUrl: `${SITE_URL}${path(leadLocale, 'valuation')}?service=onsite-visit`,
+            judicialUrl: `${SITE_URL}${path(leadLocale, 'valuation')}?service=judicial`,
           })
         );
       } else {

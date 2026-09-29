@@ -50,6 +50,13 @@ export type Services = {
   valuationFreeConfirmed: boolean;
   /** Approved wording of the accuracy notice under the valuation form, per language. */
   valuationNotice?: Partial<Record<'hu' | 'nl', string>>;
+  /** Approved refund wording; empty until the business rules are signed off. */
+  refundPolicy?: Partial<Record<'hu' | 'nl', string>>;
+  instantValuation?: boolean;
+  valuationBandPercent?: number | null;
+  valuationMinCount?: number | null;
+  eurHufRate?: number | null;
+  eurHufRateDate?: string | null;
 };
 
 export type Automation = {
@@ -59,7 +66,7 @@ export type Automation = {
   inviteAutomation: boolean;
 };
 
-export const SERVICES_DEFAULT: Services = { valuationEntry: false, valuationFreeConfirmed: false };
+export const SERVICES_DEFAULT: Services = { valuationEntry: false, valuationFreeConfirmed: false, instantValuation: false };
 export const AUTOMATION_DEFAULT: Automation = { registrationReminder: false, inviteAutomation: false };
 
 export type Company = Omit<typeof COMPANY, 'phones'> & {

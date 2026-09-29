@@ -13,6 +13,7 @@
 import type { APIContext } from 'astro';
 import { Resend } from 'resend';
 import { logEvent } from '~/lib/activity';
+import { SITE_HOST } from '~/config/site.mjs';
 import { senderAddress, officeInbox, replyToAddress } from '~/lib/email/routing';
 
 export type FieldRule = {
@@ -41,7 +42,9 @@ export interface FormDefinition {
     extras: Record<string, string>,
     /** The raw submission, for what `fields` cannot carry — the valuation form's photos. */
     form: FormData
-  ) => Promise<void>;
+  ) => Promise<void | Record<string, unknown>>;
+  /** Critical persistence hooks return an error instead of false success. */
+  requireSuccess?: boolean;
   /**
    * Suppresses the generic "thanks for your message" acknowledgement.
    *
@@ -99,6 +102,10 @@ export function validate(form: FormData, def: FormDefinition): ValidationResult 
       errors[field.name] = 'email';
       continue;
     }
+    if (value && field.type === 'number' && !Number.isFinite(Number(value))) {
+      errors[field.name] = 'number';
+      continue;
+    }
     if (field.maxLength && value.length > field.maxLength) {
       errors[field.name] = 'too-long';
       continue;
@@ -154,7 +161,7 @@ function buildEmail(def: FormDefinition, values: Record<string, string>, extras:
 
   return `<div style="font-family:system-ui,-apple-system,sans-serif;max-width:640px">
   <h2 style="font-size:18px;color:#102A43;margin:0 0 4px">${escapeHtml(def.subject)}</h2>
-  <p style="font-size:13px;color:#5E6E72;margin:0 0 20px">fodel.nl</p>
+  <p style="font-size:13px;color:#5E6E72;margin:0 0 20px">${SITE_HOST}</p>
   <table style="font-size:14px;line-height:1.6;border-collapse:collapse">${rows}</table>
   ${extraRows ? `<hr style="border:none;border-top:1px solid #D0D4D6;margin:20px 0"><table style="font-size:12px;line-height:1.6;border-collapse:collapse">${extraRows}</table>` : ''}
 </div>`;
@@ -191,12 +198,14 @@ async function runHook(
   values: Record<string, string>,
   extras: Record<string, string>,
   form: FormData
-): Promise<void> {
-  if (!def.onSuccess) return;
+): Promise<Record<string, unknown>> {
+  if (!def.onSuccess) return {};
   try {
-    await def.onSuccess(values, extras, form);
+    return (await def.onSuccess(values, extras, form)) ?? {};
   } catch (error) {
     console.error(`[form:${def.id}] onSuccess hook failed`, error);
+    if (def.requireSuccess) throw error;
+    return {};
   }
 }
 
@@ -277,8 +286,10 @@ export async function handleForm(
     // and persists an enquiry — real state changes, not email side effects, so
     // skipping them offline would make the whole registration flow untestable
     // without a Resend key.
-    await runHook(def, result.values, extras, form);
-    return respond(200, { ok: true, delivered: false });
+    try {
+      const data = await runHook(def, result.values, extras, form);
+      return respond(200, { ok: true, delivered: false, ...data });
+    } catch { return respond(500, { ok: false, error: 'save-failed' }); }
   }
 
   try {
@@ -310,9 +321,9 @@ export async function handleForm(
       });
     }
 
-    await runHook(def, result.values, extras, form);
+    const data = await runHook(def, result.values, extras, form);
 
-    return respond(200, { ok: true, delivered: true });
+    return respond(200, { ok: true, delivered: true, ...data });
   } catch (error) {
     console.error(`[form:${def.id}] delivery failed`, error);
     return respond(502, { ok: false, error: 'delivery-failed' });

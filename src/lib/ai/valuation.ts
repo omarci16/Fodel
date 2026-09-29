@@ -30,6 +30,7 @@ export type Comp = {
   id: string;
   ref: string;
   priceEur: number;
+  priceHuf: number;
   floorM2: number;
   pricePerM2: number;
   score: number;
@@ -52,7 +53,7 @@ export async function findComparables(
 ): Promise<ComparablesResult> {
   const { data } = await client
     .from('properties')
-    .select('id, ref, category, county, region, price_eur, floor_m2')
+    .select('id, ref, category, county, region, price_eur, price_huf, floor_m2')
     .eq('category', subject.category)
     .in('status', ['published', 'sold'])
     .not('floor_m2', 'is', null);
@@ -63,6 +64,7 @@ export async function findComparables(
     county: string;
     region: string;
     price_eur: number;
+    price_huf: number;
     floor_m2: number;
   }[];
 
@@ -84,6 +86,7 @@ export async function findComparables(
         id: r.id,
         ref: r.ref,
         priceEur: r.price_eur,
+        priceHuf: r.price_huf,
         floorM2: r.floor_m2,
         pricePerM2: r.price_eur / r.floor_m2,
         score,

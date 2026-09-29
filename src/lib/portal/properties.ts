@@ -10,6 +10,7 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getTaxonomy, termLabel } from '~/lib/runtime-config';
+import { readRequestedExtras, type RequestedExtras } from '~/lib/portal/requested-extras';
 
 export type PortalTranslation = {
   locale: string;
@@ -81,6 +82,8 @@ export type PortalProperty = {
   expires_at: string | null;
   submitted_at: string | null;
   approved_at: string | null;
+  /** Migration 0015; `{}` for older rows, absent before it runs. */
+  requested_extras?: RequestedExtras;
   translations: PortalTranslation[];
   media: PortalMedia[];
 };
@@ -181,6 +184,8 @@ export type ListingIntake = {
    *  through on the invite for a future invoicing stage to read. */
   billingName?: string;
   billingAddress?: string;
+  /** Package, extras and on-site service chosen on the form (brief 3, migration 0015). */
+  requestedExtras?: RequestedExtras;
 };
 
 /**
@@ -271,6 +276,16 @@ export async function applyIntake(
   if (Object.keys(patch).length > 0) {
     const { error } = await supabase.from('properties').update(patch).eq('id', propertyId);
     if (error) throw new Error(error.message);
+  }
+
+  // Its own statement: before migration 0015 the column does not exist, and
+  // that must not cost the owner the rest of their pre-filled draft.
+  if (intake.requestedExtras) {
+    const { error } = await supabase
+      .from('properties')
+      .update({ requested_extras: readRequestedExtras(intake.requestedExtras) })
+      .eq('id', propertyId);
+    if (error) console.error('[intake] requested_extras not stored (migration 0015?)', error.message);
   }
 
   if (intake.description) {

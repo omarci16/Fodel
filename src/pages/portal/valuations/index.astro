@@ -13,15 +13,19 @@ const { supabase, profile } = Astro.locals;
 if (profile?.role !== 'admin') return Astro.redirect('/portal/dashboard');
 
 const filter = Astro.url.searchParams.get('status') ?? '';
+const kindFilter = Astro.url.searchParams.get('kind') ?? '';
 
 let query = supabase
   .from('valuations')
-  .select('id, source, category, county, settlement, contact_name, comp_count, low_eur, high_eur, status, created_at')
+  .select('*')
   .order('created_at', { ascending: false })
   .limit(200);
 if (filter) query = query.eq('status', filter);
 
 const { data: valuations } = await query;
+const shown = (valuations ?? []).filter((v) => !kindFilter || (v.request_kind ?? 'indicative') === kindFilter);
+const kindLabel: Record<string,string> = { indicative: 'Tájékoztató', expert_visit: 'Helyszíni látogatás', judicial: 'Igazságügyi / hivatalos' };
+const huf = (amount: number) => new Intl.NumberFormat('hu-HU', { style: 'currency', currency: 'HUF', maximumFractionDigits: 0 }).format(amount);
 
 // The form stores the category key; an admin reads its Hungarian name.
 const taxonomy = await getTaxonomy();
@@ -33,7 +37,7 @@ const dateFmt = new Intl.DateTimeFormat('hu-HU', { year: 'numeric', month: 'shor
 <Portal title="Értékbecslések">
   <header class="head">
     <p class="eyebrow">Értékbecslések</p>
-    <h1>{valuations?.length ?? 0} tétel</h1>
+    <h1>{shown.length} tétel</h1>
   </header>
 
   <div class="filters">
@@ -42,18 +46,23 @@ const dateFmt = new Intl.DateTimeFormat('hu-HU', { year: 'numeric', month: 'shor
       <a href={`/portal/valuations?status=${value}`} aria-current={filter === value ? 'page' : undefined}>{label}</a>
     ))}
   </div>
+  <div class="filters">
+    <a href={`/portal/valuations${filter ? `?status=${filter}` : ''}`} aria-current={!kindFilter ? 'page' : undefined}>Minden kérés</a>
+    {Object.entries(kindLabel).map(([key,label]) => <a href={`/portal/valuations?kind=${key}${filter ? `&status=${filter}` : ''}`} aria-current={kindFilter === key ? 'page' : undefined}>{label}</a>)}
+  </div>
 
-  {valuations && valuations.length > 0 ? (
+  {shown.length > 0 ? (
     <table class="list">
-      <thead><tr><th>Dátum</th><th>Forrás</th><th>Ingatlan</th><th>Kapcsolat</th><th class="right">Sáv</th><th>Állapot</th></tr></thead>
+      <thead><tr><th>Dátum</th><th>Forrás</th><th>Kérés</th><th>Ingatlan</th><th>Kapcsolat</th><th class="right">Sáv</th><th>Állapot</th></tr></thead>
       <tbody>
-        {valuations.map((v) => (
+        {shown.map((v) => (
           <tr>
             <td class="nowrap">{dateFmt.format(new Date(v.created_at))}</td>
             <td>{v.source === 'public_lead' ? 'Nyilvános' : 'Admin'}</td>
+            <td>{kindLabel[v.request_kind ?? 'indicative'] ?? 'Tájékoztató'}</td>
             <td>{categoryName(v.category)} · {v.county}{v.settlement ? `, ${v.settlement}` : ''}</td>
             <td>{v.contact_name ?? '—'}</td>
-            <td class="right">{v.low_eur ? `${eur(v.low_eur)} – ${eur(v.high_eur)}` : '—'}</td>
+            <td class="right">{v.low_huf ? `${huf(v.low_huf)} – ${huf(v.high_huf)}` : v.low_eur ? `${eur(v.low_eur)} – ${eur(v.high_eur)}` : '—'}</td>
             <td>
               <span class:list={['pill', `pill-${v.status}`]}>{STATUS_LABEL[v.status] ?? v.status}</span>
               <br /><a href={`/portal/valuations/${v.id}`} class="detail-link">Részletek →</a>

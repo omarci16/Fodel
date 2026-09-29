@@ -11,8 +11,9 @@ import type { Company } from '~/lib/runtime-config';
 import { BRAND, LOCALE_META, type Locale } from '~/i18n/ui';
 import type { Property } from './properties';
 import { text } from './properties';
+import { SITE_URL } from '~/config/site.mjs';
 
-const SITE = 'https://fodel.nl';
+const SITE = SITE_URL;
 
 export const abs = (path: string): string => new URL(path, SITE).toString();
 

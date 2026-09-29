@@ -13,7 +13,7 @@ export const prerender = false;
 import type { APIRoute } from 'astro';
 import { publishedPosts, siblingPost, postPath, BLOG_LOCALES, type BlogLocale } from '~/lib/blog';
 
-const SITE = 'https://fodel.nl';
+import { SITE_URL as SITE } from '~/config/site.mjs';
 const FAMILY: Record<BlogLocale, BlogLocale> = { hu: 'nl', nl: 'hu', en: 'de', de: 'en' };
 
 export const GET: APIRoute = async () => {

@@ -149,7 +149,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   if (payload.settlement || payload.description || invite.grants_free_listing) {
     try {
       const draftId = await createDraft(admin, created.user.id);
-      if (payload.settlement || payload.description) await applyIntake(admin, draftId, payload as ListingIntake);
+      if (payload.settlement || payload.description || payload.requestedExtras) await applyIntake(admin, draftId, payload as ListingIntake);
       if (invite.grants_free_listing) {
         await admin.from('properties').update({ free_listing: true }).eq('id', draftId);
       }
@@ -157,6 +157,17 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
       const referralId = (payload as { referralId?: string | null }).referralId;
       if (referralId) {
         await admin.from('referrals').update({ referred_property_id: draftId }).eq('id', referralId);
+      }
+
+      // An on-site service asked for on the form now belongs to this listing
+      // and this account (brief 3 §F). A no-op before migration 0015.
+      const serviceRequestId = (payload as { serviceRequestId?: string | null }).serviceRequestId;
+      if (serviceRequestId) {
+        await admin
+          .from('service_requests')
+          .update({ property_id: draftId, profile_id: created.user.id })
+          .eq('id', serviceRequestId)
+          .then(() => {}, () => {});
       }
 
       return redirect(`/portal/properties/${draftId}`);

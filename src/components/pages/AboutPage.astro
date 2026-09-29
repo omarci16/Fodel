@@ -12,6 +12,7 @@
  * on the contact band instead of stopping at the footer.
  */
 import Base from '~/layouts/Base.astro';
+import { SITE_HOST } from '~/config/site.mjs';
 import PageHeader from '~/components/PageHeader.astro';
 import SectionHead from '~/components/SectionHead.astro';
 import PointsList from '~/components/PointsList.astro';
@@ -65,7 +66,7 @@ const quote = splitOpeningQuote(c.origin.quote);
       <blockquote class="origin-quote" data-words>
         {quote.mark && <span class="hang-quote">{quote.mark}</span>}{quote.rest}
       </blockquote>
-      <figcaption class="origin-cite reveal">{COMPANY.names.legal} — fodel.nl</figcaption>
+      <figcaption class="origin-cite reveal">{COMPANY.names.legal} — {SITE_HOST}</figcaption>
     </figure>
   </section>
 

@@ -11,6 +11,7 @@
 export const prerender = false;
 
 import Portal from '~/layouts/Portal.astro';
+import { SITE_URL } from '~/config/site.mjs';
 import { INVITE_LOCALES, inviteTemplates } from '~/lib/portal/invites';
 import { templates } from '~/lib/email/templates';
 import { LOCALE_LABEL } from '~/lib/portal/labels';
@@ -21,7 +22,7 @@ if (profile?.role !== 'admin') return Astro.redirect('/portal/dashboard');
 const saved = Astro.url.searchParams.get('saved');
 const err = Astro.url.searchParams.get('error');
 const rows = await inviteTemplates(supabase);
-const SAMPLE_URL = 'https://fodel.nl/portal/invite/minta-link';
+const SAMPLE_URL = `${SITE_URL}/portal/invite/minta-link`;
 ---
 
 <Portal title="Meghívólevelek">
@@ -29,9 +30,13 @@ const SAMPLE_URL = 'https://fodel.nl/portal/invite/minta-link';
     <p class="eyebrow"><a href="/portal/settings">← Beállítások</a></p>
     <h1>Meghívólevelek</h1>
     <p class="lede">
-      A meghívó szövege nyelvenként. Élesben csak jóváhagyott szöveg megy ki: magyarul és hollandul
-      addig az eddigi alapértelmezett szöveg, angolul és németül jóváhagyott szöveg nélkül meghívó
-      nem küldhető.
+      A hirdetőknek (tulajdonosoknak) szóló meghívó szövege nyelvenként. Élesben csak jóváhagyott
+      szöveg megy ki: magyarul és hollandul addig az eddigi alapértelmezett szöveg, angolul és
+      németül jóváhagyott szöveg nélkül meghívó nem küldhető.
+    </p>
+    <p class="lede">
+      Admin meghívóra ezek a sablonok nem vonatkoznak: kollégák mindig a beépített admin szöveget
+      kapják.
     </p>
   </header>
 

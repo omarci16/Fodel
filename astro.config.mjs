@@ -54,6 +54,9 @@ export default defineConfig({
       { protocol: 'https', hostname: 'fodel-git-main-marton-oroszs-projects.vercel.app' },
       // The real domain, once DNS is pointed at Vercel — see README's
       // "Before this can go live".
+      { protocol: 'https', hostname: 'fodel.eu' },
+      { protocol: 'https', hostname: 'www.fodel.eu' },
+      // The old domains, until they are retired (brief 3 §A — Ops decision).
       { protocol: 'https', hostname: 'fodel.nl' },
       { protocol: 'https', hostname: 'www.fodel.nl' },
     ],

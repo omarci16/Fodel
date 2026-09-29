@@ -14,14 +14,19 @@ export const prerender = false;
 
 import Portal from '~/layouts/Portal.astro';
 import Field from '~/components/forms/Field.astro';
+import PhotoTips from '~/components/PhotoTips.astro';
+import { ONSITE_SERVICES } from '~/config/company';
+import { isPortrait, isLowResolution, photoHints } from '~/config/review-checklist';
+import { serviceName, servicePrice, SERVICE_STATUS_LABEL, type ServiceStatus } from '~/lib/portal/service-requests';
 import { getProperty, STATUS_LABEL, EPC_OPTIONS, LOCALE_OPTIONS, OWNER_EDITABLE } from '~/lib/portal/properties';
-import { getTaxonomy, termLabel } from '~/lib/runtime-config';
+import { getTaxonomy, getCompany, termLabel } from '~/lib/runtime-config';
 import { resolveImage } from '~/lib/property-images';
 import { formatCents, type OrderLine } from '~/lib/orders';
 import { isStripeEnabled } from '~/lib/stripe';
 import { isAiEnabled } from '~/lib/ai/client';
 import { COMPANY } from '~/config/company';
 import { COUNTRIES } from '~/config/countries';
+import { SITE_HOST } from '~/config/site.mjs';
 import { MAX_UPLOAD_MB, MAX_EDGE, LOW_RESOLUTION_EDGE } from '~/lib/media';
 
 /** A demo photo (bare filename) needs Astro's asset pipeline to become a real URL; a real upload already is one. */
@@ -102,6 +107,7 @@ const { data: order } = await supabase
   .maybeSingle();
 
 const awaitingPayment = property.status === 'awaiting_payment';
+const refundPolicy = (await getCompany()).services.refundPolicy?.hu?.trim();
 const orderLines = (order?.line_items ?? []) as OrderLine[];
 const cardEnabled = isStripeEnabled();
 
@@ -120,6 +126,21 @@ if (!property.settlement || !property.county || !property.region) {
   blockers.push('A helyszín mezők (település, megye, régió) kitöltése kötelező.');
 }
 if (property.price_eur <= 1 || property.price_huf <= 1) blockers.push('Adja meg az irányárat.');
+
+// The on-site service for this listing, if one is open (0015). A read error
+// (migration not yet run) simply hides the section's status.
+const { data: openService, error: serviceTableError } = await supabase
+  .from('service_requests')
+  .select('id, service_id, status, scheduled_for')
+  .eq('property_id', property.id)
+  .in('status', ['requested', 'scheduled'])
+  .order('created_at', { ascending: false })
+  .limit(1)
+  .maybeSingle();
+const servicesAvailable = !serviceTableError;
+const canRequestService = servicesAvailable && isOwnProperty && OWNER_EDITABLE.includes(property.status) && !openService;
+
+const photoHintCounts = photoHints(property.media);
 
 /** Not a blocker — but it costs the listing real search traffic. */
 const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).length;
@@ -359,7 +380,7 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
     <section class="pay">
       <h2>Fizetendő díj</h2>
       <p class="hint">
-        Hirdetését jóváhagytuk. A fizetés beérkezése után azonnal megjelenik a fodel.nl oldalon.
+        Hirdetését jóváhagytuk. A fizetés beérkezése után azonnal megjelenik a {SITE_HOST} oldalon.
       </p>
 
       <table class="order-table">
@@ -379,6 +400,7 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
         </tfoot>
       </table>
       <p class="vat-note">Az ár tartalmazza a 21% holland áfát.</p>
+      {refundPolicy && <p class="hint"><strong>Visszatérítési szabály:</strong> {refundPolicy}</p>}
 
       {cardEnabled ? (
         <>
@@ -442,20 +464,16 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
       képet is elfogadunk, de nagy képernyőn elmosódottnak látszhat.
     </p>
 
-    <div class="photo-guide">
-      <p class="photo-guide-head">Milyen képek működnek a legjobban?</p>
-      <ul>
-        <li>Nappali fényben, világos helyiségekről készüljenek — kapcsolja fel a lámpákat is.</li>
-        <li>Élesek legyenek: tartsa stabilan a telefont, és törölje le a lencsét.</li>
-        <li>Mutassák be az egész ingatlant: homlokzat, minden fontos helyiség, kert, kilátás.</li>
-        <li>Rendezett, zsúfoltságmentes terekről — a vevő a házat nézze, ne a tárgyakat.</li>
-      </ul>
-      <p class="photo-guide-why">
-        A vevők többsége külföldről, a képek alapján dönt arról, hogy felveszi-e a kapcsolatot és
-        vállalja-e az utat a megtekintésre. A jó fénykép ezért közvetlenül több érdeklődést jelent.
-        A képeket munkatársunk az elbírálás során megnézi, és szükség esetén cserét kér.
+    <PhotoTips locale="hu" variant="portal" heading="Így készítsen jó fotót" />
+
+    {(photoHintCounts.portrait > 0 || photoHintCounts.lowResolution > 0) && (
+      <p class="soft-warn">
+        {photoHintCounts.portrait > 0 && `${photoHintCounts.portrait} kép álló tájolású. `}
+        {photoHintCounts.lowResolution > 0 && `${photoHintCounts.lowResolution} kép kis felbontású. `}
+        Beküldheti így is, de fekvő, nagy felbontású képekkel a hirdetés jobban mutat — a jelölt képeket
+        érdemes cserélni.
       </p>
-    </div>
+    )}
 
     <p class="hint">
       Írjon minden képhez egy rövid leírást (pl. „Nappali cserépkályhával”). Ezt olvassa fel a
@@ -469,6 +487,12 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
           <div class="media-thumb">
             <img src={mediaSrc(m!.storage_path)} alt={captionOf(m!)} />
             {m === hero && <span class="hero-badge">Címlapkép</span>}
+            {(isPortrait(m!) || isLowResolution(m!)) && (
+              <span class="photo-flags">
+                {isPortrait(m!) && <span title="A kép álló tájolású — fekvő képek mutatnak jobban.">Álló kép</span>}
+                {isLowResolution(m!) && <span title="Nagy képernyőn elmosódottnak látszhat.">Kis felbontás</span>}
+              </span>
+            )}
             {m !== hero && <button type="button" class="set-hero" data-set-hero={m!.id}>Címlapképnek</button>}
             <button type="button" class="remove" data-remove-media={m!.id} aria-label="Kép törlése">×</button>
           </div>
@@ -495,7 +519,87 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
     </label>
     <p class="upload-status" id="upload-status" role="status"></p>
   </section>
+
+  {servicesAvailable && (openService || canRequestService) && (
+    <section id="service" class="service-section">
+      <h2>Helyszíni szolgáltatás</h2>
+      {openService ? (
+        <div class="service-status">
+          <p>
+            <strong>{serviceName(openService.service_id)}</strong> — {servicePrice(openService.service_id)}
+          </p>
+          <p class="hint">
+            Állapot: {SERVICE_STATUS_LABEL[openService.status as ServiceStatus] ?? openService.status}
+            {openService.scheduled_for && ` · időpont: ${new Date(openService.scheduled_for).toLocaleDateString('hu-HU')}`}.
+            {openService.status === 'requested' && ' Munkatársunk felveszi Önnel a kapcsolatot az időpont egyeztetéséhez.'}
+          </p>
+          {isOwnProperty && openService.status === 'requested' && (
+            <button type="button" class="btn ghost" id="service-cancel">Igény visszavonása</button>
+          )}
+          {isAdmin && <a class="hint-link" href="/portal/services">Kezelés a Helyszíni szolgáltatások oldalon →</a>}
+        </div>
+      ) : (
+        <form id="service-form" class="service-form">
+          <p class="hint">
+            Nem szeretne maga fotózni? Kérje szakember segítségét — nem kötelező. Munkatársunk felveszi
+            Önnel a kapcsolatot az időpont egyeztetéséhez, és ekkor tájékoztatja a díj rendezéséről.
+          </p>
+          <div class="service-options">
+            {ONSITE_SERVICES.map((service) => (
+              <label class="service-option">
+                <input type="radio" name="serviceId" value={service.id} />
+                <span>
+                  <strong>{service.names.hu}</strong>
+                  <span class="service-price">{servicePrice(service.id)} · egyszeri díj</span>
+                  <span class="service-includes">{service.includes.hu.join(' · ')}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+          <label class="service-note">
+            Megjegyzés (nem kötelező)
+            <textarea name="note" rows="2" maxlength="2000" placeholder="pl. mikor alkalmas, hogyan lehet bejutni"></textarea>
+          </label>
+          <button type="submit" class="btn">Szolgáltatás kérése</button>
+        </form>
+      )}
+      <p class="workflow-status" id="service-status" role="status"></p>
+    </section>
+  )}
 </Portal>
+
+<script define:vars={{ servicePropertyId: property.id }}>
+  // On-site service: ask for one, or withdraw it before it is scheduled.
+  const serviceStatus = document.getElementById('service-status');
+  async function serviceCall(payload) {
+    const res = await fetch(`/api/portal/properties/${servicePropertyId}/service`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (res.ok && json.ok) {
+      location.hash = 'service';
+      location.reload();
+    } else if (serviceStatus) {
+      serviceStatus.textContent = json.error || 'Nem sikerült. Próbálja újra.';
+    }
+  }
+  document.getElementById('service-form')?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const chosen = form.querySelector('input[name="serviceId"]:checked');
+    if (!chosen) {
+      if (serviceStatus) serviceStatus.textContent = 'Válassza ki, melyik szolgáltatást kéri.';
+      return;
+    }
+    if (serviceStatus) serviceStatus.textContent = 'Küldés…';
+    serviceCall({ action: 'request', serviceId: chosen.value, note: form.note.value });
+  });
+  document.getElementById('service-cancel')?.addEventListener('click', () => {
+    if (confirm('Visszavonja a helyszíni szolgáltatás iránti igényét?')) serviceCall({ action: 'cancel' });
+  });
+</script>
 
 <script>
   import { exposeShrinkImage } from '~/scripts/shrink-image';
@@ -791,11 +895,6 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
   .review-note blockquote { font-size: var(--fs-body); line-height: var(--lh-body); color: var(--ink); margin: 0 0 12px; white-space: pre-line; }
   .review-note-foot { font-size: var(--fs-small); line-height: 1.7; color: var(--taupe); }
 
-  .photo-guide { margin: 4px 0 20px; padding: 16px 20px; background: rgba(16, 42, 67, 0.04); border-left: 2px solid var(--ink); }
-  .photo-guide-head { font-size: var(--fs-small); color: var(--ink); margin-bottom: 8px; }
-  .photo-guide ul { padding-left: 18px; margin-bottom: 10px; }
-  .photo-guide li { font-size: var(--fs-small); line-height: 1.7; color: var(--taupe); }
-  .photo-guide-why { font-size: var(--fs-micro); line-height: 1.7; color: var(--taupe); }
 
   .pay { padding: 28px 0; border-top: 1px solid var(--border); }
   .pay h2 { font-family: var(--serif); font-size: 19px; color: var(--ink); margin-bottom: 10px; }
@@ -814,6 +913,22 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
   .bank dd { font-size: var(--fs-small); color: var(--ink); }
 
   .media-section { padding-top: 28px; border-top: 1px solid var(--border); margin-top: 8px; }
+
+  .photo-flags { position: absolute; left: 6px; bottom: 6px; display: flex; gap: 4px; flex-wrap: wrap; pointer-events: none; }
+  .photo-flags span { font-size: 11px; padding: 2px 7px; border-radius: 999px; background: #fff7e0; color: #6b4f08; border: 1px solid #96700b; }
+  .service-section { padding: 28px 0; border-top: 1px solid var(--border); margin-top: 20px; }
+  .service-section h2 { font-family: var(--serif); font-size: 19px; color: var(--ink); margin-bottom: 10px; }
+  .service-status p { font-size: var(--fs-small); color: var(--ink); line-height: 1.7; }
+  .service-options { display: grid; gap: 10px; margin: 14px 0; max-width: 640px; }
+  .service-option { display: grid; grid-template-columns: 20px 1fr; gap: 12px; align-items: start; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: #fff; cursor: pointer; }
+  .service-option:has(input:checked) { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
+  .service-option input { margin-top: 4px; }
+  .service-option > span { display: flex; flex-direction: column; gap: 3px; font-size: var(--fs-small); color: var(--taupe); line-height: 1.5; }
+  .service-option strong { color: var(--ink); font-weight: 500; }
+  .service-price { color: var(--ink); }
+  .service-note { display: flex; flex-direction: column; gap: 6px; max-width: 640px; margin-bottom: 14px; font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; color: var(--taupe); }
+  .service-note textarea { border: 1px solid var(--border); background: #fff; padding: 10px; font-size: var(--fs-small); color: var(--ink); text-transform: none; letter-spacing: 0; font-family: inherit; }
+  .hint-link { font-size: var(--fs-small); text-decoration: underline; text-underline-offset: 2px; }
   .media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 18px 14px; margin: 18px 0; }
   .media-item { display: flex; flex-direction: column; gap: 8px; }
   .media-thumb { position: relative; aspect-ratio: 4/3; background: var(--mist); overflow: hidden; }

@@ -25,6 +25,8 @@ import { templates } from '~/lib/email/templates';
 import type { BuiltEmail } from '~/lib/email/templates';
 import { SITE_URL } from '~/config/site.mjs';
 import { createSupabaseServerClient } from '~/lib/supabase-server';
+import { buildInvite } from '~/lib/portal/invites';
+import { HU_OWNER_INVITE } from '~/data/invite-letter';
 
 export const prerender = false;
 
@@ -54,6 +56,15 @@ const SAMPLE_ORDER: Record<Locale, { label: string; amount: string }[]> = {
   ],
 };
 
+/** A stand-in Supabase client whose email_templates hold the approved HU owner letter. */
+const approvedStub = {
+  from: () => ({
+    select: () => ({
+      eq: async () => ({ data: [{ locale: 'hu', approved: true, ...HU_OWNER_INVITE }], error: null }),
+    }),
+  }),
+};
+
 const SAMPLE_INVITE = {
   subject: '[MINTA] Meghívó a FODEL portálra',
   heading: '[MINTA] Meghívó',
@@ -62,7 +73,7 @@ const SAMPLE_INVITE = {
 };
 
 /** Every template with sample arguments that exercise its longest branch. */
-const CASES: Record<string, (locale: Locale) => BuiltEmail> = {
+const CASES: Record<string, (locale: Locale) => BuiltEmail | null | Promise<BuiltEmail | null>> = {
   registrationConfirm: (l) =>
     templates.registrationConfirm(l, {
       name: 'Kovács Anna',
@@ -176,9 +187,24 @@ const CASES: Record<string, (locale: Locale) => BuiltEmail> = {
   valuationReady: (l) =>
     templates.valuationReady(l, {
       range: '€ 142 000 – € 168 000',
+      mid: '€ 155 000', basis: l === 'nl' ? '11 vergelijkbare FODEL-advertenties' : '11 hasonló FODEL-hirdetés',
+      factors: [{ text: 'Panorámás kilátás', direction: 'plus' }],
+      notice: l === 'hu' ? 'Tájékoztató, piaci alapú értékmeghatározás.' : 'Indicatieve, marktgebaseerde waardebepaling.',
       compCount: 11,
       submitAdUrl: `${SITE_URL}${l === 'nl' ? '/nl/advertentie-plaatsen/' : '/hu/hirdetes-feladasa/'}`,
     }),
+  valuationReadyKsh: (l) => templates.valuationReady(l, {
+    range: l === 'hu' ? '42 000 000 – 54 000 000 Ft' : '€ 105 000 – € 135 000',
+    mid: l === 'hu' ? '48 000 000 Ft' : '€ 120 000',
+    compCount: 0, basis: l === 'nl' ? 'KSH Ingatlanadattár, 2024 (plaats, 18 gegevens)' : 'KSH Ingatlanadattár, 2024 (település, 18 adat)',
+    sourceUrl: 'https://www.ksh.hu/s/ingatlanadattar/', sourceDate: l === 'nl' ? '2024, opgehaald 2026-09-29' : '2024, letöltve 2026-09-29', rateDate: l === 'nl' ? '2026-09-29' : undefined,
+    factors: [{ text: 'Felújított tető', direction: 'plus' }, { text: 'Forgalmas út', direction: 'minus' }],
+    notice: l === 'hu' ? 'Tájékoztató, piaci alapú értékmeghatározás.' : 'Indicatieve, marktgebaseerde waardebepaling.',
+    submitAdUrl: `${SITE_URL}${l === 'nl' ? '/nl/advertentie-plaatsen/' : '/hu/hirdetes-feladasa/'}`,
+    visitUrl: `${SITE_URL}${l === 'nl' ? '/nl/waardebepaling/' : '/hu/ertekbecsles/'}?service=onsite-visit`,
+    judicialUrl: `${SITE_URL}${l === 'nl' ? '/nl/waardebepaling/' : '/hu/ertekbecsles/'}?service=judicial`,
+  }),
+  valuationReceived: (l) => templates.valuationReceived(l),
   // Priced by hand by an admin: no comparable count to cite.
   valuationReadyManual: (l) =>
     templates.valuationReady(l, {
@@ -191,11 +217,26 @@ const CASES: Record<string, (locale: Locale) => BuiltEmail> = {
     templates.valuationNeedsInfo(l, {
       note: 'Kérjük, küldjön néhány fényképet a ház külsejéről, és írja meg, mikor cserélték a tetőt.',
     }),
+  serviceRequested: (l) => templates.serviceRequested(l, { service: l === 'hu' ? 'Gábor helyszíni látogatása' : 'Bezoek van Gábor', price: '€ 200' }),
+  judicialRequested: (l) => templates.judicialRequested(l),
+  adminServiceRequested: (l) => templates.adminServiceRequested(l, {
+    service: 'Helyszíni fotózás, videó és drónfelvétel', name: 'Kovács Anna',
+    email: 'anna.kovacs@example.com', phone: '+36 20 123 4567',
+    source: 'valuation', note: 'Időpont egyeztetése szükséges.', url: `${SITE_URL}/portal/services`,
+  }),
   // The admin-edited invite text (Beállítások → Meghívólevelek). The body here
   // is a visible sample, not approved copy.
   inviteFromTemplate: (l) => templates.inviteFromTemplate(l, SAMPLE_INVITE, `${SITE_URL}/portal/invite/${SAMPLE_TOKEN}`),
   inviteFromTemplateEn: () => templates.inviteFromTemplate('en', SAMPLE_INVITE, `${SITE_URL}/portal/invite/${SAMPLE_TOKEN}`),
   inviteFromTemplateDe: () => templates.inviteFromTemplate('de', SAMPLE_INVITE, `${SITE_URL}/portal/invite/${SAMPLE_TOKEN}`),
+  // Brief 3 §B: the client's Hungarian owner letter, exactly as migration 0015
+  // seeds it (approved). Hungarian only — there is no NL client text.
+  inviteOwnerApprovedHu: () =>
+    templates.inviteFromTemplate('hu', HU_OWNER_INVITE, `${SITE_URL}/portal/invite/${SAMPLE_TOKEN}`),
+  // What buildInvite() actually sends once that letter is approved: the owner
+  // gets it, an admin still gets the built-in admin wording (the role bug).
+  inviteOwnerAfterApproval: () => buildInvite(approvedStub, 'hu', 'owner', `${SITE_URL}/portal/invite/${SAMPLE_TOKEN}`),
+  inviteAdminAfterApproval: (l) => buildInvite(approvedStub, l, 'admin', `${SITE_URL}/portal/invite/${SAMPLE_TOKEN}`),
   creditNoteIssued: (l) =>
     templates.creditNoteIssued(l, {
       ref: SAMPLE_REF,
@@ -255,7 +296,8 @@ export const GET: APIRoute = async ({ url, request, cookies }) => {
   if (!build) return new Response(`Unknown template: ${key}`, { status: 404 });
 
   const locale: Locale = url.searchParams.get('locale') === 'nl' ? 'nl' : 'hu';
-  const email = build(locale);
+  const email = await build(locale);
+  if (!email) return new Response(`No email for ${key} in ${locale}`, { status: 404 });
 
   if (url.searchParams.get('format') === 'text') {
     return new Response(`Subject: ${email.subject}\n\n${email.text}`, {

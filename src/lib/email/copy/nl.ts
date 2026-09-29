@@ -7,6 +7,7 @@
  * seller is exactly the failure this arrangement is meant to make impossible.
  */
 import type { HU } from './hu';
+import { SITE_HOST } from '~/config/site.mjs';
 
 export const NL = {
   common: {
@@ -130,7 +131,7 @@ export const NL = {
     preheader: 'Dank u wel, wij hebben uw betaling ontvangen.',
     heading: 'Dank u wel, uw betaling is ontvangen',
     body: (title: string, ref: string) =>
-      `Wij hebben de betaling voor advertentie „${title}” (#${ref}) ontvangen. De advertentie staat online en is zichtbaar op fodel.nl.`,
+      `Wij hebben de betaling voor advertentie „${title}” (#${ref}) ontvangen. De advertentie staat online en is zichtbaar op ${SITE_HOST}.`,
     orderTitle: 'Specificatie',
     discountLabel: 'Aanbrengkorting (10%)',
     totalLabel: 'Betaald bedrag',
@@ -140,10 +141,10 @@ export const NL = {
 
   published: {
     subject: (ref: string) => `Uw advertentie staat online — #${ref}`,
-    preheader: 'De advertentie is nu zichtbaar op fodel.nl.',
+    preheader: `De advertentie is nu zichtbaar op ${SITE_HOST}.`,
     heading: 'Uw advertentie staat online',
     body: (title: string, ref: string) =>
-      `Uw advertentie „${title}” (#${ref}) staat op fodel.nl en is bereikbaar voor kopers in acht landen.`,
+      `Uw advertentie „${title}” (#${ref}) staat op ${SITE_HOST} en is bereikbaar voor kopers in acht landen.`,
     cta: 'Advertentie bekijken',
     next: 'Zodra iemand interesse toont, sturen wij u direct een e-mail met zijn gegevens. De status van uw advertentie ziet u altijd in het portaal.',
   },
@@ -234,6 +235,45 @@ export const NL = {
     body: (title: string, ref: string, number: string, correctsNumber: string) =>
       `Bij factuur ${correctsNumber} van uw advertentie „${title}” (#${ref}) hebben wij creditfactuur ${number} opgesteld.`,
     cta: 'Creditfactuur bekijken',
+  },
+
+  serviceRequested: {
+    subject: 'Uw aanvraag is ontvangen — FODEL',
+    preheader: 'Onze medewerker neemt contact met u op om een afspraak te maken.',
+    heading: 'Wij hebben uw aanvraag ontvangen',
+    body: (service: string, price: string) => `Dank u wel, wij hebben uw aanvraag genoteerd: ${service} (${price}).`,
+    next: 'Onze medewerker neemt contact met u op om een afspraak te maken.',
+    payment: 'Over de betaling informeren wij u bij het maken van de afspraak. U hoeft nu niets te betalen.',
+    cancel: 'Bedenkt u zich? Beantwoord dan gewoon deze e-mail.',
+  },
+
+  judicialRequested: {
+    subject: 'Aanvraag officiële taxatie — FODEL',
+    preheader: 'Onze medewerker neemt contact met u op over de mogelijkheden.',
+    heading: 'Wij hebben uw verzoek ontvangen',
+    body: 'Dank u wel, wij hebben genoteerd dat u een officiële (gerechtelijke) taxatie door een deskundige wenst. Dit is iets anders dan de indicatieve, marktgebaseerde waardebepaling op onze website: een bevoegde taxateur voert deze uit, op basis van een offerte.',
+    next: 'Onze medewerker neemt contact met u op over de mogelijkheden en de offerte.',
+  },
+
+  adminServiceRequested: {
+    subject: (service: string) => `Nieuwe aanvraag — ${service}`,
+    preheader: 'Maak een afspraak met de klant.',
+    heading: 'Nieuwe dienstaanvraag',
+    labels: {
+      service: 'Dienst',
+      name: 'Naam',
+      email: 'E-mail',
+      phone: 'Telefoon',
+      where: 'Via',
+      note: 'Opmerking',
+    },
+    sources: {
+      submit_form: 'Advertentieformulier',
+      listing_editor: 'Advertentie-editor',
+      valuation: 'Waardebepaling',
+      admin: 'Admin',
+    } as Record<string, string>,
+    cta: 'Openen in het portaal',
   },
 
   referralAdminNotice: {

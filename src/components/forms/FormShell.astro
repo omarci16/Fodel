@@ -59,7 +59,7 @@ const contactPhone = locale === 'hu' ? (publicPhones.find((phone) => phone.href.
         <path d="M5 11.5l4 4 8-9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
       </svg>
     </span>
-    <h3>{successTitle ?? ui.form.successTitle}</h3>
+    <h3 tabindex="-1">{successTitle ?? ui.form.successTitle}</h3>
     <p>{successBody ?? ui.form.successBody}</p>
   </div>
 
@@ -212,6 +212,8 @@ const contactPhone = locale === 'hu' ? (publicPhones.find((phone) => phone.href.
         });
 
         if (!response.ok) throw new Error(String(response.status));
+        const data = await response.json();
+        form.dispatchEvent(new CustomEvent('fodel:success', { detail: data }));
 
         form.hidden = true;
         success.hidden = false;

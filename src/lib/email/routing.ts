@@ -9,7 +9,7 @@
  * open business decision (brief §9) — whichever it is, it changes here and in
  * the environment, nowhere else.
  *
- *   FODEL_FROM      sender, e.g. "FODEL <website@fodel.nl>" (verified domain)
+ *   FODEL_FROM      sender, e.g. "FODEL <website@fodel.eu>" (verified domain)
  *   FODEL_INBOX     where form submissions and admin fallbacks are delivered
  *   FODEL_REPLY_TO  where a customer's reply lands; defaults to FODEL_INBOX
  */
@@ -19,7 +19,7 @@ import { COMPANY } from '~/config/company';
 export function senderAddress(kind: 'portal' | 'website' = 'portal'): string {
   const configured = import.meta.env.FODEL_FROM;
   if (configured) return configured;
-  return kind === 'portal' ? 'FODEL Portál <portal@fodel.nl>' : 'FODEL Website <website@fodel.nl>';
+  return kind === 'portal' ? 'FODEL Portál <portal@fodel.eu>' : 'FODEL Website <website@fodel.eu>';
 }
 
 export function officeInbox(): string {

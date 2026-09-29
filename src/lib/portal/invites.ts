@@ -9,6 +9,11 @@
  *
  * The language is always the admin's explicit choice. Nothing is guessed from
  * an email address or the admin's own location.
+ *
+ * Approved templates are the *owner* letter ("Kedves Tulajdonos!"). An admin
+ * invite always uses the built-in admin wording, so approving the owner text
+ * can never turn a colleague's invite into a letter to a property owner
+ * (brief 3 §B.1). English and German therefore have no admin invite at all.
  */
 import { templates, type BuiltEmail, type InviteTemplate } from '~/lib/email/templates';
 
@@ -33,17 +38,23 @@ export async function inviteTemplates(client: any): Promise<Map<InviteLocale, Te
   return new Map((data ?? []).map((row: TemplateRow) => [row.locale, row]));
 }
 
-/** Per language: can an invite be sent, and with which wording. */
+export type InviteRole = 'admin' | 'owner';
+export type InviteSource = 'approved' | 'built-in' | 'missing';
+
+/** Which wording an invite in `locale` for `role` would use. Pure, so it is testable. */
+export function inviteSource(locale: InviteLocale, role: InviteRole, approved: boolean): InviteSource {
+  if (role === 'owner' && approved) return 'approved';
+  return BUILT_IN.has(locale) ? 'built-in' : 'missing';
+}
+
+/** Per language and role: can an invite be sent, and with which wording. */
 export async function inviteAvailability(client: any) {
   const rows = await inviteTemplates(client);
   return INVITE_LOCALES.map((locale) => {
-    const row = rows.get(locale);
-    const approved = Boolean(row?.approved);
-    return {
-      locale,
-      sendable: approved || BUILT_IN.has(locale),
-      source: approved ? ('approved' as const) : BUILT_IN.has(locale) ? ('built-in' as const) : ('missing' as const),
-    };
+    const approved = Boolean(rows.get(locale)?.approved);
+    const owner = inviteSource(locale, 'owner', approved);
+    const admin = inviteSource(locale, 'admin', approved);
+    return { locale, owner, admin };
   });
 }
 
@@ -54,11 +65,14 @@ export async function inviteAvailability(client: any) {
 export async function buildInvite(
   client: any,
   locale: InviteLocale,
-  role: 'admin' | 'owner',
+  role: InviteRole,
   acceptUrl: string
 ): Promise<BuiltEmail | null> {
-  const row = (await inviteTemplates(client)).get(locale);
-  if (row?.approved) return templates.inviteFromTemplate(locale, row, acceptUrl);
-  if (locale === 'hu' || locale === 'nl') return templates.invite(locale, { role, acceptUrl });
+  const row = role === 'owner' ? (await inviteTemplates(client)).get(locale) : undefined;
+  const source = inviteSource(locale, role, Boolean(row?.approved));
+  if (source === 'approved' && row) return templates.inviteFromTemplate(locale, row, acceptUrl);
+  if (source === 'built-in' && (locale === 'hu' || locale === 'nl')) {
+    return templates.invite(locale, { role, acceptUrl });
+  }
   return null;
 }

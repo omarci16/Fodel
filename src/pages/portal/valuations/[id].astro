@@ -13,7 +13,7 @@ import { eur } from '~/lib/format';
 import type { Comp } from '~/lib/ai/valuation';
 import { VALUATION_STATUS_LABEL as STATUS_LABEL, LOCALE_LABEL } from '~/lib/portal/labels';
 import { describeAnswer } from '~/data/valuation-questions';
-import { getTaxonomy, termLabel } from '~/lib/runtime-config';
+import { getTaxonomy, getCompany, termLabel } from '~/lib/runtime-config';
 import { createSupabaseAdminClient } from '~/lib/supabase-server';
 
 const { supabase, profile } = Astro.locals;
@@ -29,7 +29,14 @@ const taxonomy = await getTaxonomy();
 const categoryName = termLabel(taxonomy.category.find((term) => term.key === v.category), 'hu') || v.category;
 
 // Columns from migration 0014; absent (undefined) until it has been run.
-const answers = Object.entries((v.answers ?? {}) as Record<string, string>).map(([key, value]) => describeAnswer(key, value));
+const answers = Object.entries((v.answers ?? {}) as Record<string, string>).map(([key, value]) => describeAnswer(key, String(value)));
+const answerGroups = [1,2,3,4].map((step) => ({ step, title: ['', 'Ingatlan', 'Épület és műszaki állapot', 'Környezet', 'Extrák és korlátok'][step], rows: answers.filter((answer) => answer.step === step) }));
+const unknownHu = (value: string | null | undefined) => value === 'nem-tudom' || value === 'unknown' ? 'Nem tudom' : null;
+const extentLabel: Record<string, string> = { partial: 'Részleges', full: 'Teljes', none: 'Nem volt', unknown: 'Nem tudom' };
+const company = await getCompany();
+const baseline = v.baseline as { kind?: string; source?: string; year?: number; count?: number; level?: string; dispersionPercent?: number; url?: string; retrievedAt?: string } | null;
+const factors = (Array.isArray(v.factors) ? v.factors : []) as { text: string; direction: string }[];
+const kindLabel: Record<string,string> = { indicative: 'Tájékoztató', expert_visit: 'Helyszíni látogatás', judicial: 'Igazságügyi / hivatalos' };
 const photoRows = (Array.isArray(v.photos) ? v.photos : []) as { path: string }[];
 const isLead = v.source === 'public_lead' && Boolean(v.contact_email);
 
@@ -60,24 +67,31 @@ const canDecide = v.status !== 'queued';
       <dl class="facts">
         <div><dt>Forrás</dt><dd>{v.source === 'public_lead' ? 'Nyilvános űrlap' : 'Admin (hirdetés)'}</dd></div>
         <div><dt>Típus</dt><dd>{categoryName}</dd></div>
+        <div><dt>Kérés</dt><dd>{kindLabel[v.request_kind ?? 'indicative'] ?? 'Tájékoztató'}</dd></div>
+        {v.address_private && <div><dt>Pontos cím (nem nyilvános)</dt><dd>{v.address_private}</dd></div>}
         {v.locale && <div><dt>Nyelv</dt><dd>{LOCALE_LABEL[v.locale] ?? v.locale}</dd></div>}
         <div><dt>Alapterület</dt><dd>{v.floor_m2 ?? '—'} m²</dd></div>
         <div><dt>Telek</dt><dd>{v.plot_m2 ?? '—'} m²</dd></div>
         <div><dt>Épült</dt><dd>{v.year_built ?? '—'}</dd></div>
         <div><dt>Állapot</dt><dd>{v.condition ?? '—'}</dd></div>
+        {v.bedrooms != null && <div><dt>Szobák</dt><dd>{v.bedrooms}</dd></div>}
+        {v.bathrooms != null && <div><dt>Fürdőszobák</dt><dd>{v.bathrooms}</dd></div>}
+        {v.parcel_count != null && <div><dt>Helyrajzi számok</dt><dd>{v.parcel_count}</dd></div>}
+        {(v.renovated_in || v.renovation_extent) && <div><dt>Felújítva</dt><dd>{[v.renovated_in, extentLabel[v.renovation_extent] ?? v.renovation_extent].filter(Boolean).join(' · ') || '—'}</dd></div>}
+        {v.condition_key && <div><dt>Állapotbesorolás</dt><dd>{unknownHu(v.condition_key) || termLabel(taxonomy.condition.find((term) => term.key === v.condition_key), 'hu') || v.condition_key}</dd></div>}
+        {v.heating_key && <div><dt>Fűtés</dt><dd>{unknownHu(v.heating_key) || termLabel(taxonomy.heating.find((term) => term.key === v.heating_key), 'hu') || v.heating_key}</dd></div>}
+        {v.epc_class && <div><dt>Energetika</dt><dd>{unknownHu(v.epc_class) || v.epc_class}</dd></div>}
+        {Array.isArray(v.features) && v.features.length > 0 && <div><dt>Extrák</dt><dd>{v.features.map((key: string) => termLabel(taxonomy.feature.find((term) => term.key === key), 'hu') || key).join(', ')}</dd></div>}
         {v.contact_name && <div><dt>Kapcsolat</dt><dd>{v.contact_name} · {v.contact_email} · {v.contact_phone ?? '—'}</dd></div>}
       </dl>
 
       {answers.length > 0 && (
         <>
-          <h2>Kiegészítő kérdések</h2>
-          <dl class="answers">
-            {answers.map((a) => (
-              <div><dt>{a.question}</dt><dd>{a.answer}</dd></div>
-            ))}
-          </dl>
+          {answerGroups.filter((group) => group.rows.length).map((group) => <><h2>{group.title}</h2><dl class="answers">{group.rows.map((a) => <div><dt>{a.question}</dt><dd>{a.answer}</dd></div>)}</dl></>)}
         </>
       )}
+      {factors.length > 0 && <><h2>Értéket befolyásoló szempontok</h2><ul class="ai-factors">{factors.map((factor) => <li>{factor.direction === 'plus' ? 'Értéknövelő' : factor.direction === 'minus' ? 'Értékcsökkentő' : 'Bizonytalan'}: {factor.text}</li>)}</ul></>}
+      {baseline && <><h2>Adatalap</h2><p class="hint">{baseline.kind === 'ksh' ? `KSH Ingatlanadattár, ${baseline.year} · ${baseline.level === 'county' ? 'vármegyei helyettesítés' : 'települési adat'} · ${baseline.count} ügylet` : `${baseline.count} hasonló FODEL-hirdetés`}</p>{baseline.dispersionPercent != null && <p class="hint">KSH szórás: {baseline.dispersionPercent}% (tájékoztató statisztikai adat).</p>}{baseline.url && <a href={baseline.url} target="_blank" rel="noopener">Forrás: KSH Ingatlanadattár, {baseline.year}{baseline.retrievedAt ? ` (letöltve: ${baseline.retrievedAt})` : ''} · CC BY 4.0</a>}</>}
 
       {photoRows.length > 0 && (
         <>
@@ -125,7 +139,7 @@ const canDecide = v.status !== 'queued';
       )}
 
       {v.status === 'insufficient_data' && (
-        <p class="notice">Kevesebb, mint 8 összehasonlítható ingatlan — nincs elég adat egy megbízható sávhoz. Áras becslés kézzel, vagy várjon több hirdetésre.</p>
+        <p class="notice">Nincs automatikus adatalap ehhez a kéréshez (kevesebb mint 8 FODEL-összehasonlító, és a kategóriához nincs használható KSH-adat). A sávot kézzel lehet megadni.</p>
       )}
 
       {(v.ai_rationale_hu || v.ai_adjustment_percent != null) && (
@@ -144,6 +158,8 @@ const canDecide = v.status !== 'queued';
       {canDecide && (
         <form id="band-form" class="panel">
           <h2>Ár-sáv</h2>
+          {'low_huf' in v && <><label>Alsó (HUF) <input type="number" name="lowHuf" min="1" value={v.low_huf ?? ''} /></label><label>Közép (HUF) <input type="number" name="midHuf" min="1" value={v.mid_huf ?? ''} /></label><label>Felső (HUF) <input type="number" name="highHuf" min="1" value={v.high_huf ?? ''} /></label></>}
+          {company.services.eurHufRate && company.services.eurHufRateDate && <p class="hint">Árfolyam: 1 EUR = {company.services.eurHufRate} HUF ({company.services.eurHufRateDate}).</p>}
           {v.low_eur == null && (
             <p class="hint">Nincs számított sáv. Jóváhagyni csak kitöltött sávval lehet — ha kézzel árazza, adja meg mindhárom értéket.</p>
           )}
@@ -185,6 +201,9 @@ const canDecide = v.status !== 'queued';
       payload.lowEur = Number(form.lowEur?.value) || undefined;
       payload.midEur = Number(form.midEur?.value) || undefined;
       payload.highEur = Number(form.highEur?.value) || undefined;
+      payload.lowHuf = Number(form.lowHuf?.value) || undefined;
+      payload.midHuf = Number(form.midHuf?.value) || undefined;
+      payload.highHuf = Number(form.highHuf?.value) || undefined;
       payload.note = form.note?.value;
     }
     const res = await fetch(`/api/portal/valuations/${valuationId}/action`, {
@@ -209,9 +228,10 @@ const canDecide = v.status !== 'queued';
   });
 
   document.getElementById('approve-btn')?.addEventListener('click', async () => {
-    const low = Number(form?.lowEur?.value);
-    const mid = Number(form?.midEur?.value);
-    const high = Number(form?.highEur?.value);
+    const hufMode = Boolean(form?.lowHuf);
+    const low = Number(hufMode ? form?.lowHuf?.value : form?.lowEur?.value);
+    const mid = Number(hufMode ? form?.midHuf?.value : form?.midEur?.value);
+    const high = Number(hufMode ? form?.highHuf?.value : form?.highEur?.value);
     if (!(low > 0 && mid > 0 && high > 0) || low > mid || mid > high) {
       actionStatus.textContent = 'Jóváhagyás előtt adjon meg érvényes ár-sávot (alsó ≤ közép ≤ felső).';
       return;

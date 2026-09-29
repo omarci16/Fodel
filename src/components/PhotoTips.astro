@@ -1,0 +1,206 @@
+---
+/**
+ * The six photo tips as a compact, scannable card — the listing editor (at the
+ * moment of upload) and the public submit page ("Mielőtt fotózna"). Text comes
+ * from src/data/photo-tips.ts, the same source as the full guide page, so the
+ * three can never drift apart (brief 3 §E).
+ *
+ * `variant="portal"` matches the admin/owner portal's flatter look;
+ * `variant="public"` sits inside the FODEL 2.0 public pages.
+ */
+import { TOP_TIPS, WHY_IT_MATTERS, type TipLocale } from '~/data/photo-tips';
+import { path } from '~/i18n/ui';
+
+interface Props {
+  locale: TipLocale;
+  variant?: 'portal' | 'public';
+  heading?: string;
+  /** Show the "why it matters" line (default on). */
+  why?: boolean;
+}
+
+const { locale, variant = 'public', heading, why = true } = Astro.props;
+const t =
+  locale === 'hu'
+    ? { heading: 'Mielőtt fotózna', guide: 'A teljes fotózási útmutató', whyLabel: 'Miért számít?' }
+    : { heading: 'Voordat u fotografeert', guide: 'De volledige fotografiegids', whyLabel: 'Waarom het ertoe doet' };
+const guideHref = path(locale, 'photoGuide');
+const headingId = `photo-tips-${variant}`;
+---
+
+<section class:list={['tips', `tips-${variant}`]} aria-labelledby={headingId}>
+  <h2 class="tips-head" id={headingId}>{heading ?? t.heading}</h2>
+  <ol class="tips-list">
+    {TOP_TIPS.map((tip) => (
+      <li class="tip">
+        <span class="tip-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            {tip.icon === 'sun' && (
+              <>
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4" />
+              </>
+            )}
+            {tip.icon === 'tidy' && (
+              <>
+                <path d="M4 20h16" />
+                <path d="M7 20v-6h10v6" />
+                <path d="M9 14V9a3 3 0 0 1 6 0v5" />
+              </>
+            )}
+            {tip.icon === 'curtain' && (
+              <>
+                <path d="M3 3.5h18" />
+                <path d="M5 3.5c0 6 1.5 11 4 16.5H5" />
+                <path d="M19 3.5c0 6-1.5 11-4 16.5h4" />
+              </>
+            )}
+            {tip.icon === 'corner' && (
+              <>
+                <path d="M4 20 12 14l8 6" />
+                <path d="M12 3v11" />
+                <path d="M4 20V7l8-4 8 4v13" />
+              </>
+            )}
+            {tip.icon === 'phone' && (
+              <>
+                <rect x="2.5" y="6.5" width="19" height="11" rx="2.5" />
+                <circle cx="17" cy="12" r="2" />
+                <path d="M6 12h4" />
+              </>
+            )}
+            {tip.icon === 'nobody' && (
+              <>
+                <circle cx="12" cy="8" r="3" />
+                <path d="M6 20c.8-3.5 3.2-5.5 6-5.5s5.2 2 6 5.5" />
+                <path d="M4 4l16 16" />
+              </>
+            )}
+          </svg>
+        </span>
+        <span class="tip-text">
+          <strong>{tip.title[locale]}</strong>
+          <span>{tip.body[locale]}</span>
+        </span>
+      </li>
+    ))}
+  </ol>
+  {why && (
+    <p class="tips-why">
+      <span class="tips-why-label">{t.whyLabel}</span> {WHY_IT_MATTERS[locale]}
+    </p>
+  )}
+  <a class="tips-link" href={guideHref}>{t.guide} <span aria-hidden="true">→</span></a>
+</section>
+
+<style>
+  .tips {
+    container-type: inline-size;
+  }
+  .tips-head {
+    font-family: var(--serif);
+    font-weight: var(--fw-medium);
+    letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+  .tips-list {
+    list-style: none;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+  }
+  @container (min-width: 520px) {
+    .tips-list {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  .tip {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+  }
+  .tip-icon {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(16, 42, 67, 0.07);
+    color: var(--ink);
+  }
+  .tip-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    font-size: var(--fs-small);
+    line-height: 1.5;
+    color: var(--taupe);
+  }
+  .tip-text strong {
+    font-weight: var(--fw-medium);
+    color: var(--ink);
+  }
+  .tips-why {
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: var(--taupe);
+  }
+  .tips-why-label {
+    font-weight: var(--fw-medium);
+    color: var(--ink);
+  }
+  .tips-link {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    font-size: var(--fs-small);
+    font-weight: var(--fw-medium);
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .tips-link:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: 3px;
+  }
+
+  /* Public pages: a white card on the cream page, FODEL 2.0 radius. */
+  .tips-public {
+    display: grid;
+    gap: 18px;
+    padding: clamp(22px, 3vw, 32px);
+    border-radius: var(--r-xl);
+    background: var(--white);
+    border: 1px solid rgba(16, 42, 67, 0.07);
+  }
+  .tips-public .tips-head {
+    font-size: clamp(20px, 2vw, 24px);
+  }
+  .tips-public .tips-list {
+    gap: 16px 24px;
+  }
+
+  /* Portal: compact, inside the editor's photo section. */
+  .tips-portal {
+    display: grid;
+    gap: 12px;
+    margin: 4px 0 20px;
+    padding: 18px 20px;
+    border-radius: 12px;
+    background: rgba(16, 42, 67, 0.04);
+  }
+  .tips-portal .tips-head {
+    font-size: 16px;
+  }
+  .tips-portal .tip-icon {
+    width: 32px;
+    height: 32px;
+  }
+  .tips-portal .tip {
+    grid-template-columns: 32px minmax(0, 1fr);
+  }
+</style>

@@ -4,9 +4,10 @@
  * page is reachable at two URLs.
  *
  * Dutch is x-default: FODEL's buyer demand is Dutch and Belgian, and the
- * Hungarian side arrives through fodel.hu and direct links.
+ * Hungarian side arrives through direct links and the old fodel.hu.
  */
 export const prerender = true;
+import { SITE_URL } from '~/config/site.mjs';
 ---
 
 <!doctype html>
@@ -17,10 +18,10 @@ export const prerender = true;
     <title>FODEL — Kies uw taal / Válasszon nyelvet</title>
     <meta name="description" content="Kies uw taal om verder te gaan: Nederlands of Hongaars. Válasszon nyelvet a folytatáshoz." />
     <meta name="robots" content="noindex, follow" />
-    <link rel="canonical" href="https://fodel.nl/nl/" />
-    <link rel="alternate" hreflang="nl" href="https://fodel.nl/nl/" />
-    <link rel="alternate" hreflang="hu" href="https://fodel.nl/hu/" />
-    <link rel="alternate" hreflang="x-default" href="https://fodel.nl/nl/" />
+    <link rel="canonical" href={`${SITE_URL}/nl/`} />
+    <link rel="alternate" hreflang="nl" href={`${SITE_URL}/nl/`} />
+    <link rel="alternate" hreflang="hu" href={`${SITE_URL}/hu/`} />
+    <link rel="alternate" hreflang="x-default" href={`${SITE_URL}/nl/`} />
     <meta http-equiv="refresh" content="0; url=/nl/" />
     <script is:inline>
       // Prefer the visitor's own language when we publish it.

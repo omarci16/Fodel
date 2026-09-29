@@ -3,6 +3,8 @@ import crypto from 'node:crypto';
 import { handleForm } from '~/lib/form-handler';
 import { createSupabaseAdminClient } from '~/lib/supabase-server';
 import { deliver, templates } from '~/lib/email/send';
+import { extrasFromForm } from '~/lib/portal/requested-extras';
+import { createServiceRequest } from '~/lib/portal/service-requests';
 
 export const prerender = false;
 
@@ -49,6 +51,7 @@ export const POST: APIRoute = (context) =>
       { name: 'translations', label: 'Kért fordítások', maxLength: 200 },
       { name: 'highlight', label: 'Kiemelés', maxLength: 120 },
       { name: 'video', label: 'Videós bemutató', maxLength: 10 },
+      { name: 'service', label: 'Helyszíni szolgáltatás', maxLength: 40 },
       { name: 'ownerVisible', label: 'Elérhetőség megjelenítése', maxLength: 20 },
       { name: 'speaks', label: 'Beszélt nyelvek', maxLength: 200 },
       { name: 'description', label: 'Leírás', maxLength: 6000 },
@@ -60,6 +63,23 @@ export const POST: APIRoute = (context) =>
       const email = values.email.toLowerCase();
       const locale = extras.Locale === 'nl' ? 'nl' : 'hu';
       const admin = createSupabaseAdminClient();
+
+      // Everything chosen on the form, kept with the draft (brief 3 item 14).
+      const requested = extrasFromForm(values);
+
+      // An on-site service is recorded now, whatever happens to the account
+      // below: an existing seller or someone with an open invite asked for it
+      // just as much, and the office schedules it before any listing exists.
+      const serviceRequestId = requested.service
+        ? await createServiceRequest(admin, {
+            serviceId: requested.service,
+            source: 'submit_form',
+            locale,
+            name: values.name,
+            email,
+            phone: values.phone,
+          })
+        : null;
 
       // Already has an account: they should sign in, not be invited again.
       // FODEL still received the submission by email, so nothing is lost — an
@@ -140,6 +160,8 @@ export const POST: APIRoute = (context) =>
           billingName: values.billingName,
           billingAddress: values.billingAddress,
           referralId,
+          requestedExtras: requested,
+          serviceRequestId,
         },
       });
       if (error) throw new Error(error.message);

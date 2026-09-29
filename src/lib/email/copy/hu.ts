@@ -11,6 +11,8 @@
  * sellers are frequently pensioners — clarity outranks warmth, and both
  * outrank marketing voice.
  */
+import { SITE_HOST } from '~/config/site.mjs';
+
 export const HU = {
   common: {
     greeting: (name: string) => `Kedves ${name}!`,
@@ -133,7 +135,7 @@ export const HU = {
     preheader: 'Köszönjük, a fizetés megérkezett.',
     heading: 'Köszönjük, a fizetés megérkezett',
     body: (title: string, ref: string) =>
-      `A(z) „${title}” (#${ref}) hirdetés díját megkaptuk. A hirdetés élesítve, és mostantól látható a fodel.nl oldalon.`,
+      `A(z) „${title}” (#${ref}) hirdetés díját megkaptuk. A hirdetés élesítve, és mostantól látható a ${SITE_HOST} oldalon.`,
     orderTitle: 'Tételek',
     discountLabel: 'Ajánlói kedvezmény (10%)',
     totalLabel: 'Fizetett összeg',
@@ -143,10 +145,10 @@ export const HU = {
 
   published: {
     subject: (ref: string) => `Hirdetése élesedett — #${ref}`,
-    preheader: 'A hirdetés mostantól látható a fodel.nl oldalon.',
+    preheader: `A hirdetés mostantól látható a ${SITE_HOST} oldalon.`,
     heading: 'Hirdetése mostantól élő',
     body: (title: string, ref: string) =>
-      `A(z) „${title}” (#${ref}) hirdetése megjelent a fodel.nl oldalon, és nyolc ország vásárlói számára elérhető.`,
+      `A(z) „${title}” (#${ref}) hirdetése megjelent a ${SITE_HOST} oldalon, és nyolc ország vásárlói számára elérhető.`,
     cta: 'Hirdetés megtekintése',
     next: 'Ha valaki érdeklődik, azonnal e-mailt küldünk Önnek az érdeklődő adataival. A hirdetés állapotát bármikor megnézheti a portálon.',
   },
@@ -237,6 +239,45 @@ export const HU = {
     body: (title: string, ref: string, number: string, correctsNumber: string) =>
       `A(z) „${title}” (#${ref}) hirdetéshez kiállított ${correctsNumber} számú számlához ${number} számú jóváíró számlát készítettünk.`,
     cta: 'Jóváíró számla megtekintése',
+  },
+
+  serviceRequested: {
+    subject: 'Megkaptuk szolgáltatásigényét — FODEL',
+    preheader: 'Munkatársunk felveszi Önnel a kapcsolatot az időpont egyeztetéséhez.',
+    heading: 'Megkaptuk az igényét',
+    body: (service: string, price: string) => `Köszönjük, rögzítettük az igényét: ${service} (${price}).`,
+    next: 'Munkatársunk felveszi Önnel a kapcsolatot az időpont egyeztetéséhez.',
+    payment: 'A díj rendezéséről az egyeztetéskor tájékoztatjuk. Most nem kell fizetnie semmit.',
+    cancel: 'Ha meggondolta magát, egyszerűen válaszoljon erre az e-mailre.',
+  },
+
+  judicialRequested: {
+    subject: 'Hivatalos értékbecslési igény — FODEL',
+    preheader: 'Munkatársunk felveszi Önnel a kapcsolatot a lehetőségekről.',
+    heading: 'Megkaptuk kérését',
+    body: 'Köszönjük, rögzítettük, hogy hivatalos (igazságügyi) szakértői értékbecslést szeretne. Ez nem azonos az oldalunkon kérhető tájékoztató, piaci alapú értékmeghatározással: erre jogosult szakértő végzi, egyedi árajánlat alapján.',
+    next: 'Munkatársunk felveszi Önnel a kapcsolatot a lehetőségekről és az árajánlatról.',
+  },
+
+  adminServiceRequested: {
+    subject: (service: string) => `Új szolgáltatásigény — ${service}`,
+    preheader: 'Egyeztessen időpontot az ügyféllel.',
+    heading: 'Új szolgáltatásigény érkezett',
+    labels: {
+      service: 'Szolgáltatás',
+      name: 'Név',
+      email: 'E-mail',
+      phone: 'Telefon',
+      where: 'Honnan',
+      note: 'Megjegyzés',
+    },
+    sources: {
+      submit_form: 'Hirdetésfeladási űrlap',
+      listing_editor: 'Hirdetésszerkesztő',
+      valuation: 'Értékbecslés',
+      admin: 'Admin',
+    } as Record<string, string>,
+    cta: 'Megnyitás a portálon',
   },
 
   referralAdminNotice: {

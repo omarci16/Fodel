@@ -22,6 +22,8 @@ import Base from '~/layouts/Base.astro';
 import Eyebrow from '~/components/Eyebrow.astro';
 import Button from '~/components/Button.astro';
 import PackageCard from '~/components/PackageCard.astro';
+import PhotoTips from '~/components/PhotoTips.astro';
+import OnsiteServiceChoice from '~/components/OnsiteServiceChoice.astro';
 import FormShell from '~/components/forms/FormShell.astro';
 import Field from '~/components/forms/Field.astro';
 import { UI, LOCALE_META, path, type Locale } from '~/i18n/ui';
@@ -39,6 +41,7 @@ const { locale } = Astro.props;
 const ui = UI[locale];
 const hu = locale === 'hu';
 const COMPANY = await getCompany();
+const refundPolicy = COMPANY.services.refundPolicy?.[locale]?.trim();
 
 const t = hu
   ? {
@@ -287,7 +290,7 @@ const packageSchema = listingServiceSchema(locale, {
                   data-extra="translation"
                   data-price-cents={translationExtra.priceEur * 100}
                   data-months="1"
-                  data-label={LOCALE_META[lang].label}
+                  data-lang={lang}
                 />
                 <span class="box" aria-hidden="true"></span>
                 <span class="chip-name">{LOCALE_META[lang].label}</span>
@@ -328,6 +331,18 @@ const packageSchema = listingServiceSchema(locale, {
             <span class="chip-price">{formatCents(videoExtra.priceEur * 100)} {t.once}</span>
           </label>
         </div>
+      </section>
+
+      {/* ── Photos: tips, or a professional on site (brief 3 §E.3, §F.2) ── */}
+      <section class="photos">
+        <PhotoTips locale={locale} />
+        <div class="onsite-wrap">
+          <OnsiteServiceChoice locale={locale} formId="listing-order" />
+        </div>
+      </section>
+
+      <section class="estimate">
+        {refundPolicy && <div class="refund-policy"><h3>{hu ? 'Visszatérítési szabály' : 'Terugbetalingsbeleid'}</h3><p>{refundPolicy}</p></div>}
         <div class="total" aria-live="polite">
           <p class="total-copy">
             <span class="total-label">{t.totalLabel}</span>
@@ -516,12 +531,13 @@ const packageSchema = listingServiceSchema(locale, {
       const months = Number(input.dataset.months ?? 1);
       totalCents += priceCents * months;
 
-      if (input.dataset.extra === 'translation') languages.push(input.dataset.label ?? '');
+      if (input.dataset.extra === 'translation') languages.push(input.dataset.lang ?? '');
       if (input.dataset.extra === 'category-highlight') highlightCategory = true;
       if (input.dataset.extra === 'homepage-highlight') highlightHomepage = true;
       if (input.dataset.extra === 'video') videoChecked = true;
     });
 
+    totalCents += addService();
     if (totalEl) totalEl.textContent = formatCents(totalCents);
     if (translationsHidden) translationsHidden.value = languages.join(', ');
     if (highlightHidden) {
@@ -536,6 +552,12 @@ const packageSchema = listingServiceSchema(locale, {
     }
     if (videoHidden) videoHidden.value = videoChecked ? 'yes' : '';
   }
+
+  // The optional on-site service is part of the estimate too.
+  const serviceInputs = document.querySelectorAll<HTMLInputElement>('input[name="service"]');
+  const addService = () =>
+    Number(document.querySelector<HTMLInputElement>('input[name="service"]:checked')?.dataset.priceCents ?? 0);
+  serviceInputs.forEach((input) => input.addEventListener('change', recalc));
 
   packageInputs.forEach((input) => input.addEventListener('change', recalc));
   extraInputs.forEach((input) => input.addEventListener('change', recalc));
@@ -597,8 +619,22 @@ const packageSchema = listingServiceSchema(locale, {
 
   .process,
   .packages,
-  .extras {
+  .extras,
+  .photos,
+  .estimate {
     margin-bottom: 56px;
+  }
+  .extras {
+    margin-bottom: 40px;
+  }
+  .photos {
+    display: grid;
+    gap: 12px;
+  }
+  .onsite-wrap {
+    padding: clamp(22px, 3vw, 32px);
+    border-radius: var(--r-xl);
+    background: rgba(16, 42, 67, 0.04);
   }
   .process ol {
     display: grid;

@@ -513,12 +513,26 @@ ${common.signOff}`,
 
 /* ── 16. Valuation ready ──────────────────────────────────────────────────── */
 
+export function valuationReceived(locale: EmailLocale): BuiltEmail {
+  const hu = locale === 'hu';
+  const heading = hu ? 'Értékmeghatározási kérését megkaptuk' : 'Uw aanvraag is ontvangen';
+  const body = hu
+    ? 'Munkatársunk ellenőrzi az ingatlan adatait és az adatalapot, majd e-mailben küldi a tájékoztató, piaci alapú értékmeghatározást.'
+    : 'Onze medewerker controleert de woninggegevens en de gegevensbasis en stuurt daarna de indicatieve, marktgebaseerde waardebepaling per e-mail.';
+  return { subject: heading + ' — FODEL',
+    html: shell({ locale, preheader: heading, body: h1(heading) + lead(body) + signOff(locale) }),
+    text: textShell({ locale, body: `${heading}\n\n${body}` }) };
+}
+
 export function valuationReady(
   locale: EmailLocale,
-  opts: { range: string; compCount: number; submitAdUrl: string }
+  opts: { range: string; compCount: number; submitAdUrl: string; mid?: string; basis?: string; sourceUrl?: string; sourceDate?: string; factors?: { text: string; direction: 'plus' | 'minus' | 'unsure' }[]; notice?: string; visitUrl?: string; judicialUrl?: string; rateDate?: string }
 ): BuiltEmail {
   const c = copyFor(locale).valuationReady;
   const disclaimer = opts.compCount > 0 ? c.disclaimerWithCount(opts.compCount) : c.disclaimer;
+  const intro = opts.basis
+    ? (locale === 'nl' ? `Op basis van de verstrekte gegevens is de indicatieve, marktgebaseerde waarde: ${opts.range}.` : `A megadott adatok alapján a tájékoztató, piaci alapú értékmeghatározás: ${opts.range}.`)
+    : c.body(opts.range);
 
   return {
     subject: c.subject,
@@ -527,14 +541,22 @@ export function valuationReady(
       preheader: c.preheader,
       body:
         h1(c.heading) +
-        lead(c.body(opts.range)) +
+        lead(intro) +
+        (opts.mid ? p(`${locale === 'nl' ? 'Middenwaarde' : 'Középérték'}: ${opts.mid}`) : '') +
+        (opts.basis ? p(`${locale === 'nl' ? 'Gegevensbasis' : 'Adatalap'}: ${opts.basis}`) : '') +
+        (opts.rateDate ? p(`${locale === 'nl' ? 'Wisselkoersdatum' : 'Árfolyam dátuma'}: ${opts.rateDate}`) : '') +
+        (opts.sourceUrl ? linkFallback(`${locale === 'nl' ? 'Bron' : 'Forrás'}: KSH Ingatlanadattár${opts.sourceDate ? `, ${opts.sourceDate}` : ''} · CC BY 4.0`, opts.sourceUrl) : '') +
+        (opts.factors?.length ? h2(locale === 'nl' ? 'Factoren' : 'Értéket befolyásoló szempontok') + opts.factors.map((f) => p(`${f.direction === 'plus' ? '+' : f.direction === 'minus' ? '−' : '?'} ${f.text}`)).join('') : '') +
+        (opts.notice ? small(opts.notice) : '') +
         small(disclaimer) +
         button(c.cta, opts.submitAdUrl) +
+        (opts.visitUrl ? linkFallback(locale === 'nl' ? 'Bezoek van Gábor aanvragen' : 'Gábor helyszíni látogatása', opts.visitUrl) : '') +
+        (opts.judicialUrl ? linkFallback(locale === 'nl' ? 'Officiële taxatie aanvragen' : 'Igazságügyi értékbecslés kérése', opts.judicialUrl) : '') +
         signOff(locale),
     }),
     text: textShell({
       locale,
-      body: `${c.heading}\n\n${c.body(opts.range)}\n\n${disclaimer}\n\n${textCta(c.cta, opts.submitAdUrl)}`,
+      body: `${c.heading}\n\n${intro}\n${opts.mid ? `\n${locale === 'nl' ? 'Middenwaarde' : 'Középérték'}: ${opts.mid}` : ''}${opts.basis ? `\n${locale === 'nl' ? 'Gegevensbasis' : 'Adatalap'}: ${opts.basis}` : ''}${opts.rateDate ? `\n${locale === 'nl' ? 'Wisselkoersdatum' : 'Árfolyam dátuma'}: ${opts.rateDate}` : ''}${opts.sourceUrl ? `\n${locale === 'nl' ? 'Bron' : 'Forrás'}: KSH Ingatlanadattár${opts.sourceDate ? `, ${opts.sourceDate}` : ''} · CC BY 4.0 — ${opts.sourceUrl}` : ''}\n${opts.factors?.map((f) => `${f.direction === 'plus' ? (locale === 'nl' ? 'Waardeverhogend' : 'Értéknövelő') : f.direction === 'minus' ? (locale === 'nl' ? 'Waardeverlagend' : 'Értékcsökkentő') : (locale === 'nl' ? 'Onzeker' : 'Bizonytalan')}: ${f.text}`).join('\n') ?? ''}\n${opts.notice ?? ''}\n${disclaimer}\n\n${textCta(c.cta, opts.submitAdUrl)}${opts.visitUrl ? `\n${locale === 'nl' ? 'Bezoek van Gábor aanvragen' : 'Gábor helyszíni látogatása'}: ${opts.visitUrl}` : ''}${opts.judicialUrl ? `\n${locale === 'nl' ? 'Officiële taxatie aanvragen' : 'Igazságügyi értékbecslés kérése'}: ${opts.judicialUrl}` : ''}`,
     }),
   };
 }
@@ -566,13 +588,70 @@ export function valuationNeedsInfo(locale: EmailLocale, opts: { note: string }):
   };
 }
 
+/* ── On-site service requested (to the customer and to FODEL) ─────────────── */
+// Brief 3 §F. No payment is taken here: the payment timing for on-site
+// services is still a decision, so the email promises contact, not a charge.
+
+export function serviceRequested(locale: EmailLocale, opts: { service: string; price: string }): BuiltEmail {
+  const c = copyFor(locale).serviceRequested;
+  const common = copyFor(locale).common;
+  return {
+    subject: c.subject,
+    html: shell({
+      locale,
+      preheader: c.preheader,
+      body: h1(c.heading) + lead(c.body(opts.service, opts.price)) + p(c.next) + small(c.payment) + small(c.cancel) + p(common.signOff),
+    }),
+    text: textShell({
+      locale,
+      body: `${c.heading}\n\n${c.body(opts.service, opts.price)}\n\n${c.next}\n\n${c.payment}\n${c.cancel}\n\n${common.signOff}`,
+    }),
+  };
+}
+
+/** Brief 3 §D.5 — acknowledged with no price and no turnaround. */
+export function judicialRequested(locale: EmailLocale): BuiltEmail {
+  const c = copyFor(locale).judicialRequested;
+  const common = copyFor(locale).common;
+  return {
+    subject: c.subject,
+    html: shell({ locale, preheader: c.preheader, body: h1(c.heading) + lead(c.body) + p(c.next) + signOff(locale) }),
+    text: textShell({ locale, body: `${c.heading}\n\n${c.body}\n\n${c.next}\n\n${common.signOff}` }),
+  };
+}
+
+export function adminServiceRequested(
+  locale: EmailLocale,
+  opts: { service: string; name: string; email: string; phone: string; source: string; note: string; url: string }
+): BuiltEmail {
+  const c = copyFor(locale).adminServiceRequested;
+  const L = c.labels;
+  const where = c.sources[opts.source] ?? opts.source;
+  const rows: [string, string][] = [
+    [L.service, opts.service],
+    [L.name, opts.name || '—'],
+    [L.email, opts.email || '—'],
+    [L.phone, opts.phone || '—'],
+    [L.where, where],
+  ];
+  if (opts.note) rows.push([L.note, opts.note]);
+  return {
+    subject: c.subject(opts.service),
+    html: shell({ locale, preheader: c.preheader, body: h1(c.heading) + facts(rows) + button(c.cta, opts.url) }),
+    text: textShell({
+      locale,
+      body: `${c.heading}\n\n${rows.map(([k, v]) => `${k}: ${v}`).join('\n')}\n\n${textCta(c.cta, opts.url)}`,
+    }),
+  };
+}
+
 /* ── Listing rejected ─────────────────────────────────────────────────────── */
 // Terminal, unlike changesRequested: there is no edit link. Whether money goes
 // back is decided by a person — the email only promises contact about it.
 
 export function rejected(
   locale: EmailLocale,
-  opts: { ref: string; title: string; note: string; refundRequired: boolean }
+  opts: { ref: string; title: string; note: string; refundRequired: boolean; refundPolicy?: string }
 ): BuiltEmail {
   const c = copyFor(locale).rejected;
   const common = copyFor(locale).common;
@@ -585,7 +664,7 @@ export function rejected(
         h1(c.heading) +
         lead(c.body(opts.title, opts.ref)) +
         quote(opts.note) +
-        (opts.refundRequired ? p(c.refund) : '') +
+        (opts.refundRequired ? p(c.refund) + (opts.refundPolicy ? p(opts.refundPolicy) : '') : '') +
         p(c.after) +
         p(common.signOff),
     }),
@@ -596,7 +675,7 @@ export function rejected(
 ${c.body(opts.title, opts.ref)}
 
   "${opts.note.replace(/\n/g, '\n  ')}"
-${opts.refundRequired ? `\n${c.refund}\n` : ''}
+${opts.refundRequired ? `\n${c.refund}\n${opts.refundPolicy ?? ''}\n` : ''}
 ${c.after}
 
 ${common.signOff}`,
@@ -870,7 +949,11 @@ export const templates = {
   invoiceIssued,
   creditNoteIssued,
   valuationReady,
+  valuationReceived,
   valuationDeclined,
   valuationNeedsInfo,
+  serviceRequested,
+  judicialRequested,
+  adminServiceRequested,
   rejected,
 };

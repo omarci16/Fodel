@@ -13,9 +13,10 @@ import Eyebrow from '~/components/Eyebrow.astro';
 import Button from '~/components/Button.astro';
 import PackageCard from '~/components/PackageCard.astro';
 import { path, type Locale } from '~/i18n/ui';
-import { COMMISSION, CONTRACT_PRICES, LISTING_PACKAGES } from '~/config/company';
+import { COMMISSION, CONTRACT_PRICES, LISTING_PACKAGES, ONSITE_SERVICES } from '~/config/company';
 import { alternatesFor } from '~/lib/page';
 import { listingServiceSchema } from '~/lib/seo';
+import { getCompany } from '~/lib/runtime-config';
 
 interface Props {
   locale: Locale;
@@ -23,6 +24,7 @@ interface Props {
 
 const { locale } = Astro.props;
 const hu = locale === 'hu';
+const refundPolicy = (await getCompany()).services.refundPolicy?.[locale]?.trim();
 
 const t = hu
   ? {
@@ -72,15 +74,14 @@ const t = hu
         { name: 'Idegen nyelvű szöveg (holland, német, angol, francia)', price: '25 €', unit: '/ nyelv' },
         { name: 'Kategórián belüli kiemelés (min. 3 hónap)', price: '15 €', unit: '/ hó' },
         { name: 'Főoldali kiemelés (min. 3 hónap)', price: '25 €', unit: '/ hó' },
-        { name: 'Videó megjelenítése', price: '36 €', unit: 'egyszeri' },
+        { name: 'Videó megjelenítése (az Ön által készített videó elhelyezése)', price: '36 €', unit: 'egyszeri' },
         { name: 'Utólagos képfeltöltés', price: '30 €', unit: 'egyszeri' },
         { name: 'Standard hirdetés megújítása 6 hónapra', price: '25 €', unit: 'egyszeri' },
       ],
-      services: [
-        'Épületenergetikai tanúsítvány beszerzése',
-        'Professzionális ingatlanfotózás',
-        'Drónfelvétel',
-      ],
+      // Professional photography and drone now have fixed prices — see the
+      // on-site rows in the extras table (brief 3 §F).
+      services: ['Épületenergetikai tanúsítvány beszerzése'],
+      onsiteUnit: 'egyszeri, helyszínen',
       servicesHead: 'További szolgáltatások',
       servicesNote: 'Ezekre egyedi árajánlatot adunk — kérdezzen bátran.',
       contractNote: 'Szerződésfordítás nyelvpáronként, tájékoztató jellegű ártól.',
@@ -134,15 +135,12 @@ const t = hu
         { name: 'Vertaling (Nederlands, Duits, Engels, Frans)', price: '€ 25', unit: '/ taal' },
         { name: 'Uitlichten binnen de categorie (min. 3 maanden)', price: '€ 15', unit: '/ maand' },
         { name: 'Uitlichten op de homepage (min. 3 maanden)', price: '€ 25', unit: '/ maand' },
-        { name: 'Video plaatsen', price: '€ 36', unit: 'eenmalig' },
+        { name: 'Video plaatsen (uw eigen video)', price: '€ 36', unit: 'eenmalig' },
         { name: 'Foto’s achteraf toevoegen', price: '€ 30', unit: 'eenmalig' },
         { name: 'Verlenging standaard advertentie, 6 maanden', price: '€ 25', unit: 'eenmalig' },
       ],
-      services: [
-        'Aanvragen van het energieprestatiecertificaat',
-        'Professionele vastgoedfotografie',
-        'Drone-opnamen',
-      ],
+      services: ['Aanvragen van het energieprestatiecertificaat'],
+      onsiteUnit: 'eenmalig, ter plaatse',
       servicesHead: 'Overige diensten',
       servicesNote: 'Hiervoor maken wij een offerte op maat — vraag het ons gerust.',
       contractNote: 'Vertaling van de koopovereenkomst per talencombinatie, vanafprijs.',
@@ -215,6 +213,15 @@ const packageSchema = listingServiceSchema(locale, {
             </tr>
           ))
         }
+        {
+          ONSITE_SERVICES.map((service) => (
+            <tr>
+              <th scope="row">{service.names[locale]}</th>
+              <td class="amount">{locale === 'hu' ? `${service.priceEur} €` : `€ ${service.priceEur}`}</td>
+              <td class="unit">{t.onsiteUnit}</td>
+            </tr>
+          ))
+        }
       </tbody>
     </table>
   </section>
@@ -259,6 +266,7 @@ const packageSchema = listingServiceSchema(locale, {
   </div>
 
   {/* ── Commission ── */}
+  {refundPolicy && <section class="slab"><h2>{hu ? 'Visszatérítési szabály' : 'Terugbetalingsbeleid'}</h2><p>{refundPolicy}</p></section>}
   <section class="commission slab surface-ink" data-bg="dark">
     <div class="commission-copy">
       <Eyebrow space="24px">{t.commissionHead}</Eyebrow>

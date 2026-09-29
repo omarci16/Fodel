@@ -1,0 +1,172 @@
+---
+/**
+ * Admin — on-site service requests (brief 3 §F.4): €150 photo/video/drone and
+ * €200 Gábor's visit, from the submit form, the listing editor or a
+ * valuation. Filter by status, set the date, mark done or cancelled, jump to
+ * the listing or valuation it belongs to.
+ */
+export const prerender = false;
+
+import Portal from '~/layouts/Portal.astro';
+import {
+  SERVICE_STATUS_LABEL,
+  SERVICE_SOURCE_LABEL,
+  serviceName,
+  servicePrice,
+  type ServiceStatus,
+  type ServiceSource,
+} from '~/lib/portal/service-requests';
+
+const { supabase, profile } = Astro.locals;
+if (profile?.role !== 'admin') return Astro.redirect('/portal/dashboard');
+
+const filter = Astro.url.searchParams.get('status') ?? 'open';
+
+let query = supabase
+  .from('service_requests')
+  .select('id, service_id, status, source, property_id, valuation_id, contact_name, contact_email, contact_phone, locale, note, admin_note, scheduled_for, created_at, properties(ref)')
+  .order('created_at', { ascending: false })
+  .limit(300);
+if (filter === 'open') query = query.in('status', ['requested', 'scheduled']);
+else if (filter !== 'all') query = query.eq('status', filter);
+
+const { data: rows, error } = await query;
+const migrated = !error;
+
+const dateFmt = new Intl.DateTimeFormat('hu-HU', { year: 'numeric', month: 'short', day: 'numeric' });
+const FILTERS: [string, string][] = [
+  ['open', 'Folyamatban'],
+  ['requested', SERVICE_STATUS_LABEL.requested],
+  ['scheduled', SERVICE_STATUS_LABEL.scheduled],
+  ['done', SERVICE_STATUS_LABEL.done],
+  ['cancelled', SERVICE_STATUS_LABEL.cancelled],
+  ['all', 'Mind'],
+];
+---
+
+<Portal title="Helyszíni szolgáltatások">
+  <header class="head">
+    <p class="eyebrow">Helyszíni szolgáltatások</p>
+    <h1>{rows?.length ?? 0} tétel</h1>
+    <p class="lede">
+      Profi fotózás, videó és drón (€ 150), illetve Gábor helyszíni látogatása értékbecsléssel (€ 200).
+      A díj a hirdetés jóváhagyásakor a díjbekérőre kerül (előre bejelölve); az előre fizetésről még
+      döntés szükséges.
+    </p>
+  </header>
+
+  {!migrated && <p class="notice error">Ehhez az oldalhoz futtassa le a 0015-ös migrációt.</p>}
+
+  <div class="filters">
+    {FILTERS.map(([value, label]) => (
+      <a href={`/portal/services?status=${value}`} aria-current={filter === value ? 'page' : undefined}>{label}</a>
+    ))}
+  </div>
+
+  {rows && rows.length > 0 ? (
+    <ul class="list">
+      {rows.map((row: any) => (
+        <li class="item" data-id={row.id}>
+          <div class="item-main">
+            <p class="item-top">
+              <span class:list={['pill', `pill-${row.status}`]}>{SERVICE_STATUS_LABEL[row.status as ServiceStatus] ?? row.status}</span>
+              <span class="date">{dateFmt.format(new Date(row.created_at))}</span>
+              <span class="source">{SERVICE_SOURCE_LABEL[row.source as ServiceSource] ?? row.source}</span>
+            </p>
+            <h2>{serviceName(row.service_id)} <span class="price">{servicePrice(row.service_id)}</span></h2>
+            <p class="contact">
+              {row.contact_name ?? '—'}
+              {row.contact_email && <> · <a href={`mailto:${row.contact_email}`}>{row.contact_email}</a></>}
+              {row.contact_phone && <> · <a href={`tel:${row.contact_phone}`}>{row.contact_phone}</a></>}
+              · {row.locale === 'nl' ? 'holland' : 'magyar'}
+            </p>
+            {row.note && <p class="note">„{row.note}”</p>}
+            <p class="links">
+              {row.property_id && <a href={`/portal/properties/${row.property_id}`}>Hirdetés #{row.properties?.ref ?? ''} →</a>}
+              {row.valuation_id && <a href={`/portal/valuations/${row.valuation_id}`}>Értékbecslés →</a>}
+              {!row.property_id && !row.valuation_id && <span class="muted">Még nincs hozzá hirdetés (a regisztráció után kapcsolódik).</span>}
+            </p>
+          </div>
+          <form class="item-edit" data-service-form>
+            <label>Állapot
+              <select name="status">
+                {Object.entries(SERVICE_STATUS_LABEL).map(([value, label]) => (
+                  <option value={value} selected={row.status === value}>{label}</option>
+                ))}
+              </select>
+            </label>
+            <label>Időpont <input type="date" name="scheduled_for" value={row.scheduled_for ?? ''} /></label>
+            <label>Belső megjegyzés <textarea name="admin_note" rows="2" maxlength="2000">{row.admin_note ?? ''}</textarea></label>
+            <button type="submit" class="btn">Mentés</button>
+            <p class="status-line" role="status"></p>
+          </form>
+        </li>
+      ))}
+    </ul>
+  ) : (
+    migrated && <p class="empty">Ehhez a szűréshez nincs tétel.</p>
+  )}
+</Portal>
+
+<script>
+  document.querySelectorAll<HTMLFormElement>('[data-service-form]').forEach((form) => {
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const id = form.closest<HTMLElement>('[data-id]')?.dataset.id;
+      const line = form.querySelector<HTMLElement>('.status-line');
+      if (!id || !line) return;
+      line.textContent = 'Mentés…';
+      const data = new FormData(form);
+      const res = await fetch(`/api/portal/services/${id}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          status: data.get('status'),
+          scheduledFor: data.get('scheduled_for') || null,
+          adminNote: data.get('admin_note'),
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      line.textContent = res.ok && json.ok ? 'Mentve.' : json.error || 'Nem sikerült menteni.';
+    });
+  });
+</script>
+
+<style>
+  .head { margin-bottom: 20px; max-width: 760px; }
+  .eyebrow { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--taupe); margin-bottom: 8px; }
+  h1 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 26px; color: var(--ink); margin-bottom: 8px; }
+  .lede { font-size: var(--fs-small); line-height: 1.7; color: var(--taupe); }
+  .notice.error { padding: 12px 16px; font-size: var(--fs-small); background: rgba(179, 38, 30, 0.06); border-left: 2px solid #b3261e; color: #b3261e; margin-bottom: 20px; }
+
+  .filters { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 22px; }
+  .filters a { padding: 7px 14px; font-size: var(--fs-micro); letter-spacing: 0.04em; color: var(--taupe); border: 1px solid var(--border); }
+  .filters a[aria-current='page'] { background: var(--ink); color: var(--cream); border-color: var(--ink); }
+  .empty { color: var(--taupe); font-size: var(--fs-small); padding: 32px 0; }
+
+  .list { list-style: none; padding: 0; display: grid; gap: 0; }
+  .item { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 32px; padding: 22px 0; border-top: 1px solid var(--border); }
+  .item-top { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: var(--fs-micro); color: var(--taupe); margin-bottom: 6px; }
+  .item h2 { font-family: var(--serif); font-size: 17px; color: var(--ink); margin-bottom: 6px; line-height: 1.4; }
+  .price { color: var(--taupe); font-weight: 400; white-space: nowrap; }
+  .contact, .links { font-size: var(--fs-small); color: var(--ink); line-height: 1.7; }
+  .contact a, .links a { text-decoration: underline; text-underline-offset: 2px; }
+  .links { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px; }
+  .muted { color: var(--taupe); }
+  .note { font-size: var(--fs-small); color: var(--taupe); margin-top: 6px; white-space: pre-wrap; }
+
+  .item-edit { display: grid; gap: 10px; }
+  .item-edit label { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; color: var(--taupe); }
+  .item-edit select, .item-edit input, .item-edit textarea { border: 1px solid var(--border); background: #fff; padding: 8px 10px; font-size: var(--fs-small); color: var(--ink); text-transform: none; letter-spacing: 0; font-family: inherit; }
+  .btn { justify-self: start; padding: 9px 18px; background: var(--ink); color: var(--cream); font-size: var(--fs-micro); letter-spacing: var(--ls-button); text-transform: uppercase; }
+  .status-line { font-size: var(--fs-small); color: var(--taupe); min-height: 1.4em; }
+
+  .pill { display: inline-block; font-size: var(--fs-micro); padding: 3px 10px; border: 1px solid var(--border); white-space: nowrap; color: var(--ink); }
+  .pill-requested { background: rgba(200, 150, 0, 0.1); border-color: #96700b; color: #6b4f08; }
+  .pill-scheduled { background: rgba(16, 42, 67, 0.08); border-color: var(--ink); }
+  .pill-cancelled { opacity: 0.6; }
+
+  @media (max-width: 900px) {
+    .item { grid-template-columns: 1fr; gap: 16px; }
+  }
+</style>
