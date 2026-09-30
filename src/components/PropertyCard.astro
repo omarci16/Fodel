@@ -10,7 +10,7 @@
  * filter pre-rendered markup without re-rendering anything.
  *
  * 1.4: the photograph is uncovered from its bottom edge as it scrolls in,
- * carries a pointer label, and is the element that morphs into the property
+ * is the element that morphs into the property
  * page's hero on click (data-vt, see Base.astro). The rule above the price
  * draws across in ink on hover. `ratio` and `sizes` let a page set a card
  * large or tall inside an editorial grid.
@@ -85,7 +85,6 @@ const specs = [
     <div
       class:list={['card-img-wrap', { reveal }]}
       data-reveal={reveal ? 'mask' : undefined}
-      data-cursor={ui.cta.viewProperty}
     >
       <div class="card-img-inner" data-vt>
         {/* astro:assets' <Image> has separate local/remote overloads; a src that can be either doesn't match either cleanly — the `as any` is a type-checker limitation, not a runtime one. */}

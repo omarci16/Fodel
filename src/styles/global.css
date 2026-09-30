@@ -416,46 +416,6 @@ svg {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.06 0 0 0 0 0.16 0 0 0 0 0.26 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-/* ── Pointer label ──
-   A small ink disc that follows a fine pointer across [data-cursor] areas
-   (property photographs) and says what a click will do. Decorative: the
-   same words are always in the link's own text. */
-.cursor {
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: var(--z-cursor);
-  pointer-events: none;
-  display: grid;
-  place-items: center;
-  width: 96px;
-  height: 96px;
-  margin: -48px 0 0 -48px;
-  border-radius: 50%;
-  background: rgba(16, 42, 67, 0.82);
-  backdrop-filter: blur(10px) saturate(1.3);
-  -webkit-backdrop-filter: blur(10px) saturate(1.3);
-  color: var(--cream);
-  font-family: var(--sans);
-  font-size: 13px;
-  font-weight: var(--fw-medium);
-  letter-spacing: 0.01em;
-  text-align: center;
-  line-height: 1.25;
-  padding: 12px;
-  transform: translate3d(var(--cx, -200px), var(--cy, -200px), 0) scale(0);
-  transition: transform 0.45s var(--ease-out);
-  will-change: transform;
-}
-.cursor[data-active] {
-  transform: translate3d(var(--cx), var(--cy), 0) scale(1);
-}
-@media (hover: none), (pointer: coarse) {
-  .cursor {
-    display: none;
-  }
-}
-
 /* ── Page transitions ──
    Native cross-document view transitions: no router, no JS. Browsers
    without support simply navigate as before. The nav is lifted out (Nav.astro)
@@ -709,9 +669,6 @@ svg {
   [data-words-ready] .w {
     opacity: 1;
   }
-  .cursor {
-    display: none;
-  }
   [data-parallax] {
     transform: none !important;
   }
@@ -733,7 +690,6 @@ svg {
   nav,
   footer,
   .grain,
-  .cursor,
   .parallax-cta,
   .no-print,
   form,

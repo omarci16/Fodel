@@ -122,7 +122,6 @@ const jsonLd = graph([organisationSchema(locale, company), ...schema]);
     {whatsapp && <WhatsApp locale={locale} number={company.whatsapp} message={whatsapp.message} variant="floating" />}
 
     <div class="grain" aria-hidden="true"></div>
-    <div class="cursor" id="cursor" aria-hidden="true"></div>
 
     <script>
       const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -253,26 +252,6 @@ const jsonLd = graph([organisationSchema(locale, company), ...schema]);
           }, { threshold: 0.6 });
           counters.forEach((el) => io.observe(el));
         }
-      }
-
-      /* ── Pointer label ── */
-      const cursor = document.getElementById('cursor');
-      if (cursor && !reduced && window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
-        let active: HTMLElement | null = null;
-        window.addEventListener('pointermove', (e) => {
-          cursor.style.setProperty('--cx', `${e.clientX}px`);
-          cursor.style.setProperty('--cy', `${e.clientY}px`);
-          const target = (e.target as HTMLElement).closest<HTMLElement>('[data-cursor]');
-          if (target !== active) {
-            active = target;
-            if (target) cursor.textContent = target.dataset.cursor ?? '';
-            cursor.toggleAttribute('data-active', !!target);
-          }
-        }, { passive: true });
-        document.addEventListener('pointerleave', () => {
-          active = null;
-          cursor.removeAttribute('data-active');
-        });
       }
 
       /* ── Photograph → hero morph ──

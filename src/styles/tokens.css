@@ -185,7 +185,7 @@
   /* ── Layers ── */
   --z-grain: 900;
   --z-nav: 1000;
-  --z-cursor: 1100;
+  --z-cookie: 1050;
 
   /* ── Focus ──
      NEW. The prototype had no visible focus state at all (WCAG 2.4.7). */
