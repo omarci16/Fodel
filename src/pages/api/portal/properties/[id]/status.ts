@@ -418,6 +418,29 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
 
   /* ── request changes ────────────────────────────────────────────────── */
 
+  /* ── move_to_draft (admin, silent) ──────────────────────────────────────
+     The inbox board lets an admin pull a listing back to a draft. No email:
+     nothing the owner needs to act on has changed. */
+
+  if (action === 'move_to_draft') {
+    if (!isAdmin) return json(403, { ok: false });
+    if (!['submitted', 'changes_requested'].includes(property.status)) {
+      return json(409, { ok: false, error: 'not-movable' });
+    }
+    const { error } = await supabase.from('properties').update({ status: 'draft' }).eq('id', id);
+    if (error) return json(500, { ok: false, error: error.message });
+    await logEvent({
+      kind: 'listing.move_to_draft',
+      actorId: user!.id,
+      actorEmail: profile?.email ?? null,
+      subjectType: 'property',
+      subjectId: id,
+      propertyId: id,
+      source: 'portal',
+    }).catch(() => {});
+    return json(200, { ok: true });
+  }
+
   if (action === 'request_changes') {
     if (!isAdmin) return json(403, { ok: false });
     if (!['submitted', 'awaiting_payment', 'published'].includes(property.status)) {

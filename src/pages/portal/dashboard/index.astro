@@ -1,233 +1,802 @@
 ---
+/**
+ * Áttekintés — the first thing anyone sees after signing in.
+ *
+ * Admin: what is waiting on you right now (listings to approve, callbacks to
+ * make, valuations and on-site requests), then the numbers that say how the
+ * business is doing, then the path every listing walks. Owner: their own
+ * listings by stage, and the one thing that needs them (a payment, a callback).
+ *
+ * Everything is scoped by Row-Level Security — the same queries serve both
+ * roles, an owner simply gets "mine".
+ */
 export const prerender = false;
 
 import Portal from '~/layouts/Portal.astro';
+import ArrowChip from '~/components/ArrowChip.astro';
 import { STATUS_LABEL } from '~/lib/portal/properties';
 import { formatCents } from '~/lib/orders';
+import { icon } from '~/lib/portal/icons';
+import { greeting, longDate, timeAgo, hoursSince, listingName } from '~/lib/portal/time';
 
 const { supabase, profile } = Astro.locals;
 const isAdmin = profile?.role === 'admin';
 
-// Row-Level Security already scopes this to "my own properties" for an owner
-// and "everything" for an admin — the query itself doesn't need to know which.
-const { data: rows } = await supabase.from('properties').select('id, status, ref');
+const { data: rows } = await supabase
+  .from('properties')
+  .select(
+    'id, ref, status, settlement, price_eur, owner_id, created_at, submitted_at, property_translations(locale, title), property_media(storage_path, is_hero, sort_order)'
+  );
+const properties = rows ?? [];
 
 const counts: Record<string, number> = {
   draft: 0,
   submitted: 0,
-  awaiting_payment: 0,
   changes_requested: 0,
-  rejected: 0,
+  awaiting_payment: 0,
   published: 0,
   sold: 0,
+  rejected: 0,
 };
-for (const row of rows ?? []) {
-  if (row.status in counts) counts[row.status]++;
-}
+for (const row of properties) if (row.status in counts) counts[row.status]++;
 
-// Enquiries needing a reply — scoped by RLS the same way, so this is "mine"
-// for an owner and "everyone's" for an admin.
-const { count: openEnquiries } = await supabase
+// `*` on purpose: callback fields arrive with a migration, and a column that
+// does not exist yet must not take the dashboard down.
+const { data: openEnquiryRows } = await supabase
   .from('enquiries')
-  .select('id', { count: 'exact', head: true })
-  .eq('handled', false);
+  .select('*')
+  .eq('handled', false)
+  .order('created_at', { ascending: false })
+  .limit(50);
+const openEnquiries = openEnquiryRows ?? [];
 
-let pendingReview = 0;
+const weekAgo = new Date(Date.now() - 7 * 86400_000).toISOString();
+const newThisWeek = properties.filter((p) => p.created_at >= weekAgo).length;
+
 let ownerCount = 0;
+let settledCents = 0;
 let outstandingCents = 0;
+let pendingValuations = 0;
+let requestedServices = 0;
+const ownerName = new Map<string, string>();
+
 if (isAdmin) {
-  const { count } = await supabase
-    .from('properties')
-    .select('id', { count: 'exact', head: true })
-    .eq('status', 'submitted');
-  pendingReview = count ?? 0;
-
-  const { count: owners } = await supabase
-    .from('profiles')
-    .select('id', { count: 'exact', head: true })
-    .eq('role', 'owner');
-  ownerCount = owners ?? 0;
-
-  const { data: openOrders } = await supabase
-    .from('payments')
-    .select('amount_cents')
-    .eq('status', 'pending');
-  outstandingCents = (openOrders ?? []).reduce((sum, o) => sum + o.amount_cents, 0);
+  const [owners, orders, valuations, services, people] = await Promise.all([
+    supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'owner'),
+    supabase.from('payments').select('status, amount_cents, currency'),
+    supabase.from('valuations').select('id', { count: 'exact', head: true }).in('status', ['queued', 'needs_review', 'insufficient_data']),
+    supabase.from('service_requests').select('id', { count: 'exact', head: true }).eq('status', 'requested'),
+    supabase.from('profiles').select('id, full_name, email'),
+  ]);
+  ownerCount = owners.count ?? 0;
+  pendingValuations = valuations.count ?? 0;
+  requestedServices = services.count ?? 0;
+  for (const o of (orders.data ?? []).filter((o: any) => (o.currency ?? 'eur') === 'eur')) {
+    if (o.status === 'paid' || o.status === 'manual') settledCents += o.amount_cents;
+    if (o.status === 'pending') outstandingCents += o.amount_cents;
+  }
+  for (const p of people.data ?? []) ownerName.set(p.id, p.full_name || p.email);
 }
 
-/** An owner's own listing waiting on them to pay — the one thing they must act on. */
+const waiting = properties
+  .filter((p) => p.status === 'submitted')
+  .sort((a, b) => String(a.submitted_at ?? a.created_at).localeCompare(String(b.submitted_at ?? b.created_at)));
+
+const thumb = (p: (typeof properties)[number]) => {
+  const media = [...(p.property_media ?? [])].sort((a: any, b: any) => a.sort_order - b.sort_order);
+  return (media.find((m: any) => m.is_hero) ?? media[0])?.storage_path as string | undefined;
+};
+
+const todo = waiting.length + openEnquiries.length + pendingValuations + requestedServices;
 const myAwaitingPayment = !isAdmin ? counts.awaiting_payment : 0;
+
+// The path a listing walks, in order, each with the tint it carries elsewhere.
+const PIPELINE: { key: string; label: string; tone: string; href: string }[] = [
+  { key: 'draft', label: 'Piszkozat', tone: 'mute', href: '/portal/inbox' },
+  { key: 'submitted', label: 'Elbírálásra vár', tone: 'amber', href: '/portal/inbox' },
+  { key: 'changes_requested', label: 'Javítás szükséges', tone: 'red', href: '/portal/inbox' },
+  { key: 'awaiting_payment', label: 'Fizetésre vár', tone: 'amber2', href: '/portal/properties?status=awaiting_payment' },
+  { key: 'published', label: 'Élő hirdetés', tone: 'green', href: '/portal/properties?status=published' },
+  { key: 'sold', label: 'Eladva', tone: 'ink', href: '/portal/properties?status=sold' },
+];
+const pipelineTotal = PIPELINE.reduce((sum, step) => sum + counts[step.key], 0);
+const ownerSteps = PIPELINE.filter((step) => counts[step.key] > 0 || step.key === 'published');
 ---
 
 <Portal title="Áttekintés">
-  <header class="head">
-    <p class="eyebrow">Áttekintés</p>
-    <h1>Üdvözöljük, {profile?.full_name ?? profile?.email}</h1>
+  <header class="top">
+    <div>
+      <p class="eyebrow">{longDate()}</p>
+      <h1>{greeting()}</h1>
+      <p class="sub">
+        {
+          isAdmin
+            ? todo > 0
+              ? `Ma ${todo} dolog vár Önre.`
+              : 'Minden rendben — jelenleg nincs függőben lévő teendő.'
+            : myAwaitingPayment > 0
+              ? 'Egy jóváhagyott hirdetése fizetésre vár.'
+              : 'Itt látja hirdetései állapotát.'
+        }
+      </p>
+    </div>
+    <div class="top-actions">
+      <a class="btn" href="/portal/properties/new">
+        Új ingatlan
+        <ArrowChip />
+      </a>
+    </div>
   </header>
 
   {
-    isAdmin && pendingReview > 0 && (
-      <a class="callout" href="/portal/properties?status=submitted">
-        <strong>{pendingReview}</strong> hirdetés vár elbírálásra →
-      </a>
+    isAdmin ? (
+      <>
+        <section class="attn surface-ink" aria-label="Teendők">
+          <div class="attn-main">
+            <div class="attn-head">
+              <h2>
+                <span class:list={['bead', waiting.length > 0 && 'pt-live']} aria-hidden="true" />
+                Elbírálásra váró hirdetések
+              </h2>
+              {waiting.length > 0 && <span class="count">{waiting.length}</span>}
+            </div>
+
+            {waiting.length === 0 ? (
+              <p class="clear">
+                <Fragment set:html={icon('check', 20)} />
+                Minden beérkezett hirdetést elbíráltak. Szép munka.
+              </p>
+            ) : (
+              <ul class="queue">
+                {waiting.slice(0, 5).map((p) => {
+                  const src = thumb(p);
+                  const late = hoursSince(p.submitted_at ?? p.created_at) > 24;
+                  return (
+                    <li>
+                      <a href={`/portal/review/${p.id}`} class="q-row">
+                        <span class="q-thumb">
+                          {src ? <img src={src} alt="" loading="lazy" /> : <Fragment set:html={icon('building', 22)} />}
+                        </span>
+                        <span class="q-text">
+                          <b>{listingName(p)}</b>
+                          <span>
+                            {p.settlement || '—'} · {(p.owner_id && ownerName.get(p.owner_id)) || 'Ismeretlen hirdető'} · €
+                            {Number(p.price_eur).toLocaleString('de-DE')}
+                          </span>
+                        </span>
+                        <span class:list={['q-when', late && 'late']}>{timeAgo(p.submitted_at ?? p.created_at)}</span>
+                        <ArrowChip size={34} class="q-chip" />
+                      </a>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            {waiting.length > 5 && (
+              <a class="more" href="/portal/inbox">
+                Mind a {waiting.length} megnyitása →
+              </a>
+            )}
+          </div>
+
+          <div class="attn-side">
+            <div class="side-block">
+              <div class="attn-head">
+                <h3>Új érdeklődők</h3>
+                {openEnquiries.length > 0 && <span class="count soft">{openEnquiries.length}</span>}
+              </div>
+              {openEnquiries.length === 0 ? (
+                <p class="quiet">Nincs megválaszolatlan érdeklődés.</p>
+              ) : (
+                <ul class="calls">
+                  {openEnquiries.slice(0, 3).map((e: any) => (
+                    <li>
+                      <span class="c-name">
+                        <b>{e.name}</b>
+                        <span>
+                          {e.contact_pref === 'email' ? 'E-mailt kér' : e.phone ? 'Visszahívást kér' : 'Érdeklődik'} · {timeAgo(e.created_at)}
+                        </span>
+                      </span>
+                      {e.phone ? (
+                        <a class="call" href={`tel:${String(e.phone).replace(/\s/g, '')}`} aria-label={`Hívás: ${e.name}`}>
+                          <Fragment set:html={icon('phone', 16)} />
+                          Hívás
+                        </a>
+                      ) : (
+                        <a class="call ghost" href="/portal/enquiries">
+                          Megnyitás
+                        </a>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {openEnquiries.length > 3 && (
+                <a class="more" href="/portal/enquiries">
+                  Mind a {openEnquiries.length} →
+                </a>
+              )}
+            </div>
+
+            <a class="tile" href="/portal/valuations">
+              <span class="t-ic"><Fragment set:html={icon('calc', 20)} /></span>
+              <span class="t-text">
+                <b>Értékbecslések</b>
+                <span>{pendingValuations > 0 ? `${pendingValuations} vár feldolgozásra` : 'Nincs függő kérés'}</span>
+              </span>
+              {pendingValuations > 0 && <span class="count">{pendingValuations}</span>}
+            </a>
+            <a class="tile" href="/portal/services">
+              <span class="t-ic"><Fragment set:html={icon('camera', 20)} /></span>
+              <span class="t-text">
+                <b>Helyszíni szolgáltatások</b>
+                <span>{requestedServices > 0 ? `${requestedServices} új igény` : 'Nincs új igény'}</span>
+              </span>
+              {requestedServices > 0 && <span class="count">{requestedServices}</span>}
+            </a>
+          </div>
+        </section>
+
+        <section class="kpis" aria-label="Számok">
+          <a class="kpi" href="/portal/properties?status=published">
+            <span class="k-label">Élő hirdetés</span>
+            <span class="k-n">{counts.published}</span>
+            <span class="k-sub">{newThisWeek > 0 ? `+${newThisWeek} új az elmúlt héten` : 'Nincs új az elmúlt héten'}</span>
+          </a>
+          <a class="kpi" href="/portal/payments">
+            <span class="k-label">Beérkezett összeg</span>
+            <span class="k-n">{formatCents(settledCents)}</span>
+            <span class="k-sub">Kártya és átutalás együtt</span>
+          </a>
+          <a class="kpi" href="/portal/payments?status=pending">
+            <span class="k-label">Kintlévőség</span>
+            <span class="k-n">{formatCents(outstandingCents)}</span>
+            <span class="k-sub">Még kifizetetlen rendelések</span>
+          </a>
+          <a class="kpi" href="/portal/users">
+            <span class="k-label">Regisztrált hirdető</span>
+            <span class="k-n">{ownerCount}</span>
+            <span class="k-sub">{counts.sold} eladott ingatlan</span>
+          </a>
+        </section>
+      </>
+    ) : (
+      <>
+        {myAwaitingPayment > 0 && (
+          <a class="callout" href="/portal/properties?status=awaiting_payment">
+            <span><b>{myAwaitingPayment}</b> jóváhagyott hirdetése fizetésre vár — a díj rendezése után azonnal megjelenik.</span>
+            <ArrowChip size={34} />
+          </a>
+        )}
+        {openEnquiries.length > 0 && (
+          <a class="callout ghost" href="/portal/enquiries">
+            <span><b>{openEnquiries.length}</b> megválaszolatlan érdeklődés a hirdetéseire.</span>
+            <ArrowChip size={34} />
+          </a>
+        )}
+      </>
     )
   }
 
-  {
-    myAwaitingPayment > 0 && (
-      <a class="callout" href="/portal/properties?status=awaiting_payment">
-        <strong>{myAwaitingPayment}</strong> jóváhagyott hirdetése fizetésre vár — a díj
-        rendezése után azonnal megjelenik →
-      </a>
-    )
-  }
+  <section class="path card" aria-label="Hirdetések útja">
+    <div class="path-head">
+      <h2>{isAdmin ? 'A hirdetések útja' : 'Hirdetései'}</h2>
+      <span class="path-total">{pipelineTotal} hirdetés összesen</span>
+    </div>
 
-  {
-    (openEnquiries ?? 0) > 0 && (
-      <a class="callout ghost" href="/portal/enquiries">
-        <strong>{openEnquiries}</strong> elintézetlen érdeklődés →
-      </a>
-    )
-  }
-
-  <section class="stats">
     {
-      Object.entries(counts).map(([status, n]) => (
-        <a class="stat" href={`/portal/properties?status=${status}`}>
-          <span class="n">{n}</span>
-          <span class="label">{STATUS_LABEL[status]}</span>
-        </a>
-      ))
+      pipelineTotal > 0 && (
+        <div class="bar" role="img" aria-label="Hirdetések megoszlása állapot szerint">
+          {(isAdmin ? PIPELINE : ownerSteps).map((step) =>
+            counts[step.key] > 0 ? (
+              <span class={`seg ${step.tone}`} style={`flex-grow:${counts[step.key]}`} title={`${step.label}: ${counts[step.key]}`} />
+            ) : null
+          )}
+        </div>
+      )
     }
+
+    <ul class="legend">
+      {
+        (isAdmin ? PIPELINE : ownerSteps).map((step) => (
+          <li>
+            <a href={isAdmin ? step.href : `/portal/properties?status=${step.key}`}>
+              <span class={`dot ${step.tone}`} aria-hidden="true" />
+              <span class="l-n">{counts[step.key]}</span>
+              <span class="l-t">{STATUS_LABEL[step.key] ?? step.label}</span>
+            </a>
+          </li>
+        ))
+      }
+    </ul>
   </section>
-
-  {
-    isAdmin && (
-      <section class="admin-row">
-        <a class="stat" href="/portal/users">
-          <span class="n">{ownerCount}</span>
-          <span class="label">Regisztrált hirdető</span>
-        </a>
-        <a class="stat" href="/portal/payments?status=pending">
-          <span class="n">{formatCents(outstandingCents)}</span>
-          <span class="label">Kintlévőség</span>
-        </a>
-      </section>
-    )
-  }
-
-  <div class="actions">
-    <a class="btn" href="/portal/properties/new">+ Új ingatlan</a>
-    <a class="btn ghost" href="/portal/properties">Összes ingatlan</a>
-  </div>
 </Portal>
 
 <style>
-  .head {
-    margin-bottom: 32px;
+  .top {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin-bottom: 28px;
   }
-  .eyebrow {
-    font-size: var(--fs-eyebrow);
-    letter-spacing: var(--ls-eyebrow);
-    text-transform: uppercase;
+  .top h1 {
+    margin-top: 10px;
+  }
+  .sub {
+    margin-top: 8px;
+    font-size: var(--fs-body-lg);
     color: var(--taupe);
-    margin-bottom: 8px;
   }
-  h1 {
+
+  /* ── The "needs you now" slab ── */
+  .attn {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    gap: 0;
+    border-radius: var(--r-2xl);
+    color: var(--on-dark-body);
+    box-shadow: var(--shadow-lg);
+    overflow: clip;
+    margin-bottom: 20px;
+  }
+  .attn-main {
+    padding: 32px 32px 28px;
+  }
+  .attn-side {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 24px;
+    background: rgba(244, 244, 242, 0.05);
+    border-left: 1px solid rgba(244, 244, 242, 0.08);
+  }
+  .attn-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .attn h2,
+  .attn h3 {
+    display: flex;
+    align-items: center;
+    gap: 12px;
     font-family: var(--serif);
     font-weight: var(--fw-display);
-    font-size: 32px;
-    color: var(--ink);
-  }
-
-  .callout {
-    display: block;
-    background: var(--ink);
+    font-size: 22px;
+    letter-spacing: var(--ls-heading);
     color: var(--cream);
-    padding: 16px 20px;
-    margin-bottom: 12px;
-    font-size: var(--fs-body);
-    line-height: 1.6;
   }
-  .callout:hover {
-    opacity: 0.92;
+  .attn h3 {
+    font-size: 17px;
+    font-weight: var(--fw-semibold);
   }
-  .callout.ghost {
-    background: transparent;
-    color: var(--ink);
-    border: 1px solid var(--border);
+  .bead {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #e0473d;
+    color: #e0473d;
+    flex-shrink: 0;
   }
-  .callout.ghost:hover {
-    border-color: var(--ink);
-    opacity: 1;
+  .bead:not(.pt-live) {
+    background: rgba(244, 244, 242, 0.3);
+  }
+  .count {
+    min-width: 28px;
+    padding: 3px 10px;
+    border-radius: var(--r-pill);
+    background: #e0473d;
+    color: #fff;
+    font-size: 13px;
+    font-weight: var(--fw-semibold);
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .count.soft {
+    background: rgba(244, 244, 242, 0.14);
+    color: var(--cream);
+  }
+  .clear {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 22px 0 8px;
+    font-size: var(--fs-body-lg);
+    color: var(--on-dark-strong);
+  }
+  .clear :global(svg) {
+    padding: 6px;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: rgba(244, 244, 242, 0.12);
+  }
+  .quiet {
+    font-size: 15px;
+    color: var(--on-dark-muted);
   }
 
-  .stats,
-  .admin-row {
+  .queue {
+    list-style: none;
     display: grid;
-    gap: 1px;
-    background: var(--border);
-    border: 1px solid var(--border);
-    margin-bottom: 16px;
+    gap: 8px;
   }
-  .stats {
-    grid-template-columns: repeat(6, 1fr);
-    margin-top: 20px;
+  .q-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 12px 10px 10px;
+    border-radius: var(--r-lg);
+    background: rgba(244, 244, 242, 0.06);
+    transition:
+      background-color 0.35s var(--ease-out),
+      transform 0.45s var(--ease-out);
   }
-  .admin-row {
-    grid-template-columns: repeat(2, 1fr);
-    max-width: 420px;
+  .q-row:hover {
+    background: rgba(244, 244, 242, 0.12);
+    transform: translateX(3px);
   }
-  .stat {
-    background: var(--cream);
-    padding: 20px 16px;
-    text-align: center;
+  .q-thumb {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 56px;
+    height: 56px;
+    border-radius: var(--r-md);
+    background: rgba(244, 244, 242, 0.1);
+    color: var(--on-dark-muted);
+    overflow: hidden;
   }
-  .stat:hover {
-    background: var(--linen);
+  .q-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
-  .stat .n {
+  .q-text {
+    flex: 1;
+    min-width: 0;
+  }
+  .q-text b {
     display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-family: var(--serif);
-    font-weight: var(--fw-medium);
-    font-size: 26px;
-    color: var(--ink);
+    font-weight: var(--fw-semibold);
+    font-size: 16.5px;
+    color: var(--cream);
   }
-  .stat .label {
+  .q-text span {
     display: block;
-    margin-top: 4px;
-    font-size: var(--fs-micro);
-    line-height: 1.4;
+    margin-top: 3px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 14px;
+    color: var(--on-dark-muted);
+  }
+  .q-when {
+    flex-shrink: 0;
+    padding: 4px 11px;
+    border-radius: var(--r-pill);
+    background: rgba(244, 244, 242, 0.1);
+    font-size: 13px;
+    color: var(--on-dark-body);
+    white-space: nowrap;
+  }
+  .q-when.late {
+    background: rgba(224, 71, 61, 0.2);
+    color: #ffb4ad;
+  }
+  .attn :global(.q-chip) {
+    --chip-bg: var(--cream);
+    --chip-fg: var(--ink);
+  }
+  .more {
+    display: inline-block;
+    margin-top: 16px;
+    font-size: 14.5px;
+    color: var(--on-dark-body);
+    text-decoration: underline;
+    text-underline-offset: 4px;
+    text-decoration-color: rgba(244, 244, 242, 0.3);
+  }
+  .more:hover {
+    color: var(--cream);
+  }
+
+  .side-block {
+    padding: 20px;
+    border-radius: var(--r-lg);
+    background: rgba(244, 244, 242, 0.06);
+  }
+  .side-block .attn-head {
+    margin-bottom: 12px;
+  }
+  .calls {
+    list-style: none;
+    display: grid;
+    gap: 10px;
+  }
+  .calls li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .c-name {
+    flex: 1;
+    min-width: 0;
+  }
+  .c-name b {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: var(--fw-semibold);
+    font-size: 15.5px;
+    color: var(--cream);
+  }
+  .c-name span {
+    display: block;
+    font-size: 13px;
+    color: var(--on-dark-muted);
+  }
+  .call {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    flex-shrink: 0;
+    padding: 8px 15px;
+    border-radius: var(--r-pill);
+    background: var(--cream);
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: var(--fw-semibold);
+    transition:
+      transform 0.35s var(--ease-out),
+      box-shadow 0.35s var(--ease-out);
+  }
+  .call:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 20px -8px rgba(0, 0, 0, 0.5);
+  }
+  .call.ghost {
+    background: transparent;
+    color: var(--on-dark-body);
+    box-shadow: inset 0 0 0 1px rgba(244, 244, 242, 0.28);
+    font-weight: var(--fw-regular);
+  }
+  .tile {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 18px;
+    border-radius: var(--r-lg);
+    background: rgba(244, 244, 242, 0.06);
+    transition: background-color 0.35s var(--ease-out);
+  }
+  .tile:hover {
+    background: rgba(244, 244, 242, 0.12);
+  }
+  .t-ic {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(244, 244, 242, 0.1);
+    color: var(--cream);
+  }
+  .t-text {
+    flex: 1;
+    min-width: 0;
+  }
+  .t-text b {
+    display: block;
+    font-weight: var(--fw-semibold);
+    font-size: 15.5px;
+    color: var(--cream);
+  }
+  .t-text span {
+    display: block;
+    font-size: 13.5px;
+    color: var(--on-dark-muted);
+  }
+
+  /* ── Numbers ── */
+  .kpis {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .kpi {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 24px 24px 22px;
+    border-radius: var(--r-lg);
+    background: var(--white);
+    border: 1px solid var(--pt-hair);
+    box-shadow: var(--shadow-xs);
+    transition:
+      transform 0.5s var(--ease-out),
+      box-shadow 0.5s var(--ease-out);
+  }
+  .kpi:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-md);
+  }
+  .k-label {
+    font-size: 13.5px;
+    color: var(--ink-quiet);
+  }
+  .k-n {
+    font-family: var(--serif);
+    font-weight: var(--fw-display);
+    font-size: clamp(28px, 2.6vw, 38px);
+    line-height: 1.1;
+    letter-spacing: var(--ls-display);
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .k-sub {
+    font-size: 13.5px;
     color: var(--taupe);
   }
 
-  .actions {
+  /* ── Owner callouts ── */
+  .callout {
     display: flex;
-    gap: 14px;
-    margin-top: 32px;
-  }
-  .btn {
-    padding: 12px 24px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 18px 20px 18px 26px;
+    margin-bottom: 12px;
+    border-radius: var(--r-lg);
     background: var(--ink);
     color: var(--cream);
-    font-size: var(--fs-micro);
-    letter-spacing: var(--ls-button);
-    text-transform: uppercase;
+    font-size: var(--fs-body);
+    line-height: 1.55;
   }
-  .btn.ghost {
-    background: transparent;
+  .callout :global(.arrow-chip) {
+    --chip-bg: var(--cream);
+    --chip-fg: var(--ink);
+  }
+  .callout.ghost {
+    background: var(--white);
     color: var(--ink);
-    border: 1px solid var(--ink);
+    border: 1px solid var(--pt-hair);
+  }
+  .callout.ghost :global(.arrow-chip) {
+    --chip-bg: var(--ink);
+    --chip-fg: var(--cream);
   }
 
-  @media (max-width: 900px) {
-    .stats {
-      grid-template-columns: repeat(3, 1fr);
+  /* ── The path ── */
+  .path {
+    padding: 28px;
+    margin-top: 8px;
+  }
+  .path-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .path h2 {
+    font-family: var(--serif);
+    font-weight: var(--fw-display);
+    font-size: 20px;
+    color: var(--ink);
+  }
+  .path-total {
+    font-size: 14px;
+    color: var(--ink-quiet);
+  }
+  .bar {
+    display: flex;
+    gap: 4px;
+    height: 16px;
+    margin-bottom: 22px;
+  }
+  .seg {
+    flex-basis: 0;
+    min-width: 10px;
+    border-radius: var(--r-pill);
+    transition: flex-grow 0.8s var(--ease-out);
+  }
+  .seg.mute,
+  .dot.mute {
+    background: #c9ced3;
+  }
+  .seg.amber,
+  .dot.amber {
+    background: #e2b53c;
+  }
+  .seg.amber2,
+  .dot.amber2 {
+    background: #c99a1e;
+  }
+  .seg.red,
+  .dot.red {
+    background: #d9574d;
+  }
+  .seg.green,
+  .dot.green {
+    background: #3d9a70;
+  }
+  .seg.ink,
+  .dot.ink {
+    background: var(--ink);
+  }
+  .legend {
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 8px;
+  }
+  .legend a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 14px;
+    border-radius: var(--r-md);
+    transition: background-color 0.3s var(--ease-out);
+  }
+  .legend a:hover {
+    background: var(--linen);
+  }
+  .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .l-n {
+    font-family: var(--serif);
+    font-weight: var(--fw-display);
+    font-size: 20px;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .l-t {
+    font-size: 14px;
+    color: var(--taupe);
+  }
+
+  @media (max-width: 1100px) {
+    .attn {
+      grid-template-columns: 1fr;
+    }
+    .attn-side {
+      border-left: 0;
+      border-top: 1px solid rgba(244, 244, 242, 0.08);
+    }
+    .kpis {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
-  @media (max-width: 520px) {
-    .stats {
-      grid-template-columns: repeat(2, 1fr);
+  @media (max-width: 560px) {
+    .attn-main {
+      padding: 24px 18px 22px;
+    }
+    .attn-side {
+      padding: 14px;
+    }
+    .q-when {
+      display: none;
+    }
+    .kpis {
+      grid-template-columns: 1fr;
+    }
+    .path {
+      padding: 22px 18px;
     }
   }
 </style>

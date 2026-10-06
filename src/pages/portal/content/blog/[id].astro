@@ -357,7 +357,15 @@ const LANG = { hu: 'Magyar', nl: 'Holland', en: 'Angol', de: 'Német' } as const
   });
 
   document.getElementById('delete-btn')?.addEventListener('click', async () => {
-    if (!confirm('Biztosan törli ezt a nyelvi változatot? Ez nem vonható vissza.')) return;
+    const typed = (document.querySelector('input[name="title"]'))?.value?.trim() || '';
+    const confirmed = typed
+      ? await window.pf.confirmType({
+          title: 'Nyelvi változat végleges törlése',
+          body: 'Ez a változat véglegesen törlődik, nem vonható vissza.',
+          expected: typed,
+        })
+      : await window.pf.confirm({ title: 'Törli ezt a nyelvi változatot?', body: 'Ez nem vonható vissza.', confirmLabel: 'Törlés', danger: true });
+    if (!confirmed) return;
     const { ok } = await post(`/api/portal/content/blog/${postId}`, { action: 'delete' });
     if (ok) location.href = '/portal/content/blog';
   });

@@ -1,0 +1,557 @@
+---
+/**
+ * Beérkező hirdetések — everything that is not yet a live listing.
+ *
+ * The Ingatlanok screen now shows only listings that have been through review;
+ * this is where the rest wait, as a board an admin can move cards across:
+ *
+ *   Piszkozat ⇄ Elbírálásra vár ⇄ Javítás szükséges        Elutasítva (read-only)
+ *
+ * Moving reuses the status API's existing, already-guarded transitions
+ * (submit, request_changes) plus the silent move_to_draft. Approving is
+ * deliberately NOT a drag: it sets the package and the price, so it happens on
+ * the review screen.
+ */
+export const prerender = false;
+
+import Portal from '~/layouts/Portal.astro';
+import { icon } from '~/lib/portal/icons';
+import { timeAgo, hoursSince, listingName } from '~/lib/portal/time';
+
+const { supabase } = Astro.locals;
+
+const { data: rows } = await supabase
+  .from('properties')
+  .select(
+    'id, ref, status, settlement, price_eur, owner_id, created_at, submitted_at, property_translations(locale, title), property_media(storage_path, is_hero, sort_order)'
+  )
+  .in('status', ['draft', 'submitted', 'changes_requested', 'rejected'])
+  .order('created_at', { ascending: false });
+const properties = rows ?? [];
+
+const { data: people } = await supabase.from('profiles').select('id, full_name, email');
+const ownerName = new Map<string, string>((people ?? []).map((p: any) => [p.id, p.full_name || p.email]));
+
+const COLUMNS = [
+  { key: 'draft', title: 'Piszkozat', hint: 'A hirdető még szerkeszti', tone: 'mute' },
+  { key: 'submitted', title: 'Elbírálásra vár', hint: 'Önre vár: nézze át és hagyja jóvá', tone: 'amber' },
+  { key: 'changes_requested', title: 'Javítás szükséges', hint: 'A hirdetőnél van a labda', tone: 'red' },
+  { key: 'rejected', title: 'Elutasítva', hint: 'Lezárt hirdetések', tone: 'mute' },
+] as const;
+
+const byStatus = (status: string) =>
+  properties
+    .filter((p) => p.status === status)
+    .sort((a, b) => String(a.submitted_at ?? a.created_at).localeCompare(String(b.submitted_at ?? b.created_at)));
+
+const thumb = (p: (typeof properties)[number]) => {
+  const media = [...(p.property_media ?? [])].sort((a: any, b: any) => a.sort_order - b.sort_order);
+  return (media.find((m: any) => m.is_hero) ?? media[0])?.storage_path as string | undefined;
+};
+const openHref = (p: (typeof properties)[number]) =>
+  p.status === 'draft' ? `/portal/properties/${p.id}` : `/portal/review/${p.id}`;
+
+const MOVABLE = COLUMNS.filter((c) => c.key !== 'rejected');
+---
+
+<Portal title="Beérkező hirdetések">
+  <header class="head">
+    <div>
+      <p class="eyebrow">Teendők</p>
+      <h1>Beérkező hirdetések</h1>
+      <p class="lead">
+        Itt gyűlnek az új, még nem elbírált hirdetések. Húzza át a kártyát egy másik oszlopba, vagy használja a
+        <b>⋯</b> menüt. A jóváhagyás az elbírálás képernyőn történik, ott állítja be a csomagot és az árat.
+      </p>
+    </div>
+  </header>
+
+  <p class="status" id="board-status" role="status" aria-live="polite"></p>
+
+  <div class="board" id="board">
+    {
+      COLUMNS.map((col) => {
+        const items = byStatus(col.key);
+        return (
+          <section class={`col tone-${col.tone}`} data-col={col.key} aria-label={col.title}>
+            <header class="col-head">
+              <h2>
+                <span class="dot" aria-hidden="true" />
+                {col.title}
+              </h2>
+              <span class="n" data-count>{items.length}</span>
+            </header>
+            <p class="hint">{col.hint}</p>
+
+            <div class="drop" data-drop>
+              {items.map((p) => {
+                const src = thumb(p);
+                const late = p.status === 'submitted' && hoursSince(p.submitted_at ?? p.created_at) > 24;
+                return (
+                  <article
+                    class:list={['card', col.key === 'rejected' && 'locked']}
+                    draggable={col.key === 'rejected' ? 'false' : 'true'}
+                    data-id={p.id}
+                    data-status={p.status}
+                    data-ref={p.ref}
+                  >
+                    <a class="stretch" href={openHref(p)} draggable="false" aria-label={`${listingName(p)} megnyitása`} />
+                    <div class="pic">
+                      {src ? <img src={src} alt="" loading="lazy" draggable="false" /> : <Fragment set:html={icon('building', 26)} />}
+                    </div>
+                    <div class="body">
+                      <b class="t">{listingName(p)}</b>
+                      <p class="m">
+                        {p.settlement || 'Település nélkül'} · €{Number(p.price_eur).toLocaleString('de-DE')}
+                      </p>
+                      <p class="o">{(p.owner_id && ownerName.get(p.owner_id)) || 'Ismeretlen hirdető'}</p>
+                    </div>
+                    <div class="foot">
+                      <span class:list={['when', late && 'late']}>
+                        <Fragment set:html={icon('clock', 14)} />
+                        {timeAgo(p.submitted_at ?? p.created_at)}
+                      </span>
+                      <span class="ref">#{p.ref}</span>
+                    </div>
+
+                    {col.key !== 'rejected' && (
+                      <div class="pt-menu corner">
+                        <button type="button" class="pt-icon-btn" data-menu aria-haspopup="menu" aria-expanded="false" aria-label="Műveletek">
+                          <Fragment set:html={icon('dots', 18)} />
+                        </button>
+                        <div class="pt-menu-pop" role="menu" hidden>
+                          <a role="menuitem" href={openHref(p)}>
+                            <Fragment set:html={icon('eye', 17)} />
+                            {p.status === 'draft' ? 'Megnyitás' : 'Elbírálás'}
+                          </a>
+                          <hr />
+                          <p class="cap">Áthelyezés</p>
+                          {MOVABLE.filter((c) => c.key !== p.status).map((c) => (
+                            <button type="button" role="menuitem" data-move={c.key}>
+                              <Fragment set:html={icon('move', 17)} />
+                              {c.title}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
+              <p class="empty" data-empty hidden={items.length > 0}>
+                {col.key === 'submitted' ? 'Nincs elbírálásra váró hirdetés.' : 'Nincs hirdetés ebben az oszlopban.'}
+              </p>
+            </div>
+          </section>
+        );
+      })
+    }
+  </div>
+</Portal>
+
+<script>
+  type Pf = {
+    confirm(o: { title: string; body: string; confirmLabel?: string }): Promise<boolean>;
+    askNote(o: { title: string; body: string; label: string; confirmLabel?: string }): Promise<string | null>;
+  };
+  const pf = () => (window as any).pf as Pf;
+
+  const board = document.getElementById('board')!;
+  const statusLine = document.getElementById('board-status')!;
+
+  // What a card may become. Approval and rejection live on the review screen.
+  const ALLOWED: Record<string, string[]> = {
+    draft: ['submitted'],
+    submitted: ['draft', 'changes_requested'],
+    changes_requested: ['draft', 'submitted'],
+    rejected: [],
+  };
+  const ERRORS: Record<string, string> = {
+    'no-photos': 'Fotó nélkül nem küldhető be elbírálásra — előbb töltsön fel legalább egy képet.',
+    'note-required': 'A javításkéréshez írjon üzenetet a hirdetőnek.',
+    'not-movable': 'Ez a hirdetés ebből az állapotból nem helyezhető át.',
+  };
+
+  const say = (text: string) => (statusLine.textContent = text);
+
+  function refreshColumns() {
+    board.querySelectorAll<HTMLElement>('.col').forEach((col) => {
+      const cards = col.querySelectorAll('.card').length;
+      col.querySelector('[data-count]')!.textContent = String(cards);
+      col.querySelector<HTMLElement>('[data-empty]')!.hidden = cards > 0;
+    });
+  }
+
+  async function call(id: string, body: Record<string, unknown>) {
+    const res = await fetch(`/api/portal/properties/${id}/status`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const json = await res.json().catch(() => ({}));
+    return { ok: res.ok && json.ok, error: String(json.error ?? '') };
+  }
+
+  async function move(card: HTMLElement, to: string) {
+    const from = card.dataset.status!;
+    if (from === to) return;
+    if (!ALLOWED[from]?.includes(to)) {
+      say('Ez az áthelyezés innen nem lehetséges.');
+      return;
+    }
+    const id = card.dataset.id!;
+    const name = card.querySelector('.t')?.textContent ?? 'a hirdetés';
+
+    let body: Record<string, unknown>;
+    if (to === 'changes_requested') {
+      const note = await pf().askNote({
+        title: 'Javítás kérése',
+        body: `Mit kell kijavítania a hirdetőnek? Az üzenetet e-mailben is megkapja. (${name})`,
+        label: 'Üzenet a hirdetőnek',
+        confirmLabel: 'Küldés a hirdetőnek',
+      });
+      if (!note) return;
+      body = { action: 'request_changes', note };
+    } else if (to === 'submitted') {
+      const ok = await pf().confirm({
+        title: 'Elbírálásra küldi?',
+        body: `A(z) „${name}” bekerül az elbírálásra váró hirdetések közé, a hirdetőt e-mailben értesítjük a beérkezésről.`,
+        confirmLabel: 'Elbírálásra küldöm',
+      });
+      if (!ok) return;
+      body = { action: 'submit' };
+    } else {
+      const ok = await pf().confirm({
+        title: 'Visszahelyezi piszkozatnak?',
+        body: `A(z) „${name}” újra a hirdető szerkesztésére vár. Erről nem küldünk e-mailt.`,
+        confirmLabel: 'Visszahelyezem',
+      });
+      if (!ok) return;
+      body = { action: 'move_to_draft' };
+    }
+
+    card.setAttribute('aria-busy', 'true');
+    say('Mentés…');
+    const result = await call(id, body);
+    card.removeAttribute('aria-busy');
+    if (!result.ok) {
+      say(ERRORS[result.error] ?? 'Nem sikerült az áthelyezés.');
+      return;
+    }
+    // Move the card in place; a reload is only needed for the review links.
+    const target = board.querySelector<HTMLElement>(`.col[data-col="${to}"] [data-drop]`)!;
+    card.dataset.status = to;
+    const link = card.querySelector<HTMLAnchorElement>('.stretch');
+    if (link) link.href = to === 'draft' ? `/portal/properties/${id}` : `/portal/review/${id}`;
+    // Each menu offers the other two columns.
+    card.querySelectorAll<HTMLElement>('[data-move]').forEach((item) => {
+      item.hidden = item.dataset.move === to;
+    });
+    target.prepend(card);
+    card.classList.add('landed');
+    card.addEventListener('animationend', () => card.classList.remove('landed'), { once: true });
+    refreshColumns();
+    say('Áthelyezve.');
+  }
+
+  /* Drag and drop */
+  let dragging: HTMLElement | null = null;
+  board.addEventListener('dragstart', (event) => {
+    const card = (event.target as Element).closest<HTMLElement>('.card');
+    if (!card || card.classList.contains('locked')) return;
+    dragging = card;
+    card.classList.add('dragging');
+    event.dataTransfer?.setData('text/plain', card.dataset.id!);
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+    board.querySelectorAll<HTMLElement>('.col').forEach((col) => {
+      const ok = ALLOWED[card.dataset.status!]?.includes(col.dataset.col!);
+      col.classList.toggle('can-drop', Boolean(ok));
+      col.classList.toggle('no-drop', !ok && col.dataset.col !== card.dataset.status);
+    });
+  });
+  board.addEventListener('dragend', () => {
+    dragging?.classList.remove('dragging');
+    dragging = null;
+    board.querySelectorAll('.col').forEach((col) => col.classList.remove('can-drop', 'no-drop', 'over'));
+  });
+  board.addEventListener('dragover', (event) => {
+    const col = (event.target as Element).closest<HTMLElement>('.col');
+    if (!col || !dragging || !col.classList.contains('can-drop')) return;
+    event.preventDefault();
+    board.querySelectorAll('.col.over').forEach((c) => c !== col && c.classList.remove('over'));
+    col.classList.add('over');
+  });
+  board.addEventListener('drop', (event) => {
+    const col = (event.target as Element).closest<HTMLElement>('.col');
+    if (!col || !dragging || !col.classList.contains('can-drop')) return;
+    event.preventDefault();
+    const card = dragging;
+    board.querySelectorAll('.col').forEach((c) => c.classList.remove('can-drop', 'no-drop', 'over'));
+    move(card, col.dataset.col!);
+  });
+
+  /* The ⋯ menu — the way to move a card without a mouse. */
+  board.addEventListener('click', (event) => {
+    const item = (event.target as Element).closest<HTMLElement>('[data-move]');
+    if (!item) return;
+    const card = item.closest<HTMLElement>('.card');
+    if (card) move(card, item.dataset.move!);
+  });
+  // The menu offers every column except the one the card is in.
+  board.querySelectorAll<HTMLElement>('.card').forEach((card) => {
+    card.querySelectorAll<HTMLElement>('[data-move]').forEach((item) => {
+      item.hidden = item.dataset.move === card.dataset.status;
+    });
+  });
+</script>
+
+<style>
+  .head {
+    margin-bottom: 20px;
+  }
+  .head h1 {
+    margin-top: 10px;
+  }
+  .lead {
+    max-width: 66ch;
+    margin-top: 10px;
+    font-size: var(--fs-body);
+    line-height: 1.65;
+    color: var(--taupe);
+  }
+  .status {
+    min-height: 1.5em;
+    margin-bottom: 8px;
+    font-size: 14.5px;
+    color: var(--ink-quiet);
+  }
+
+  .board {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(290px, 1fr);
+    gap: 14px;
+    overflow-x: auto;
+    padding: 4px 2px 20px;
+    margin: 0 -2px;
+    scroll-snap-type: x proximity;
+  }
+  .col {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    padding: 16px 14px 14px;
+    border-radius: var(--r-xl);
+    background: var(--linen);
+    border: 1.5px solid transparent;
+    scroll-snap-align: start;
+    transition:
+      border-color 0.3s var(--ease-out),
+      background-color 0.3s var(--ease-out),
+      opacity 0.3s var(--ease-out);
+  }
+  .col[data-col='rejected'] {
+    background: transparent;
+    border: 1.5px dashed var(--border);
+  }
+  .col.no-drop {
+    opacity: 0.45;
+  }
+  .col.can-drop {
+    border-color: rgba(16, 42, 67, 0.28);
+    border-style: dashed;
+  }
+  .col.over {
+    background: var(--mist);
+    border-color: var(--ink);
+  }
+  .col-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 6px;
+  }
+  .col h2 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--serif);
+    font-weight: var(--fw-display);
+    font-size: 17px;
+    color: var(--ink);
+  }
+  .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #c9ced3;
+  }
+  .tone-amber .dot {
+    background: #e2b53c;
+  }
+  .tone-red .dot {
+    background: #d9574d;
+  }
+  .n {
+    min-width: 28px;
+    padding: 2px 10px;
+    border-radius: var(--r-pill);
+    background: var(--white);
+    font-size: 13.5px;
+    font-weight: var(--fw-semibold);
+    text-align: center;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .hint {
+    margin: 4px 6px 14px;
+    font-size: 13.5px;
+    color: var(--ink-quiet);
+  }
+  .drop {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+    min-height: 90px;
+  }
+  .empty {
+    display: grid;
+    place-items: center;
+    min-height: 90px;
+    padding: 14px;
+    border-radius: var(--r-lg);
+    border: 1.5px dashed var(--border);
+    font-size: 14px;
+    text-align: center;
+    color: var(--ink-quiet);
+  }
+  .empty[hidden] {
+    display: none;
+  }
+
+  .card {
+    position: relative;
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 4px 14px;
+    padding: 14px;
+    border-radius: var(--r-lg);
+    background: var(--white);
+    border: 1px solid var(--pt-hair);
+    box-shadow: var(--shadow-xs);
+    cursor: grab;
+    transition:
+      transform 0.45s var(--ease-out),
+      box-shadow 0.45s var(--ease-out),
+      opacity 0.3s var(--ease-out);
+  }
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+  .card.dragging {
+    opacity: 0.4;
+    transform: scale(0.98);
+  }
+  .card.locked {
+    cursor: default;
+    opacity: 0.8;
+  }
+  .card[aria-busy='true'] {
+    opacity: 0.55;
+    pointer-events: none;
+  }
+  .card.landed {
+    animation: land 0.6s var(--ease-out);
+  }
+  @keyframes land {
+    from {
+      transform: scale(0.94);
+      box-shadow: var(--shadow-float);
+    }
+  }
+  .stretch {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    border-radius: inherit;
+  }
+  .pic {
+    grid-row: 1 / span 2;
+    display: grid;
+    place-items: center;
+    width: 64px;
+    height: 64px;
+    border-radius: var(--r-md);
+    background: var(--linen);
+    color: var(--ink-quiet);
+    overflow: hidden;
+  }
+  .pic img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .body {
+    min-width: 0;
+    padding-right: 30px;
+  }
+  .t {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-family: var(--serif);
+    font-weight: var(--fw-semibold);
+    font-size: 15.5px;
+    line-height: 1.3;
+    color: var(--ink);
+  }
+  .m {
+    margin-top: 4px;
+    font-size: 13.5px;
+    color: var(--taupe);
+  }
+  .o {
+    font-size: 13px;
+    color: var(--ink-quiet);
+  }
+  .foot {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 8px;
+    padding-top: 10px;
+    border-top: 1px solid var(--pt-hair);
+  }
+  .when {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--ink-quiet);
+  }
+  .when.late {
+    color: var(--pt-red);
+    font-weight: var(--fw-medium);
+  }
+  .ref {
+    font-size: 13px;
+    color: var(--ink-quiet);
+    font-variant-numeric: tabular-nums;
+  }
+  .corner {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 2;
+  }
+
+  @media (max-width: 700px) {
+    .board {
+      grid-auto-columns: 84%;
+    }
+  }
+</style>

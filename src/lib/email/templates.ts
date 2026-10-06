@@ -609,6 +609,35 @@ export function serviceRequested(locale: EmailLocale, opts: { service: string; p
   };
 }
 
+/** Card payment for a valuation package — no listing, no account, so no listing wording and no VAT claim. */
+export function valuationPaid(
+  locale: EmailLocale,
+  opts: { service: string; items: OrderLine[]; total: string; paidAt: string }
+): BuiltEmail {
+  const c = copyFor(locale).valuationPaid;
+  const common = copyFor(locale).common;
+  return {
+    subject: c.subject,
+    html: shell({
+      locale,
+      preheader: c.preheader,
+      body:
+        h1(c.heading) +
+        lead(c.body(opts.service)) +
+        h2(c.orderTitle) +
+        itemisedTotal(opts.items, c.totalLabel, opts.total) +
+        facts([[c.paidAtLabel, opts.paidAt]]) +
+        p(c.next) +
+        small(c.invoice) +
+        signOff(locale),
+    }),
+    text: textShell({
+      locale,
+      body: `${c.heading}\n\n${c.body(opts.service)}\n\n${c.orderTitle}\n${opts.items.map((i) => `  ${i.label} — ${i.amount}`).join('\n')}\n  ${c.totalLabel}: ${opts.total}\n  ${c.paidAtLabel}: ${opts.paidAt}\n\n${c.next}\n${c.invoice}\n\n${common.signOff}`,
+    }),
+  };
+}
+
 /** Brief 3 §D.5 — acknowledged with no price and no turnaround. */
 export function judicialRequested(locale: EmailLocale): BuiltEmail {
   const c = copyFor(locale).judicialRequested;
@@ -953,6 +982,7 @@ export const templates = {
   valuationDeclined,
   valuationNeedsInfo,
   serviceRequested,
+  valuationPaid,
   judicialRequested,
   adminServiceRequested,
   rejected,

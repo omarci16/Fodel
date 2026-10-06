@@ -44,6 +44,7 @@ import { getTaxonomy, getCompany } from '~/lib/runtime-config';
 import PostCard from '~/components/PostCard.astro';
 import { latestArticles } from '~/lib/blog';
 import { websiteSchema } from '~/lib/seo';
+import { valuationPackages, priceLabel } from '~/lib/valuation/packages';
 import { eur } from '~/lib/format';
 import { splitOpeningQuote } from '~/lib/typography';
 import sellersImage from '~/assets/properties/vineyard.png';
@@ -79,6 +80,15 @@ const valuation = company.services.valuationEntry
         : hu ? 'Mennyit ér az ingatlanom?' : 'Wat is mijn woning waard?',
     }
   : null;
+// The three packages, named and priced in Beállítások → Szolgáltatások. The free
+// estimate's price is spoken only once the free launch is confirmed.
+const valuationTiers = valuationPackages(company.services)
+  .filter((pkg) => pkg.enabled)
+  .map((pkg) => ({
+    kind: pkg.kind,
+    name: pkg.names[locale],
+    price: pkg.kind === 'indicative' && !company.services.valuationFreeConfirmed ? '' : priceLabel(pkg, locale),
+  }));
 const hero = featured[0];
 const referral = c.referral;
 
@@ -226,6 +236,29 @@ const quote = splitOpeningQuote(c.quote);
       </p>
     </HomeSearch>
   </section>
+
+  {/* ── VALUATION ── only while an admin has the service switched on */}
+  {valuation && (
+    <section class="valuation-slab slab reveal" aria-labelledby="valuation-slab-title">
+      <div class="vs-copy">
+        <SectionHead eyebrow={hu ? 'Értékmeghatározás' : 'Waardebepaling'} title={hu ? 'Mennyit ér\naz ingatlana?' : 'Wat is uw woning\nwaard?'} size="large" />
+        <p class="vs-body">
+          {hu
+            ? 'Adja meg, amit tud az ingatlanról: fotókat, alaprajzot, dokumentumokat is csatolhat. Munkatársunk ellenőrzi az eredményt, és e-mailben küldi. Tájékoztató becslés, nem hivatalos szakvélemény.'
+            : 'Vul in wat u van de woning weet; foto’s, plattegronden en documenten kunt u bijvoegen. Onze medewerker controleert het resultaat en stuurt het per e-mail. Indicatief, geen officieel taxatierapport.'}
+        </p>
+        <Button variant="dark" href={valuation.href} arrow>{valuation.label}</Button>
+      </div>
+      <ul class="vs-tiers" aria-label={hu ? 'Értékmeghatározási csomagok' : 'Waardebepalingspakketten'}>
+        {valuationTiers.map((tier) => (
+          <li>
+            <span class="vs-name">{tier.name}</span>
+            {tier.price && <span class="vs-price">{tier.price}</span>}
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
 
   {/* ── FEATURED ── */}
   <section class="featured">
@@ -984,6 +1017,61 @@ const quote = splitOpeningQuote(c.quote);
     font-size: var(--fs-small);
     line-height: 1.45;
     color: var(--taupe);
+  }
+
+  /* ══ VALUATION ════════════════════════════════════════════════════════ */
+  .valuation-slab {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    align-items: center;
+    gap: clamp(32px, 5vw, 80px);
+    margin-top: calc(var(--section-y) * 0.3);
+    padding: clamp(40px, 5vw, 72px) calc(var(--pad-x) - var(--slab-x));
+    background: var(--linen);
+  }
+  .vs-copy {
+    display: grid;
+    gap: 24px;
+    justify-items: start;
+  }
+  .vs-body {
+    max-width: 52ch;
+    font-size: var(--fs-body);
+    line-height: 1.7;
+    color: var(--ink-quiet);
+  }
+  .vs-tiers {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 12px;
+  }
+  .vs-tiers li {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 16px;
+    padding: 20px 26px;
+    border-radius: var(--r-lg);
+    background: var(--white);
+    box-shadow: var(--shadow-md);
+  }
+  .vs-name {
+    font-family: var(--serif);
+    font-size: 19px;
+    color: var(--ink);
+  }
+  .vs-price {
+    flex: none;
+    font-size: var(--fs-small);
+    color: var(--ink-quiet);
+  }
+  @media (max-width: 900px) {
+    .valuation-slab {
+      grid-template-columns: 1fr;
+      padding: 40px calc(var(--pad-x-mob) - var(--slab-x) + 4px);
+    }
   }
 
   /* ══ FEATURED ═════════════════════════════════════════════════════════ */

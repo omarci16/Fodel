@@ -338,10 +338,34 @@ const whatsappMessage =
         formId="enquiry"
         onDark
         meta={{ propertyRef: d.ref, propertyTitle: title }}
+        submitLabel={locale === 'hu' ? 'Visszahívást kérek' : 'Bel mij terug'}
+        successTitle={locale === 'hu' ? 'Köszönjük, hamarosan hívjuk!' : 'Bedankt, wij bellen u terug!'}
+        successBody={
+          locale === 'hu'
+            ? 'Munkatársunk 24 órán belül felkeresi a megadott elérhetőségen.'
+            : 'Een medewerker neemt binnen 24 uur contact met u op.'
+        }
       >
+        <fieldset class="pref" data-required-label={ui.form.required} data-optional-label={ui.form.optional}>
+          <legend>{locale === 'hu' ? 'Hogyan keressük Önt?' : 'Hoe nemen we contact op?'}</legend>
+          <label class="opt">
+            <input type="radio" name="contact_pref" value="callback" checked />
+            <span>
+              <b>{locale === 'hu' ? 'Visszahívást kérek' : 'Terugbellen'}</b>
+              <small>{locale === 'hu' ? '24 órán belül hívjuk' : 'Binnen 24 uur'}</small>
+            </span>
+          </label>
+          <label class="opt">
+            <input type="radio" name="contact_pref" value="email" />
+            <span>
+              <b>{locale === 'hu' ? 'E-mailben' : 'Per e-mail'}</b>
+              <small>{locale === 'hu' ? 'Írásban válaszolunk' : 'Wij antwoorden schriftelijk'}</small>
+            </span>
+          </label>
+        </fieldset>
         <Field locale={locale} name="name" label={ui.form.name} required autocomplete="name" span="full" onDark />
+        <Field locale={locale} name="phone" label={ui.form.phone} type="tel" required autocomplete="tel" span="full" onDark />
         <Field locale={locale} name="email" label={ui.form.email} type="email" required autocomplete="email" span="full" onDark />
-        <Field locale={locale} name="phone" label={ui.form.phone} type="tel" autocomplete="tel" span="full" onDark />
         <Field
           locale={locale}
           name="message"
@@ -384,6 +408,18 @@ const whatsappMessage =
 </Base>
 
 <script>
+  // Callback needs a phone number; "by e-mail" does not.
+  document.querySelectorAll<HTMLElement>('fieldset.pref').forEach((group) => {
+    const form = group.closest('form');
+    const phone = form?.querySelector<HTMLInputElement>('#f-phone');
+    const tag = phone?.closest('.field')?.querySelector<HTMLElement>('.req');
+    if (!phone || !tag) return;
+    group.addEventListener('change', () => {
+      const callback = form!.querySelector<HTMLInputElement>('input[name="contact_pref"]:checked')?.value !== 'email';
+      phone.required = callback;
+      tag.textContent = `(${callback ? group.dataset.requiredLabel : group.dataset.optionalLabel})`;
+    });
+  });
   // Gallery: click, keyboard arrows and swipe. The prototype had click only.
   // 1.4: the incoming photograph fades in over the outgoing one, which is
   // only hidden once the fade has finished — so there is never a blank frame
@@ -953,6 +989,70 @@ const whatsappMessage =
     padding: 44px 40px 36px;
     box-shadow: var(--shadow-float);
   }
+  /* Callback vs e-mail: two big rounded choices on the dark panel. */
+  .pref {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    border: 0;
+    padding: 0;
+    margin: 0 0 22px;
+  }
+  .pref legend {
+    padding: 0;
+    margin-bottom: 10px;
+    font-size: var(--fs-small);
+    color: var(--on-dark-muted);
+  }
+  .opt {
+    position: relative;
+    display: block;
+    cursor: pointer;
+  }
+  .opt input {
+    position: absolute;
+    opacity: 0;
+    inset: 0;
+    cursor: pointer;
+  }
+  .opt span {
+    display: block;
+    height: 100%;
+    padding: 14px 16px;
+    border-radius: var(--r-md);
+    border: 1.5px solid var(--on-dark-field-border);
+    background: var(--on-dark-field);
+    transition:
+      border-color 0.3s var(--ease-out),
+      background-color 0.3s var(--ease-out);
+  }
+  .opt b {
+    display: block;
+    font-weight: var(--fw-medium);
+    font-size: var(--fs-small);
+    color: var(--cream);
+  }
+  .opt small {
+    display: block;
+    margin-top: 2px;
+    font-size: 13px;
+    color: var(--on-dark-muted);
+  }
+  .opt input:checked + span {
+    border-color: var(--cream);
+    background: rgba(244, 244, 242, 0.14);
+  }
+  .opt input:focus-visible + span {
+    outline: var(--focus-ring);
+    outline-offset: 2px;
+  }
+  @media (max-width: 480px) {
+    .pref {
+      grid-template-columns: 1fr;
+    }
+  }
+
   .enq-title {
     font-family: var(--serif);
     font-weight: var(--fw-medium);

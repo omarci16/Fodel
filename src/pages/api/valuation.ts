@@ -13,6 +13,9 @@ import { officeInbox } from '~/lib/email/routing';
 import places from '~/data/market/hu-settlements.json';
 import { SITE_URL } from '~/config/site.mjs';
 import { valuationActionToken } from '~/lib/valuation/action-token';
+import { valuationPackage, isPayable, priceLabel } from '~/lib/valuation/packages';
+import { readSessionDocuments } from '~/lib/valuation/documents';
+import { isStripeEnabled } from '~/lib/stripe';
 const settlements = places as [string, string, string, number][];
 
 export const prerender = false;
@@ -42,7 +45,7 @@ export const POST: APIRoute = (context) => handleForm(context, {
     { name: 'category', label: 'Típus', required: true, maxLength: 60 },
     { name: 'settlement', label: 'Település', required: true, maxLength: 120 },
     { name: 'floorM2', label: 'Alapterület (m²)', required: true, type: 'number', maxLength: 12 },
-    ...['county','kshCode','countyCode','addressPrivate','plotM2','bedrooms','bathrooms','parcelCount','yearBuilt','renovatedIn','renovationExtent','conditionKey','heatingKey','epcClass','restrictionsNote','requestKind','factors'].map((name) => optional(name,name, name === 'factors' ? 8000 : 1000)),
+    ...['county','kshCode','countyCode','addressPrivate','plotM2','bedrooms','bathrooms','parcelCount','yearBuilt','renovatedIn','renovationExtent','conditionKey','heatingKey','epcClass','restrictionsNote','requestKind','factors','docSession'].map((name) => optional(name,name, name === 'factors' ? 8000 : 1000)),
     ...VALUATION_QUESTIONS.map((question) => optional(questionField(question.id), question.label.hu, 500)),
   ],
   onSuccess: async (values, extras, form) => {
@@ -55,7 +58,12 @@ export const POST: APIRoute = (context) => handleForm(context, {
     const place = settlements.find((entry) => entry[3] !== 0 && entry[1].localeCompare(values.settlement, 'hu', { sensitivity: 'base' }) === 0);
     const county = settlements.find((entry) => entry[3] === 0 && entry[0] === place?.[2]);
     const countyName = county?.[1].replace(' vármegye','') ?? 'Ismeretlen';
-    const requestKind = ['indicative','expert_visit','judicial'].includes(values.requestKind) ? values.requestKind : 'indicative';
+    const company = await getCompany();
+    // A package an admin switched off cannot be requested, whatever the form says.
+    const chosen = valuationPackage(company.services, values.requestKind);
+    const requestKind = chosen?.enabled ? chosen.kind : 'indicative';
+    const pkg = valuationPackage(company.services, requestKind);
+    const visitPrice = valuationPackage(company.services, 'expert_visit');
     const features = form.getAll('features').filter((entry): entry is string => typeof entry === 'string' && Object.hasOwn(FEATURES, entry));
     let factors: { text: string; direction: 'plus'|'minus'|'unsure' }[] = [];
     try {
@@ -68,7 +76,7 @@ export const POST: APIRoute = (context) => handleForm(context, {
       try { const uploaded = await processAndUploadImage(admin, id, file, PHOTO_BUCKET); photos.push({ path: uploaded.path, width: uploaded.width, height: uploaded.height }); }
       catch (error) { console.error('[valuation] photo skipped', error); }
     }
-    const company = await getCompany();
+    const documents = await readSessionDocuments(admin, values.docSession ?? '');
     const estimate = await estimateValuation(admin, { category: values.category, county: countyName, floorM2,
       kshCode: place?.[0] ?? null, countyCode: place?.[2] ?? null, wallType: values[questionField('falazat')],
       bandPercent: company.services.valuationBandPercent });
@@ -86,7 +94,7 @@ export const POST: APIRoute = (context) => handleForm(context, {
       bedrooms: int(values.bedrooms,0,100), bathrooms: int(values.bathrooms,0,100), parcel_count: int(values.parcelCount,0,100),
       renovated_in: int(values.renovatedIn,1500,2100), renovation_extent: ['partial','full','none','unknown'].includes(values.renovationExtent) ? values.renovationExtent : null,
       condition_key: asKey(values.conditionKey), heating_key: asKey(values.heatingKey), epc_class: asKey(values.epcClass),
-      features, address_private: values.addressPrivate || null, factors, request_kind: requestKind,
+      documents, features, address_private: values.addressPrivate || null, factors, request_kind: requestKind,
       ksh_code: place?.[0] ?? null, low_huf: estimate.lowHuf, mid_huf: estimate.midHuf, high_huf: estimate.highHuf,
       baseline: estimate.baseline };
     const { error } = await admin.from('valuations').insert(expanded);
@@ -97,13 +105,14 @@ export const POST: APIRoute = (context) => handleForm(context, {
       if (retry.error) throw retry.error;
       if (requestKind === 'judicial') await deliver(values.email, templates.judicialRequested(locale));
       else if (requestKind === 'expert_visit') await deliver(values.email, templates.serviceRequested(locale, {
-        service: serviceName('onsite-visit', locale), price: servicePrice('onsite-visit'),
+        service: serviceName('onsite-visit', locale), price: visitPrice ? priceLabel(visitPrice, locale) : servicePrice('onsite-visit'),
       }));
       else await deliver(values.email, templates.valuationReceived(locale));
       return { instant: false, valuationId: id };
     }
     if (requestKind === 'expert_visit') await createServiceRequest(admin, { serviceId: 'onsite-visit', source: 'valuation', locale,
-      valuationId: id, name: values.name, email: values.email, phone: values.phone });
+      valuationId: id, name: values.name, email: values.email, phone: values.phone,
+      priceLabel: visitPrice ? { hu: priceLabel(visitPrice, 'hu'), nl: priceLabel(visitPrice, 'nl') } : undefined });
     if (requestKind === 'judicial') {
       await deliver(values.email, templates.judicialRequested(locale));
       await deliver(officeInbox(), templates.adminServiceRequested('hu', { service: 'Igazságügyi értékbecslési igény', name: values.name,
@@ -132,7 +141,11 @@ export const POST: APIRoute = (context) => handleForm(context, {
         judicialUrl: `${SITE_URL}${path(locale, 'valuation')}?service=judicial`,
       }));
     }
-    return { instant, valuationId: id, actionToken: instant ? valuationActionToken(id) : undefined,
+    // Card payment is offered, never forced: the request is already saved and the office follows up either way.
+    const pay = isStripeEnabled() && requestKind !== 'indicative' && isPayable(pkg)
+      ? { label: locale === 'nl' ? `Nu betalen — ${priceLabel(pkg, 'nl')} (kaart)` : `Fizetés most — ${priceLabel(pkg, 'hu')} (bankkártya)` }
+      : null;
+    return { instant, valuationId: id, actionToken: instant || pay ? valuationActionToken(id) : undefined, pay,
       result: instant ? estimate : undefined,
       rate: company.services.eurHufRateDate ? company.services.eurHufRate ?? null : null,
       rateDate: company.services.eurHufRateDate ?? null,

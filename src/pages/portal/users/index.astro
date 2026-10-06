@@ -230,7 +230,14 @@ const now = Date.now();
   };
 
   async function call(url: string, body: Record<string, unknown>, confirmText: string) {
-    if (!confirm(confirmText)) return;
+    const danger = ['deactivate', 'revoke'].includes(String(body.action));
+    const ok = await (window as any).pf.confirm({
+      title: danger ? 'Biztosan?' : 'Megerősítés',
+      body: confirmText,
+      confirmLabel: 'Igen, mehet',
+      danger,
+    });
+    if (!ok) return;
     status!.textContent = 'Feldolgozás…';
     const res = await fetch(url, {
       method: 'POST',

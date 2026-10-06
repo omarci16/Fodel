@@ -8,7 +8,8 @@ import { UI, path, type Locale } from '~/i18n/ui';
 import { getCompany, getTaxonomy, termLabel } from '~/lib/runtime-config';
 import { VALUATION_QUESTIONS, questionField } from '~/data/valuation-questions';
 import { FEATURES } from '~/data/features';
-import { ONSITE_SERVICES } from '~/config/company';
+import { valuationPackages, priceLabel } from '~/lib/valuation/packages';
+import { isStripeEnabled } from '~/lib/stripe';
 import { alternatesFor } from '~/lib/page';
 import { serviceSchema } from '~/lib/seo';
 
@@ -26,12 +27,15 @@ const notice = company.services.valuationNotice?.[locale]?.trim() || (hu ? 'Táj
 const featureKeys = ['garage','carport','storage-building','barn-hall','animal-housing','gazebo','outdoor-oven','cellar','outbuildings','stables','terrace','balcony','pool'];
 const choice = (value: string, huLabel: string, nlLabel: string) => ({ value, label: hu ? huLabel : nlLabel });
 const unknown = choice('nem-tudom','Nem tudom','Weet ik niet');
-const service = ONSITE_SERVICES.find((s) => s.id === 'onsite-visit');
+const packages = valuationPackages(company.services).filter((pkg) => pkg.enabled);
+const visit = packages.find((pkg) => pkg.kind === 'expert_visit');
+const visitPrice = visit?.priceEur ?? null;
+const cardPayments = isStripeEnabled();
 ---
 <Base locale={locale} title={hu ? 'Értékmeghatározás — FODEL' : 'Waardebepaling — FODEL'} description={hu ? 'Részletes, tájékoztató piaci értékmeghatározás.' : 'Uitgebreide, indicatieve marktwaardebepaling.'} alternates={alternatesFor('valuation')} schema={[serviceSchema(locale, hu ? 'Értékmeghatározás' : 'Waardebepaling', notice)]}>
   <PageHeader eyebrow={hu ? 'Értékmeghatározás' : 'Waardebepaling'} title={hu ? 'Mennyit ér' : 'Wat is uw woning'} titleEm={hu ? 'az ingatlana?' : 'waard?'} body={hu ? 'Adja meg az ismert adatokat. Munkatársunk ellenőrzi az eredményt, és e-mailben küldi.' : 'Vul in wat u weet. Onze medewerker controleert het resultaat en stuurt het per e-mail.'} compact />
   <section class="wizard-wrap">
-    <div class="wizard" data-submit-url={path(locale, 'submitAd')} data-valuation-url={path(locale, 'valuation')} data-visit-price={service!.priceEur} data-next-label={hu ? 'Tovább' : 'Verder'} data-submit-label={hu ? 'Kérelem elküldése' : 'Aanvraag versturen'}>
+    <div class="wizard" data-submit-url={path(locale, 'submitAd')} data-valuation-url={path(locale, 'valuation')} data-visit-price={visitPrice ?? ''} data-doc-url="/api/valuation/upload-url" data-next-label={hu ? 'Tovább' : 'Verder'} data-submit-label={hu ? 'Kérelem elküldése' : 'Aanvraag versturen'}>
       <nav class="progress" aria-label={hu ? 'Űrlap lépései' : 'Formulierstappen'}>
         {steps.map((label, index) => <span class="progress-item" data-progress={index + 1}><b>{index + 1}</b><span>{label}</span></span>)}
       </nav>
@@ -71,14 +75,19 @@ const service = ONSITE_SERVICES.find((s) => s.id === 'onsite-visit');
         <section class="step" data-step="5" aria-label={steps[4]}>
           <h2 tabindex="-1">{steps[4]}</h2>
           <label class="control">{hu ? 'Fényképek (legfeljebb 6)' : 'Foto’s (maximaal 6)'}<input id="f-photos" name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple /><small>{hu ? 'JPG, PNG vagy WebP. A képeket küldés előtt kicsinyítjük; csak munkatársunk látja.' : 'JPG, PNG of WebP. Foto’s worden vóór verzending verkleind en zijn alleen zichtbaar voor ons team.'}</small></label><p id="photo-status" role="status"></p>
+          <div class="control docs" id="docs">
+            <span>{hu ? 'Dokumentumok (alaprajz, építési engedély, tulajdoni lap, energetikai tanúsítvány…)' : 'Documenten (plattegrond, bouwvergunning, eigendomsbewijs, energielabel…)'}</span>
+            <input type="hidden" name="docSession" id="doc-session" />
+            <input id="f-docs" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.tif,.tiff,.doc,.docx,.xls,.xlsx,.zip,.dwg,.dxf" />
+            <small>{hu ? 'Legfeljebb 15 fájl, egyenként 50 MB-ig. Közvetlenül, tömörítés nélkül töltődnek fel; csak munkatársunk látja őket.' : 'Maximaal 15 bestanden van elk 50 MB. Ze worden rechtstreeks en ongecomprimeerd geüpload en zijn alleen zichtbaar voor ons team.'}</small>
+            <ul class="doc-list" id="doc-list" aria-live="polite"></ul>
+          </div>
           <div class="two"><label class="control">{ui.form.name} <span aria-hidden="true">*</span><input name="name" required autocomplete="name" maxlength="120" /></label><label class="control">{ui.form.email} <span aria-hidden="true">*</span><input name="email" type="email" required autocomplete="email" maxlength="160" /></label></div>
           <label class="control">{ui.form.phone}<input name="phone" type="tel" autocomplete="tel" maxlength="40" /></label>
           <fieldset class="chips"><legend>{hu ? 'Milyen értékmeghatározást kér?' : 'Welke waardebepaling wenst u?'}</legend>
-            <label><input type="radio" name="requestKind" value="indicative" checked /><span>{hu ? 'Tájékoztató, piaci alapú' : 'Indicatieve marktwaarde'}</span></label>
-            <label><input type="radio" name="requestKind" value="expert_visit" /><span>{hu ? `Gábor helyszíni látogatása — € ${service!.priceEur}` : `Persoonlijk bezoek van Gábor — € ${service!.priceEur}`}</span></label>
-            <label><input type="radio" name="requestKind" value="judicial" /><span>{hu ? 'Igazságügyi / hivatalos értékbecslés — árajánlat alapján' : 'Officiële / gerechtelijke taxatie — op offerte'}</span></label>
+            {packages.map((pkg) => <label><input type="radio" name="requestKind" value={pkg.kind} checked={pkg.kind === 'indicative'} /><span>{pkg.names[locale]}{pkg.kind === 'indicative' ? (company.services.valuationFreeConfirmed ? ` — ${priceLabel(pkg, locale)}` : '') : ` — ${priceLabel(pkg, locale)}`}</span></label>)}
           </fieldset>
-          <p class="question-hint">{hu ? 'Helyszíni kérésnél munkatársunk felveszi Önnel a kapcsolatot az időpont egyeztetéséhez. Hivatalos kérésnél árat és határidőt nem ígérünk.' : 'Bij een bezoek nemen wij contact op om een afspraak te maken. Voor een officiële taxatie geven wij vooraf geen prijs of termijn.'}</p>
+          <p class="question-hint">{hu ? 'Helyszíni kérésnél munkatársunk felveszi Önnel a kapcsolatot az időpont egyeztetéséhez.' : 'Bij een bezoek nemen wij contact op om een afspraak te maken.'}{cardPayments ? (hu ? ' Fix árú csomagnál a kérés elküldése után azonnal bankkártyával is fizethet.' : ' Bij een pakket met vaste prijs kunt u na het versturen meteen met kaart betalen.') : ''}{hu ? ' Hivatalos kérésnél árat és határidőt csak árajánlat után vállalunk.' : ' Voor een officiële taxatie geven wij vooraf geen prijs of termijn.'}</p>
           <p class="notice">{notice}</p>
         </section>
       </FormShell>
@@ -140,7 +149,7 @@ const service = ONSITE_SERVICES.find((s) => s.id === 'onsite-visit');
     try {
       const values: Record<string, string | string[]> = {};
       new FormData(form).forEach((value, key) => {
-        if (['photos','consent','renderedAt','name','email','phone','addressPrivate'].includes(key)) return;
+        if (['photos','docSession','consent','renderedAt','name','email','phone','addressPrivate'].includes(key)) return;
         if (typeof value !== 'string') return;
         const prior = values[key]; values[key] = prior === undefined ? value : Array.isArray(prior) ? [...prior, value] : [prior, value];
       });
@@ -261,10 +270,91 @@ const service = ONSITE_SERVICES.find((s) => s.id === 'onsite-visit');
     photoInput.files = transfer.files;
     if (status) status.textContent = `${transfer.files.length} / 6`;
   });
+
+  // Large documents skip the form post: each file goes straight to private storage
+  // through a one-off signed URL, and the form only carries the session id.
+  const docInput = document.querySelector<HTMLInputElement>('#f-docs');
+  const docList = document.querySelector<HTMLElement>('#doc-list');
+  const docSession = form?.querySelector<HTMLInputElement>('#doc-session');
+  const docText = (hu: string, nl: string) => (form?.dataset.locale === 'nl' ? nl : hu);
+  const DOC_MAX = 15, DOC_BYTES = 50 * 1024 * 1024;
+  let docCount = 0, docPending = 0;
+  if (docSession) docSession.value = crypto.randomUUID();
+  const docRow = (file: File) => {
+    const row = document.createElement('li');
+    const name = document.createElement('span'); name.textContent = file.name; name.className = 'doc-name';
+    const state = document.createElement('span'); state.className = 'doc-state';
+    row.append(name, state); docList?.append(row);
+    return (message: string, failed = false) => { state.textContent = message; row.classList.toggle('failed', failed); };
+  };
+  const uploadDoc = async (file: File) => {
+    const report = docRow(file);
+    if (docCount >= DOC_MAX) return report(docText('Legfeljebb 15 fájl tölthető fel.', 'Maximaal 15 bestanden.'), true);
+    if (file.size > DOC_BYTES) return report(docText('Túl nagy (legfeljebb 50 MB).', 'Te groot (maximaal 50 MB).'), true);
+    docCount += 1; docPending += 1; report('0%');
+    try {
+      const response = await fetch(wizard?.dataset.docUrl ?? '/api/valuation/upload-url', { method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ session: docSession?.value, name: file.name, size: file.size }) });
+      const target = await response.json().catch(() => null);
+      if (!response.ok || !target?.url) throw new Error('rejected');
+      await new Promise<void>((resolve, reject) => {
+        const body = new FormData(); body.append('cacheControl', '3600'); body.append('', file);
+        const request = new XMLHttpRequest();
+        request.open('PUT', target.url);
+        request.setRequestHeader('x-upsert', 'false');
+        request.upload.onprogress = (event) => { if (event.lengthComputable) report(`${Math.round((event.loaded / event.total) * 100)}%`); };
+        request.onload = () => (request.status >= 200 && request.status < 300 ? resolve() : reject(new Error('upload-failed')));
+        request.onerror = () => reject(new Error('upload-failed'));
+        request.send(body);
+      });
+      report(docText('Feltöltve', 'Geüpload'));
+    } catch {
+      docCount -= 1;
+      report(docText('Nem sikerült — ellenőrizze a fájltípust, vagy próbálja újra.', 'Mislukt — controleer het bestandstype of probeer opnieuw.'), true);
+    } finally { docPending -= 1; }
+  };
+  docInput?.addEventListener('change', () => {
+    const files = [...(docInput.files ?? [])];
+    docInput.value = '';
+    files.forEach((file) => void uploadDoc(file));
+  });
+  form?.addEventListener('submit', (event) => {
+    if (docPending > 0) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const status = document.querySelector<HTMLElement>('#photo-status');
+      if (status) status.textContent = docText('A dokumentumok még töltődnek fel — kérjük, várjon.', 'De documenten worden nog geüpload — even geduld.');
+    }
+  }, true);
+
+  // Pay-now: the server prices the package; the browser only names the request it just made.
+  const payButton = (container: HTMLElement, id: string, token: string, label: string) => {
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'result-link'; button.textContent = label;
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      try {
+        const response = await fetch('/api/stripe/valuation-checkout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id, token }) });
+        const reply = await response.json().catch(() => null);
+        if (!response.ok || !reply?.url) throw new Error('checkout-failed');
+        location.href = reply.url;
+      } catch { button.disabled = false; button.textContent = docText('Nem sikerült, próbálja újra', 'Mislukt, probeer opnieuw'); }
+    });
+    container.append(button);
+  };
+  if (new URLSearchParams(location.search).get('paid') === '1') {
+    const banner = document.createElement('p'); banner.className = 'notice paid-banner'; banner.setAttribute('role', 'status');
+    banner.textContent = docText('Köszönjük, a fizetés megérkezett. Visszaigazolást e-mailben küldünk.', 'Dank u, uw betaling is ontvangen. U ontvangt een bevestiging per e-mail.');
+    wizard?.prepend(banner);
+  }
   form?.addEventListener('fodel:success', (event) => {
     try { localStorage.removeItem(storageKey); } catch {}
     if (actions) actions.hidden = true;
     const data = (event as CustomEvent).detail;
+    const successPanel = document.querySelector<HTMLElement>('#valuation-success');
+    if (data?.pay && data.valuationId && data.actionToken && successPanel) {
+      const wrap = document.createElement('div'); wrap.className = 'result-actions';
+      payButton(wrap, data.valuationId, data.actionToken, data.pay.label); successPanel.append(wrap);
+    }
     if (!data?.instant || !data.result?.baseline) return;
     const success = document.querySelector<HTMLElement>('#valuation-success');
     if (!success) return;
@@ -305,6 +395,8 @@ const service = ONSITE_SERVICES.find((s) => s.id === 'onsite-visit');
             body: JSON.stringify({ id: data.valuationId, token: data.actionToken, kind }) });
           if (!response.ok) throw new Error('request-failed');
           button.textContent = locale === 'hu' ? 'Igényét rögzítettük' : 'Aanvraag ontvangen';
+          const reply = await response.json().catch(() => null);
+          if (reply?.pay) payButton(actionsWrap, data.valuationId, data.actionToken, reply.pay.label);
         } catch { button.disabled = false; button.textContent = locale === 'hu' ? 'Nem sikerült, próbálja újra' : 'Mislukt, probeer opnieuw'; }
       });
       actionsWrap.append(button);
@@ -360,6 +452,14 @@ const service = ONSITE_SERVICES.find((s) => s.id === 'onsite-visit');
   .legal-hints dd { font-size: var(--fs-small); color: var(--taupe); line-height: 1.5; }
   .result-range { font-family: var(--serif); font-size: clamp(28px, 4vw, 40px); color: var(--ink); max-width: none !important; }
   .result-mid, .result-basis { color: var(--ink); }
+  .docs { display: grid; gap: 8px; }
+  .doc-list { list-style: none; padding: 0; margin: 4px 0 0; display: grid; gap: 6px; }
+  .doc-list :global(li) { display: flex; justify-content: space-between; gap: 12px; font-size: var(--fs-small); padding: 8px 14px; border-radius: var(--r-md); background: var(--cream); color: var(--ink); }
+  .doc-list :global(li.failed) { color: #b3261e; background: rgba(179, 38, 30, 0.07); }
+  .doc-list :global(.doc-name) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .doc-list :global(.doc-state) { flex: none; color: var(--taupe); }
+  .doc-list :global(li.failed .doc-state) { color: inherit; }
+  :global(.paid-banner) { margin-bottom: 24px; }
   .result-source { display: inline-block; margin: 8px 0 16px; text-decoration: underline; text-underline-offset: 3px; }
   .result-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 22px; }
   .result-link { display: inline-flex; align-items: center; border-radius: 999px; border: 1px solid var(--ink); background: var(--ink); color: white; padding: 12px 20px; font: inherit; font-size: var(--fs-small); cursor: pointer; text-decoration: none; }

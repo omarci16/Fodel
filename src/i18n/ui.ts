@@ -297,8 +297,8 @@ export const UI = {
       ownerContact: 'A tulajdonos elérhetősége',
       ownerContactNote:
         'Ennél az ingatlannál a tulajdonos neve és elérhetősége is megjelenik — közvetlenül felveheti vele a kapcsolatot, jutalék nélkül.',
-      enquire: 'Érdeklődjön',
-      enquireTitle: 'Kérek tájékoztatást erről az ingatlanról',
+      enquire: 'Visszahívás',
+      enquireTitle: 'Hívjuk vissza 24 órán belül',
       priceOnRequest: 'Ár egyeztetés alapján',
     },
 
@@ -445,8 +445,8 @@ export const UI = {
       ownerContact: 'Contact met de eigenaar',
       ownerContactNote:
         'Bij deze woning tonen wij ook de naam en het telefoonnummer van de eigenaar — u kunt rechtstreeks contact opnemen, zonder courtage.',
-      enquire: 'Interesse?',
-      enquireTitle: 'Ik wil informatie over deze woning',
+      enquire: 'Terugbellen',
+      enquireTitle: 'Wij bellen u binnen 24 uur terug',
       priceOnRequest: 'Prijs op aanvraag',
     },
 

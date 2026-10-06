@@ -43,6 +43,8 @@ export interface FormDefinition {
     /** The raw submission, for what `fields` cannot carry — the valuation form's photos. */
     form: FormData
   ) => Promise<void | Record<string, unknown>>;
+  /** Cross-field rules the per-field rules cannot express (e.g. "phone is required when a callback is chosen"). */
+  refine?: (values: Record<string, string>) => Record<string, string>;
   /** Critical persistence hooks return an error instead of false success. */
   requireSuccess?: boolean;
   /**
@@ -246,6 +248,13 @@ export async function handleForm(
   }
 
   const result = validate(form, def);
+  if (def.refine) {
+    const extra = def.refine(result.values);
+    if (Object.keys(extra).length) {
+      result.errors = { ...result.errors, ...extra };
+      result.ok = false;
+    }
+  }
   if (!result.ok) {
     return respond(422, { ok: false, errors: result.errors });
   }

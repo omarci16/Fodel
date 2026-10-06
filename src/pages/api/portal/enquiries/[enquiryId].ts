@@ -42,7 +42,14 @@ export const PATCH: APIRoute = async ({ params, request, locals }) => {
     if (property?.owner_id !== user.id) return json(403, { ok: false, error: 'forbidden' });
   }
 
-  const { error } = await admin.from('enquiries').update({ handled }).eq('id', enquiryId);
+  // handled_at arrives with migration 0016; before it runs, fall back to the bare flag.
+  let { error } = await admin
+    .from('enquiries')
+    .update({ handled, handled_at: handled ? new Date().toISOString() : null })
+    .eq('id', enquiryId);
+  if (error && /handled_at/.test(error.message)) {
+    ({ error } = await admin.from('enquiries').update({ handled }).eq('id', enquiryId));
+  }
   if (error) return json(500, { ok: false, error: error.message });
   return json(200, { ok: true });
 };

@@ -18,6 +18,10 @@ export const prerender = false;
 import Portal from '~/layouts/Portal.astro';
 import { loadLedger, ledgerFilters, totalsByCurrency, money } from '~/lib/portal/payments';
 import { PAYMENT_STATUS_LABEL as STATUS_LABEL, friendlyError } from '~/lib/portal/labels';
+import { LISTING_PACKAGES, ONSITE_SERVICES } from '~/config/company';
+import { getCompany } from '~/lib/runtime-config';
+import { valuationPackages, isPayable } from '~/lib/valuation/packages';
+import { formatCents } from '~/lib/orders';
 
 const { supabase, profile } = Astro.locals;
 if (profile?.role !== 'admin') return Astro.redirect('/portal/dashboard');
@@ -40,6 +44,37 @@ try {
 }
 
 const totals = totalsByCurrency(orderRows);
+
+/* What was sold: one box per package and per extra, from the stored order
+   lines (never today's price list). Counts and takings only for orders that
+   were actually paid; the catalogue's packages always get a box, even at 0. */
+type SoldKind = 'package' | 'service' | 'extra';
+type Sold = { key: string; label: string; kind: SoldKind; qty: number; cents: number };
+const sold = new Map<string, Sold>();
+// On-site visits are services whether they were bought with a listing or on their own.
+const ONSITE_IDS = new Set<string>(ONSITE_SERVICES.map((service) => service.id));
+const soldKind = (line: { kind: string; id: string }): SoldKind =>
+  line.kind === 'package' ? 'package' : line.kind === 'service' || ONSITE_IDS.has(line.id) ? 'service' : 'extra';
+const seed = (kind: SoldKind, id: string, label: string) => sold.set(`${kind}:${id}`, { key: id, label, kind, qty: 0, cents: 0 });
+for (const pkg of LISTING_PACKAGES) seed('package', pkg.id, pkg.names.hu);
+for (const service of ONSITE_SERVICES) seed('service', service.id, service.names.hu);
+// A paid valuation package gets its box the moment an admin gives it a price.
+for (const pkg of valuationPackages((await getCompany()).services).filter((entry) => entry.enabled && isPayable(entry))) {
+  seed('service', `valuation-${pkg.kind}`, pkg.names.hu);
+}
+for (const order of orderRows.filter((o) => (o.status === 'paid' || o.status === 'manual') && o.currency === 'EUR')) {
+  for (const line of order.lines) {
+    const kind = soldKind(line);
+    const id = `${kind}:${line.id}`;
+    const entry = sold.get(id) ?? { key: line.id, label: line.label, kind, qty: 0, cents: 0 };
+    entry.qty += line.quantity;
+    entry.cents += line.quantity * line.unitCents;
+    sold.set(id, entry);
+  }
+}
+const kindRank: Record<SoldKind, number> = { package: 0, service: 1, extra: 2 };
+const soldList = [...sold.values()].sort((a, b) => (a.kind === b.kind ? b.cents - a.cents : kindRank[a.kind] - kindRank[b.kind]));
+const soldTotalCents = soldList.reduce((sum, item) => sum + item.cents, 0) || 1;
 const filtered = Boolean(filter || month || packageFilter || ownerFilter || view === 'overdue');
 
 // The export mirrors the filter on screen.
@@ -116,6 +151,23 @@ const nextMonth = new Date(Date.UTC(calYear, calMon, 1)).toISOString().slice(0, 
     <p class="hint">Eltérő pénznemek — az összegeket pénznemenként külön mutatjuk, átváltás nélkül.</p>
   )}
 
+  {view !== 'calendar' && soldList.length > 0 && (
+    <section class="sold" aria-label="Mi fogyott">
+      <h2>Mi fogyott{filtered ? ' ebben a szűrésben' : ''}</h2>
+      <ul>
+        {soldList.map((item) => (
+          <li class={`box ${item.kind}`}>
+            <span class="kind">{item.kind === 'package' ? 'Csomag' : item.kind === 'service' ? 'Szolgáltatás' : 'Extra'}</span>
+            <b>{item.label}</b>
+            <span class="qty">{item.qty} <small>db</small></span>
+            <span class="take">{formatCents(item.cents)}</span>
+            <span class="share" aria-hidden="true"><i style={`width:${Math.round((item.cents / soldTotalCents) * 100)}%`}></i></span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
+
   {view === 'calendar' ? (
     <section class="calendar">
       <div class="cal-head">
@@ -186,6 +238,8 @@ const nextMonth = new Date(Date.UTC(calYear, calMon, 1)).toISOString().slice(0, 
                   <br />
                   {o.propertyId ? (
                     <a href={`/portal/properties/${o.propertyId}`}>#{o.propertyRef ?? '—'}{o.propertyTitle ? ` · ${o.propertyTitle}` : ''}</a>
+                  ) : o.valuationId ? (
+                    <a href={`/portal/valuations/${o.valuationId}`}>Értékbecslés</a>
                   ) : (
                     <span class="missing">Nincs kapcsolódó hirdetés</span>
                   )}
@@ -231,6 +285,21 @@ const nextMonth = new Date(Date.UTC(calYear, calMon, 1)).toISOString().slice(0, 
   .total { flex: 1; background: var(--cream); padding: 18px 20px; }
   .total .n { display: block; font-family: var(--serif); font-weight: var(--fw-medium); font-size: 22px; color: var(--ink); }
   .total .label { display: block; margin-top: 4px; font-size: var(--fs-micro); color: var(--taupe); }
+
+  .sold { margin: 8px 0 28px; }
+  .sold h2 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 18px; color: var(--ink); margin-bottom: 14px; }
+  .sold ul { list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
+  .box { display: flex; flex-direction: column; gap: 2px; padding: 18px 20px 16px; border-radius: var(--r-lg); background: var(--white); border: 1px solid var(--pt-hair); box-shadow: var(--shadow-xs); transition: transform 0.45s var(--ease-out), box-shadow 0.45s var(--ease-out); }
+  .box:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
+  .box .kind { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-quiet); }
+  .box b { font-family: var(--serif); font-weight: var(--fw-semibold); font-size: 15.5px; color: var(--ink); line-height: 1.3; }
+  .box .qty { margin-top: 8px; font-family: var(--serif); font-weight: var(--fw-display); font-size: 30px; line-height: 1; letter-spacing: var(--ls-display); color: var(--ink); }
+  .box .qty small { font-size: 14px; font-weight: var(--fw-regular); color: var(--ink-quiet); }
+  .box .take { font-size: 14.5px; color: var(--taupe); font-variant-numeric: tabular-nums; }
+  .share { display: block; height: 5px; margin-top: 10px; border-radius: var(--r-pill); background: var(--linen); overflow: hidden; }
+  .share i { display: block; height: 100%; border-radius: inherit; background: var(--ink); }
+  .box.extra .share i { background: var(--ink-quiet); }
+  .box.service .share i { background: var(--pt-green); }
 
   .filters { margin-bottom: 22px; }
   .chips { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 14px; }

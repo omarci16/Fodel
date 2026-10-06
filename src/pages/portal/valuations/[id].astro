@@ -15,6 +15,12 @@ import { VALUATION_STATUS_LABEL as STATUS_LABEL, LOCALE_LABEL } from '~/lib/port
 import { describeAnswer } from '~/data/valuation-questions';
 import { getTaxonomy, getCompany, termLabel } from '~/lib/runtime-config';
 import { createSupabaseAdminClient } from '~/lib/supabase-server';
+import { isAiEnabled } from '~/lib/ai/client';
+import { valuationPackage } from '~/lib/valuation/packages';
+import { DOCUMENT_BUCKET, type ValuationDocument } from '~/lib/valuation/documents';
+import type { Nearby } from '~/lib/valuation/nearby';
+import type { ValuationAnalysis } from '~/lib/ai/valuation-analysis';
+import { formatCents } from '~/lib/orders';
 
 const { supabase, profile } = Astro.locals;
 if (profile?.role !== 'admin') return Astro.redirect('/portal/dashboard');
@@ -36,7 +42,8 @@ const extentLabel: Record<string, string> = { partial: 'Részleges', full: 'Telj
 const company = await getCompany();
 const baseline = v.baseline as { kind?: string; source?: string; year?: number; count?: number; level?: string; dispersionPercent?: number; url?: string; retrievedAt?: string } | null;
 const factors = (Array.isArray(v.factors) ? v.factors : []) as { text: string; direction: string }[];
-const kindLabel: Record<string,string> = { indicative: 'Tájékoztató', expert_visit: 'Helyszíni látogatás', judicial: 'Igazságügyi / hivatalos' };
+const requestKind = v.request_kind ?? 'indicative';
+const kindLabel = valuationPackage(company.services, requestKind)?.names.hu ?? requestKind;
 const photoRows = (Array.isArray(v.photos) ? v.photos : []) as { path: string }[];
 const isLead = v.source === 'public_lead' && Boolean(v.contact_email);
 
@@ -49,6 +56,28 @@ if (photoRows.length > 0) {
     .createSignedUrls(photoRows.map((photo) => photo.path), 60 * 60);
   photos = (signed ?? []).flatMap((row) => (row.signedUrl ? [{ url: row.signedUrl }] : []));
 }
+
+// Customer documents: private bucket, links that expire after an hour.
+const documents = (Array.isArray(v.documents) ? v.documents : []) as ValuationDocument[];
+let documentLinks: { name: string; size: number; url: string | null }[] = [];
+if (documents.length > 0) {
+  const { data: signed } = await createSupabaseAdminClient().storage.from(DOCUMENT_BUCKET).createSignedUrls(documents.map((doc) => doc.path), 60 * 60);
+  documentLinks = documents.map((doc, index) => ({ name: doc.name, size: doc.size, url: signed?.[index]?.signedUrl ?? null }));
+}
+const megabytes = (bytes: number) => (bytes ? `${(bytes / (1024 * 1024)).toFixed(bytes < 1024 * 1024 ? 2 : 1)} MB` : '—');
+
+const nearby = (v.nearby ?? null) as Nearby | null;
+const analysis = (v.ai_analysis ?? null) as ValuationAnalysis | null;
+const aiOn = isAiEnabled();
+const directionLabel: Record<string, string> = { plus: 'Értéknövelő', minus: 'Értékcsökkentő', unsure: 'Bizonytalan' };
+const sourceLabel: Record<string, string> = { customer: 'ügyfél', photos: 'fotók', documents: 'dokumentumok', location: 'környék', statistics: 'statisztika' };
+const positionLabel: Record<string, string> = { lower: 'a sáv alsó részén', middle: 'a sáv közepén', upper: 'a sáv felső részén', unclear: 'nem eldönthető' };
+const rangeLabel = (meters: number) => (meters >= 1000 ? `${(meters / 1000).toFixed(1).replace('.', ',')} km` : `${meters} m`);
+
+// What was paid for this request, if anything (payments.valuation_id, migration 0017).
+const { data: paymentRows } = await createSupabaseAdminClient().from('payments').select('status, amount_cents, paid_at').eq('valuation_id', v.id).order('created_at', { ascending: false });
+const payment = paymentRows?.[0] ?? null;
+const paymentLabel: Record<string, string> = { pending: 'Fizetésre vár', paid: 'Kártyával fizetve', cancelled: 'Megszakítva', refunded: 'Visszatérítve', manual: 'Átutalással rendezve' };
 
 const canCompute = ['queued', 'needs_info', 'insufficient_data'].includes(v.status);
 const canDecide = v.status !== 'queued';
@@ -67,7 +96,8 @@ const canDecide = v.status !== 'queued';
       <dl class="facts">
         <div><dt>Forrás</dt><dd>{v.source === 'public_lead' ? 'Nyilvános űrlap' : 'Admin (hirdetés)'}</dd></div>
         <div><dt>Típus</dt><dd>{categoryName}</dd></div>
-        <div><dt>Kérés</dt><dd>{kindLabel[v.request_kind ?? 'indicative'] ?? 'Tájékoztató'}</dd></div>
+        <div><dt>Kérés</dt><dd>{kindLabel}</dd></div>
+        {payment && <div><dt>Fizetés</dt><dd>{paymentLabel[payment.status] ?? payment.status} · {formatCents(payment.amount_cents)}</dd></div>}
         {v.address_private && <div><dt>Pontos cím (nem nyilvános)</dt><dd>{v.address_private}</dd></div>}
         {v.locale && <div><dt>Nyelv</dt><dd>{LOCALE_LABEL[v.locale] ?? v.locale}</dd></div>}
         <div><dt>Alapterület</dt><dd>{v.floor_m2 ?? '—'} m²</dd></div>
@@ -107,6 +137,65 @@ const canDecide = v.status !== 'queued';
           )}
         </>
       )}
+
+      {documentLinks.length > 0 && (
+        <>
+          <h2>Dokumentumok ({documentLinks.length})</h2>
+          <ul class="docs">
+            {documentLinks.map((doc) => (
+              <li>{doc.url ? <a href={doc.url} target="_blank" rel="noopener">{doc.name}</a> : <span>{doc.name}</span>}<span class="size">{megabytes(doc.size)}</span></li>
+            ))}
+          </ul>
+          <p class="hint">A letöltési linkek egy óráig érvényesek.</p>
+        </>
+      )}
+
+      <h2>Környék (OpenStreetMap)</h2>
+      {nearby ? (
+        <>
+          <p class="hint">{nearby.center.precise ? 'A megadott pontos cím alapján' : 'A település közepe alapján'}: {nearby.center.label}</p>
+          <table class="comps">
+            <thead><tr><th>Mi</th><th class="right">Darab</th><th class="right">Legközelebbi</th></tr></thead>
+            <tbody>
+              {nearby.groups.map((group) => (
+                <tr>
+                  <td>{group.labelHu} <span class="size">({group.radiusM / 1000} km-en belül)</span></td>
+                  <td class="right">{group.count}</td>
+                  <td class="right">{group.nearestM != null ? `${rangeLabel(group.nearestM)}${group.nearestName ? ` · ${group.nearestName}` : ''}` : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p class="hint">{nearby.source} · lekérve: {nearby.retrievedAt}. Tájékoztató adat, az ár sávját nem módosítja.</p>
+        </>
+      ) : (
+        <p class="hint">Még nincs lekérve. A település közepe körüli üzleteket, iskolákat, egészségügyet és közlekedést kéri le az OpenStreetMap szolgáltatásaiból.</p>
+      )}
+      <div class="inline-actions">
+        <button type="button" class="btn ghost" id="nearby-btn">{nearby ? 'Környék frissítése' : 'Környék lekérése'}</button>
+        {v.address_private && <label class="inline-check"><input type="checkbox" id="nearby-address" /> Pontos cím használata (a cím az OpenStreetMapnek is elmegy)</label>}
+      </div>
+      <p class="action-status" id="nearby-status" role="status"></p>
+
+      <h2>AI elemzés</h2>
+      {analysis ? (
+        <>
+          <p class="ai-rationale">{analysis.summaryHu}</p>
+          <p class="ai-adjustment">Az ingatlan várhatóan {positionLabel[analysis.bandPosition]} helyezkedik el · biztonság: {analysis.confidence}</p>
+          {analysis.valueDrivers.length > 0 && <ul class="ai-factors">{analysis.valueDrivers.map((driver) => <li>{directionLabel[driver.direction]} ({sourceLabel[driver.source] ?? driver.source}): {driver.text}</li>)}</ul>}
+          {analysis.inconsistencies.length > 0 && <><h3>Ellentmondások</h3><ul class="ai-factors">{analysis.inconsistencies.map((item) => <li>{item}</li>)}</ul></>}
+          {analysis.missingInfo.length > 0 && <><h3>Hiányzó információ</h3><ul class="ai-factors">{analysis.missingInfo.map((item) => <li>{item}</li>)}</ul></>}
+          {analysis.documentsReviewed.length > 0 && <><h3>Dokumentumok</h3><ul class="ai-factors">{analysis.documentsReviewed.map((doc) => <li><strong>{doc.name}:</strong> {doc.finding}</li>)}</ul></>}
+          {analysis.photoObservations.length > 0 && <><h3>Fotók</h3><ul class="ai-factors">{analysis.photoObservations.map((item) => <li>{item}</li>)}</ul></>}
+          <p class="hint">Az elemzés {analysis.inputs.photos} képet és {analysis.inputs.documents.length} dokumentumot olvasott{analysis.inputs.documentsNotRead.length > 0 ? `; nem olvasta: ${analysis.inputs.documentsNotRead.join(', ')}` : ''}. Belső munkaanyag: nem tartalmaz árat, az ügyfél nem látja, és nem hivatalos értékbecslés.</p>
+        </>
+      ) : (
+        <p class="hint">{aiOn ? 'Még nincs lefuttatva. Az ügyfél adatait, fotóit és dokumentumait, a statisztikai sávot és a környéket együtt értékeli. Árat nem javasol: a sávot Ön állítja be.' : 'Az AI nincs bekapcsolva (AI_ENABLED és OPENAI_API_KEY szükséges).'}</p>
+      )}
+      <div class="inline-actions">
+        <button type="button" class="btn ghost" id="analyse-btn" disabled={!aiOn}>{analysis ? 'AI elemzés újrafuttatása' : 'AI elemzés futtatása'}</button>
+      </div>
+      <p class="action-status" id="analyse-status" role="status"></p>
 
       {v.info_request && (
         <>
@@ -216,6 +305,21 @@ const canDecide = v.status !== 'queued';
 
   const failed = (json) => json.error || 'Nem sikerült. Próbálja újra.';
 
+  async function simple(buttonId, statusId, action, busy, extra = {}) {
+    const button = document.getElementById(buttonId);
+    const status = document.getElementById(statusId);
+    if (!button) return;
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      status.textContent = busy;
+      const { ok, json } = await post(action, typeof extra === 'function' ? extra() : extra);
+      if (ok) { status.textContent = 'Kész.'; location.reload(); }
+      else { button.disabled = false; status.textContent = failed(json); }
+    });
+  }
+  simple('nearby-btn', 'nearby-status', 'nearby', 'Lekérés az OpenStreetMapből…', () => ({ useAddress: Boolean(document.getElementById('nearby-address')?.checked) }));
+  simple('analyse-btn', 'analyse-status', 'analyse', 'Az AI elemzi az anyagot, ez akár fél percig is tarthat…');
+
   document.getElementById('compute-btn')?.addEventListener('click', async (e) => {
     e.target.disabled = true;
     e.target.textContent = 'Számítás…';
@@ -290,6 +394,13 @@ const canDecide = v.status !== 'queued';
   .answers { display: grid; gap: 10px; }
   .answers dt { font-size: var(--fs-micro); color: var(--taupe); }
   .answers dd { font-size: var(--fs-small); color: var(--ink); }
+  .docs { list-style: none; padding: 0; display: grid; gap: 6px; }
+  .docs li { display: flex; justify-content: space-between; gap: 12px; font-size: var(--fs-small); padding: 8px 14px; border-radius: var(--r-md); background: rgba(16, 42, 67, 0.04); }
+  .docs a { text-decoration: underline; text-underline-offset: 2px; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .size { color: var(--taupe); font-size: var(--fs-micro); flex: none; }
+  h3 { font-size: var(--fs-small); color: var(--ink); margin: 14px 0 4px; }
+  .inline-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; margin-top: 8px; }
+  .inline-check { display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-small); color: var(--taupe); }
   .photos { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
   .photos img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block; border-radius: 8px; }
   .info-request { font-size: var(--fs-small); color: var(--ink); white-space: pre-wrap; background: rgba(16, 42, 67, 0.04); padding: 12px 16px; }

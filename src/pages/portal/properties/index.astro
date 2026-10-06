@@ -1,180 +1,613 @@
 ---
+/**
+ * Ingatlanok — the listings database.
+ *
+ * Admin: only listings that have been through review and really are in the
+ * database (live, awaiting payment, sold, archived). Everything still being
+ * written or waiting for a decision lives on the Beérkező hirdetések board.
+ * Owner: all of their own listings, drafts included — it is their workspace.
+ *
+ * One list, two ways to look at it (list / tiles), remembered per browser.
+ * Nothing destructive sits on a row any more: a ⋯ menu holds the actions, and
+ * deleting asks for the listing's exact name first.
+ */
 export const prerender = false;
 
 import Portal from '~/layouts/Portal.astro';
 import { listProperties, STATUS_LABEL } from '~/lib/portal/properties';
+import { publicUrl } from '~/lib/portal/publish';
 import { getTaxonomy, termLabel } from '~/lib/runtime-config';
+import { icon } from '~/lib/portal/icons';
+import { listingName } from '~/lib/portal/time';
 
 const { supabase, profile } = Astro.locals;
 const isAdmin = profile?.role === 'admin';
 const statusFilter = Astro.url.searchParams.get('status') ?? '';
 const view = Astro.url.searchParams.get('view') ?? '';
 
-const allProperties = await listProperties(supabase, statusFilter ? { status: statusFilter } : {});
-const properties = view === 'curation'
-  ? allProperties.filter((property) => property.editors_pick || property.bargain)
-      .sort((a, b) => a.editors_pick_order - b.editors_pick_order)
-  : allProperties;
+const REVIEWED = ['published', 'awaiting_payment', 'sold', 'archived'];
+
+// Statuses that belong on the board, not in the database: send an admin there.
+if (isAdmin && statusFilter && !REVIEWED.includes(statusFilter)) {
+  return Astro.redirect('/portal/inbox');
+}
+
+const all = await listProperties(supabase, statusFilter ? { status: statusFilter } : {});
+const scoped = isAdmin && !statusFilter ? all.filter((p) => REVIEWED.includes(p.status)) : all;
+const properties =
+  view === 'curation'
+    ? scoped.filter((p) => p.editors_pick || p.bargain).sort((a, b) => a.editors_pick_order - b.editors_pick_order)
+    : scoped;
+
 const taxonomy = await getTaxonomy();
 const categoryLabel = (key: string) => termLabel(taxonomy.category.find((term) => term.key === key), 'hu') || key;
 
-const title = (p: (typeof properties)[number]) =>
-  p.translations.find((t) => t.locale === 'hu')?.title || 'Névtelen hirdetés';
-
-// Who owns what. An admin's list is everyone's listings, and without this
-// column the only way to tell them apart is to open each one.
-const ownerIds = isAdmin
-  ? [...new Set(properties.map((p) => p.owner_id).filter(Boolean))]
-  : [];
+const ownerIds = isAdmin ? [...new Set(properties.map((p) => p.owner_id).filter(Boolean))] : [];
 const { data: owners } = ownerIds.length
   ? await supabase.from('profiles').select('id, full_name, email').in('id', ownerIds as string[])
   : { data: [] };
 const ownerById = new Map((owners ?? []).map((o: any) => [o.id, o.full_name || o.email]));
+
+const liveUrl = new Map<string, string>();
+await Promise.all(
+  properties
+    .filter((p) => p.status === 'published')
+    .map(async (p) => liveUrl.set(p.id, await publicUrl(p, 'hu')))
+);
+
+const heroOf = (p: (typeof properties)[number]) => (p.media.find((m) => m.is_hero) ?? p.media[0])?.storage_path;
+const flags = (p: (typeof properties)[number]) =>
+  [
+    p.featured && 'Kategória',
+    p.homepage_featured && 'Főoldal',
+    p.editors_pick && `Top ${p.editors_pick_order}`,
+    p.bargain && 'Alkalmi',
+  ].filter(Boolean) as string[];
+
+const chips: [string, string][] = isAdmin
+  ? [
+      ['', 'Mind'],
+      ['published', STATUS_LABEL.published],
+      ['awaiting_payment', STATUS_LABEL.awaiting_payment],
+      ['sold', STATUS_LABEL.sold],
+      ['archived', STATUS_LABEL.archived],
+    ]
+  : [['', 'Mind'], ...Object.entries(STATUS_LABEL)];
 ---
 
 <Portal title="Ingatlanok">
   <header class="head">
-    <p class="eyebrow">Ingatlanok</p>
-    <h1>{properties.length} hirdetés</h1>
-    <a class="btn" href="/portal/properties/new">+ Új ingatlan</a>
+    <div>
+      <p class="eyebrow">{isAdmin ? 'Adatok' : 'Hirdetéseim'}</p>
+      <h1><span id="shown">{properties.length}</span> hirdetés</h1>
+    </div>
+    <a class="btn" href="/portal/properties/new">Új ingatlan</a>
   </header>
 
-  <div class="filters">
-    {isAdmin && <a href="/portal/properties?view=curation" aria-current={view === 'curation' ? 'page' : undefined}>Top 10 és alkalmi vételek</a>}
-    <a href="/portal/properties" aria-current={!statusFilter ? 'page' : undefined}>Mind</a>
-    {Object.entries(STATUS_LABEL).map(([value, label]) => (
-      <a href={`/portal/properties?status=${value}`} aria-current={statusFilter === value ? 'page' : undefined}>
-        {label}
-      </a>
-    ))}
+  <div class="bar">
+    <div class="filters">
+      {isAdmin && <a href="/portal/properties?view=curation" aria-current={view === 'curation' ? 'page' : undefined}>Top 10 és alkalmi vételek</a>}
+      {chips.map(([value, label]) => (
+        <a
+          href={value ? `/portal/properties?status=${value}` : '/portal/properties'}
+          aria-current={view !== 'curation' && statusFilter === value ? 'page' : undefined}
+        >
+          {label}
+        </a>
+      ))}
+    </div>
+
+    <div class="tools">
+      <label class="search">
+        <Fragment set:html={icon('search', 17)} />
+        <input type="search" id="q" placeholder="Keresés: cím, település, azonosító…" autocomplete="off" aria-label="Keresés a hirdetések között" />
+      </label>
+      <div class="seg" role="group" aria-label="Nézet">
+        <button type="button" data-layout="list" aria-pressed="true" aria-label="Lista">
+          <Fragment set:html={icon('list', 18)} />
+          <span>Lista</span>
+        </button>
+        <button type="button" data-layout="tiles" aria-pressed="false" aria-label="Csempék">
+          <Fragment set:html={icon('grid', 18)} />
+          <span>Csempe</span>
+        </button>
+      </div>
+    </div>
   </div>
 
-  {properties.length === 0 ? (
-    <p class="empty">
-      {statusFilter
-        ? 'Nincs ehhez a szűréshez tartozó ingatlan.'
-        : 'Még nincs hirdetése. Az „Új ingatlan” gombbal indíthat egyet — mentheti félkészen, és bármikor visszatérhet hozzá.'}
-    </p>
-  ) : (
-    <table class="list">
-      <thead>
-        <tr>
-          <th>Azonosító</th>
-          <th>Cím</th>
-          {isAdmin && <th>Hirdető</th>}
-          <th>Típus</th>
-          <th>Település</th>
-          <th>Ár</th>
-          <th>Állapot</th>
-          {isAdmin && <th>Kiemelések</th>}
-          {isAdmin && <th class="actions-col">Műveletek</th>}
-        </tr>
-      </thead>
-      <tbody>
-        {properties.map((p) => (
-          <tr id={`row-${p.id}`}>
-            <td><a href={`/portal/properties/${p.id}`}>#{p.ref}</a></td>
-            <td><a href={`/portal/properties/${p.id}`}>{title(p)}</a></td>
-            {isAdmin && <td class="owner">{(p.owner_id && ownerById.get(p.owner_id)) || '—'}</td>}
-            <td>{categoryLabel(p.category)}</td>
-            <td>{p.settlement}</td>
-            <td>€{p.price_eur.toLocaleString('de-DE')}</td>
-            <td><span class:list={['pill', `pill-${p.status}`]}>{STATUS_LABEL[p.status] ?? p.status}</span></td>
-            {isAdmin && <td>{[
-              p.featured && 'Kategória', p.homepage_featured && 'Főoldal',
-              p.editors_pick && `Top ${p.editors_pick_order}`, p.bargain && 'Alkalmi',
-            ].filter(Boolean).join(' · ') || '—'}</td>}
-            {isAdmin && (
-              <td class="actions-col">
-                <button type="button" class="delete-btn" data-delete={p.id} data-ref={p.ref}>
-                  Törlés
-                </button>
-              </td>
-            )}
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  )}
+  {
+    properties.length === 0 ? (
+      <p class="empty">
+        {statusFilter || view
+          ? 'Nincs ehhez a szűréshez tartozó ingatlan.'
+          : isAdmin
+            ? 'Még egyetlen hirdetést sem bíráltak el. Az új beérkezők a Beérkező hirdetések között várnak.'
+            : 'Még nincs hirdetése. Az „Új ingatlan” gombbal indíthat egyet — mentheti félkészen, és bármikor visszatérhet hozzá.'}
+      </p>
+    ) : (
+      <div id="results" data-layout="list">
+        <table class="list">
+          <thead>
+            <tr>
+              <th>Azonosító</th>
+              <th>Cím</th>
+              {isAdmin && <th>Hirdető</th>}
+              <th>Típus</th>
+              <th>Település</th>
+              <th>Ár</th>
+              <th>Állapot</th>
+              {isAdmin && <th>Kiemelések</th>}
+              <th class="actions-col"><span class="sr">Műveletek</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {properties.map((p) => {
+              const name = listingName(p);
+              return (
+                <tr data-item data-search={`${name} ${p.settlement} ${p.ref} ${ownerById.get(p.owner_id ?? '') ?? ''}`.toLowerCase()}>
+                  <td><a href={`/portal/properties/${p.id}`}>#{p.ref}</a></td>
+                  <td class="ttl"><a href={`/portal/properties/${p.id}`}>{name}</a></td>
+                  {isAdmin && <td class="owner">{(p.owner_id && ownerById.get(p.owner_id)) || '—'}</td>}
+                  <td>{categoryLabel(p.category)}</td>
+                  <td>{p.settlement}</td>
+                  <td class="price">€{p.price_eur.toLocaleString('de-DE')}</td>
+                  <td><span class:list={['pill', `pill-${p.status}`]}>{STATUS_LABEL[p.status] ?? p.status}</span></td>
+                  {isAdmin && <td class="owner">{flags(p).join(' · ') || '—'}</td>}
+                  <td class="actions-col">
+                    <div class="pt-menu">
+                      <button type="button" class="pt-icon-btn" data-menu aria-haspopup="menu" aria-expanded="false" aria-label={`Műveletek: ${name}`}>
+                        <Fragment set:html={icon('dots', 18)} />
+                      </button>
+                      <div class="pt-menu-pop" role="menu" hidden>
+                        <a role="menuitem" href={`/portal/properties/${p.id}`}>
+                          <Fragment set:html={icon('edit', 17)} />
+                          Megnyitás és szerkesztés
+                        </a>
+                        {liveUrl.has(p.id) && (
+                          <a role="menuitem" href={liveUrl.get(p.id)} target="_blank" rel="noopener">
+                            <Fragment set:html={icon('external', 17)} />
+                            Megtekintés az oldalon
+                          </a>
+                        )}
+                        {p.status === 'published' && (
+                          <button type="button" role="menuitem" data-act="mark_sold" data-id={p.id} data-name={name}>
+                            <Fragment set:html={icon('check', 17)} />
+                            Eladottnak jelölöm
+                          </button>
+                        )}
+                        {isAdmin && ['published', 'sold'].includes(p.status) && (
+                          <button type="button" role="menuitem" data-act="archive" data-id={p.id} data-name={name}>
+                            <Fragment set:html={icon('archive', 17)} />
+                            Archiválás
+                          </button>
+                        )}
+                        {isAdmin && (
+                          <>
+                            <hr />
+                            <button type="button" role="menuitem" class="danger" data-act="delete" data-id={p.id} data-name={name} data-ref={p.ref}>
+                              <Fragment set:html={icon('trash', 17)} />
+                              Törlés…
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        <ul class="tiles">
+          {properties.map((p) => {
+            const name = listingName(p);
+            const src = heroOf(p);
+            return (
+              <li class="tile" data-item data-search={`${name} ${p.settlement} ${p.ref} ${ownerById.get(p.owner_id ?? '') ?? ''}`.toLowerCase()}>
+                <a class="stretch" href={`/portal/properties/${p.id}`} aria-label={`${name} megnyitása`} />
+                <div class="photo">
+                  {src ? <img src={src} alt="" loading="lazy" /> : <Fragment set:html={icon('building', 32)} />}
+                  <span class:list={['pill', `pill-${p.status}`]}>{STATUS_LABEL[p.status] ?? p.status}</span>
+                </div>
+                <div class="info">
+                  <b>{name}</b>
+                  <p>{p.settlement} · {categoryLabel(p.category)}</p>
+                  <p class="row">
+                    <span class="price">€{p.price_eur.toLocaleString('de-DE')}</span>
+                    <span class="ref">#{p.ref}</span>
+                  </p>
+                  {isAdmin && (
+                    <p class="own">
+                      {(p.owner_id && ownerById.get(p.owner_id)) || '—'}
+                      {flags(p).length > 0 && ` · ${flags(p).join(' · ')}`}
+                    </p>
+                  )}
+                </div>
+                <div class="pt-menu corner">
+                  <button type="button" class="pt-icon-btn on-photo" data-menu aria-haspopup="menu" aria-expanded="false" aria-label={`Műveletek: ${name}`}>
+                    <Fragment set:html={icon('dots', 18)} />
+                  </button>
+                  <div class="pt-menu-pop" role="menu" hidden>
+                    <a role="menuitem" href={`/portal/properties/${p.id}`}>
+                      <Fragment set:html={icon('edit', 17)} />
+                      Megnyitás és szerkesztés
+                    </a>
+                    {liveUrl.has(p.id) && (
+                      <a role="menuitem" href={liveUrl.get(p.id)} target="_blank" rel="noopener">
+                        <Fragment set:html={icon('external', 17)} />
+                        Megtekintés az oldalon
+                      </a>
+                    )}
+                    {p.status === 'published' && (
+                      <button type="button" role="menuitem" data-act="mark_sold" data-id={p.id} data-name={name}>
+                        <Fragment set:html={icon('check', 17)} />
+                        Eladottnak jelölöm
+                      </button>
+                    )}
+                    {isAdmin && ['published', 'sold'].includes(p.status) && (
+                      <button type="button" role="menuitem" data-act="archive" data-id={p.id} data-name={name}>
+                        <Fragment set:html={icon('archive', 17)} />
+                        Archiválás
+                      </button>
+                    )}
+                    {isAdmin && (
+                      <>
+                        <hr />
+                        <button type="button" role="menuitem" class="danger" data-act="delete" data-id={p.id} data-name={name} data-ref={p.ref}>
+                          <Fragment set:html={icon('trash', 17)} />
+                          Törlés…
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+        <p class="empty" id="no-match" hidden>Nincs találat a keresésre.</p>
+      </div>
+    )
+  }
+  <p class="status" id="act-status" role="status" aria-live="polite"></p>
 </Portal>
 
-{isAdmin && (
-  <script>
-    document.addEventListener('click', async (e) => {
-      const btn = e.target;
-      if (!(btn instanceof HTMLButtonElement)) return;
-      const id = btn.dataset.delete;
-      if (!id) return;
+<script>
+  type Pf = {
+    confirm(o: { title: string; body: string; confirmLabel?: string; danger?: boolean }): Promise<boolean>;
+    confirmType(o: { title: string; body: string; expected: string; confirmLabel?: string }): Promise<boolean>;
+  };
+  const pf = () => (window as any).pf as Pf;
 
-      if (
-        !confirm(
-          `Véglegesen törli a(z) #${btn.dataset.ref} hirdetést? Ez nem vonható vissza — a fényképek, leírások és a hirdetéshez tartozó rendelés is törlődik.`
-        )
-      ) {
-        return;
-      }
+  const results = document.getElementById('results');
+  const statusLine = document.getElementById('act-status')!;
 
-      btn.disabled = true;
-      btn.textContent = 'Törlés…';
-
-      const res = await fetch(`/api/portal/properties/${id}/status`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'delete' }),
-      });
-      const json = await res.json().catch(() => ({}));
-
-      if (!res.ok || !json.ok) {
-        btn.disabled = false;
-        btn.textContent = 'Törlés';
-        alert('Nem sikerült törölni a hirdetést.');
-        return;
-      }
-
-      document.getElementById(`row-${id}`)?.remove();
+  /* Layout switch, remembered per browser (a convenience, never required). */
+  const KEY = 'fodel-portal-properties-layout';
+  const setLayout = (layout: 'list' | 'tiles') => {
+    if (!results) return;
+    results.dataset.layout = layout;
+    document.querySelectorAll<HTMLElement>('[data-layout]').forEach((button) => {
+      if (button.tagName === 'BUTTON') button.setAttribute('aria-pressed', String(button.dataset.layout === layout));
     });
-  </script>
-)}
+  };
+  try {
+    setLayout(localStorage.getItem(KEY) === 'tiles' ? 'tiles' : 'list');
+  } catch {
+    setLayout('list');
+  }
+  document.querySelectorAll<HTMLButtonElement>('button[data-layout]').forEach((button) =>
+    button.addEventListener('click', () => {
+      const layout = button.dataset.layout === 'tiles' ? 'tiles' : 'list';
+      setLayout(layout);
+      try {
+        localStorage.setItem(KEY, layout);
+      } catch {
+        /* private window — the choice just won't be remembered */
+      }
+    })
+  );
+
+  /* Live search across both layouts. */
+  const q = document.getElementById('q') as HTMLInputElement | null;
+  q?.addEventListener('input', () => {
+    const needle = q.value.trim().toLowerCase();
+    let shown = 0;
+    const seen = new Set<string>();
+    document.querySelectorAll<HTMLElement>('[data-item]').forEach((item) => {
+      const hit = !needle || (item.dataset.search ?? '').includes(needle);
+      item.hidden = !hit;
+      if (hit && item.tagName === 'TR') shown++;
+      seen.add(item.tagName);
+    });
+    const counter = document.getElementById('shown');
+    if (counter) counter.textContent = String(shown);
+    const none = document.getElementById('no-match');
+    if (none) none.hidden = shown > 0;
+  });
+
+  /* Menu actions. */
+  async function post(id: string, action: string) {
+    const res = await fetch(`/api/portal/properties/${id}/status`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action }),
+    });
+    const json = await res.json().catch(() => ({}));
+    return res.ok && json.ok;
+  }
+
+  document.addEventListener('click', async (event) => {
+    const button = (event.target as Element).closest<HTMLElement>('[data-act]');
+    if (!button) return;
+    const { act, id, name } = button.dataset as { act: string; id: string; name: string };
+
+    if (act === 'delete') {
+      const ok = await pf().confirmType({
+        title: 'Ingatlan végleges törlése',
+        body: 'Ez nem vonható vissza: a hirdetés, a fényképek, a leírások és a hozzá tartozó rendelés is törlődik.',
+        expected: name,
+        confirmLabel: 'Végleges törlés',
+      });
+      if (!ok) return;
+      statusLine.textContent = 'Törlés…';
+      if (await post(id, 'delete')) {
+        document.querySelectorAll(`[data-id="${id}"]`).forEach((node) => node.closest('[data-item]')?.remove());
+        const left = document.querySelectorAll('tr[data-item]').length;
+        const counter = document.getElementById('shown');
+        if (counter) counter.textContent = String(left);
+        statusLine.textContent = 'A hirdetés törölve.';
+      } else {
+        statusLine.textContent = 'Nem sikerült törölni a hirdetést.';
+      }
+      return;
+    }
+
+    const copy =
+      act === 'mark_sold'
+        ? { title: 'Eladottnak jelöli?', body: `A(z) „${name}” lekerül az élő listáról, és az eladott ingatlanok közé kerül.`, confirmLabel: 'Eladottnak jelölöm' }
+        : { title: 'Archiválja?', body: `A(z) „${name}” eltűnik a nyilvános oldalról, de az adatai megmaradnak.`, confirmLabel: 'Archiválom' };
+    if (!(await pf().confirm(copy))) return;
+    statusLine.textContent = 'Mentés…';
+    if (await post(id, act)) location.reload();
+    else statusLine.textContent = 'Nem sikerült a művelet.';
+  });
+</script>
 
 <style>
-  .head { display: flex; align-items: baseline; gap: 24px; margin-bottom: 20px; flex-wrap: wrap; }
-  .eyebrow { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--taupe); }
-  h1 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 28px; color: var(--ink); flex: 1; }
-  .btn { padding: 11px 22px; background: var(--ink); color: var(--cream); font-size: var(--fs-micro); letter-spacing: var(--ls-button); text-transform: uppercase; }
-
-  .filters { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 24px; }
-  .filters a { padding: 7px 14px; font-size: var(--fs-micro); letter-spacing: 0.04em; color: var(--taupe); border: 1px solid var(--border); }
-  .filters a[aria-current='page'] { background: var(--ink); color: var(--cream); border-color: var(--ink); }
-
-  .empty { color: var(--taupe); padding: 40px 0; }
-
-  .list { width: 100%; border-collapse: collapse; font-size: var(--fs-small); }
-  .list th { text-align: left; font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; color: var(--taupe); padding: 10px 12px; border-bottom: 1px solid var(--border); }
-  .list td { padding: 12px; border-bottom: 1px solid var(--border); color: var(--ink); }
-  .list a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
-
-  .pill { font-size: var(--fs-micro); padding: 3px 10px; border: 1px solid var(--border); white-space: nowrap; }
-  .pill-published { background: rgba(16, 42, 67, 0.08); border-color: var(--ink); }
-  .pill-submitted { background: rgba(200, 150, 0, 0.1); border-color: #96700b; color: #6b4f08; }
-  .pill-changes_requested { background: rgba(179, 38, 30, 0.08); border-color: #b3261e; color: #b3261e; }
-  .pill-awaiting_payment { background: rgba(200, 150, 0, 0.1); border-color: #96700b; color: #6b4f08; }
-  .pill-rejected { background: rgba(179, 38, 30, 0.05); border-color: rgba(179, 38, 30, 0.5); color: #8c1d16; }
-  .owner { font-size: var(--fs-micro); color: var(--taupe); }
-
-  .actions-col { width: 1%; white-space: nowrap; }
-  .delete-btn {
-    font-size: var(--fs-micro);
-    letter-spacing: 0.04em;
-    padding: 6px 12px;
-    border: 1px solid #b3261e;
-    background: transparent;
-    color: #b3261e;
-    cursor: pointer;
+  .head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
   }
-  .delete-btn:hover:not(:disabled) { background: #b3261e; color: #fff; }
-  .delete-btn:disabled { opacity: 0.5; cursor: default; }
+  .head h1 {
+    margin-top: 10px;
+  }
+  .bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px 24px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  .tools {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .search {
+    position: relative;
+    display: block;
+  }
+  .search :global(svg) {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    translate: 0 -50%;
+    color: var(--ink-quiet);
+    pointer-events: none;
+  }
+  .search input {
+    width: min(320px, 78vw);
+    padding: 10px 16px 10px 40px;
+    border-radius: var(--r-pill);
+    font-size: 14.5px;
+  }
+  .seg {
+    display: inline-flex;
+    padding: 4px;
+    border-radius: var(--r-pill);
+    background: var(--linen);
+  }
+  .seg button {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 14px;
+    border-radius: var(--r-pill);
+    font-size: 14px;
+    color: var(--taupe);
+    cursor: pointer;
+    transition:
+      background-color 0.3s var(--ease-out),
+      color 0.3s var(--ease-out),
+      box-shadow 0.3s var(--ease-out);
+  }
+  .seg button[aria-pressed='true'] {
+    background: var(--white);
+    color: var(--ink);
+    box-shadow: var(--shadow-sm);
+  }
 
-  @media (max-width: 720px) {
-    .list { display: block; overflow-x: auto; }
+  .empty {
+    padding: 48px 0;
+    color: var(--taupe);
+    max-width: 62ch;
+  }
+  .empty[hidden] {
+    display: none;
+  }
+  .status {
+    min-height: 1.5em;
+    margin-top: 14px;
+    font-size: 14.5px;
+    color: var(--ink-quiet);
+  }
+  .sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  /* List ↔ tiles */
+  #results[data-layout='tiles'] table {
+    display: none;
+  }
+  #results[data-layout='list'] .tiles {
+    display: none;
+  }
+  [data-item][hidden] {
+    display: none;
+  }
+  .ttl {
+    max-width: 34ch;
+  }
+  .owner {
+    font-size: 13.5px;
+    color: var(--ink-quiet);
+  }
+  .price {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .actions-col {
+    width: 1%;
+    white-space: nowrap;
+    text-align: right;
+  }
+
+  .tiles {
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+    gap: 16px;
+  }
+  .tile {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    border-radius: var(--r-xl);
+    background: var(--white);
+    border: 1px solid var(--pt-hair);
+    box-shadow: var(--shadow-xs);
+    transition:
+      transform 0.55s var(--ease-out),
+      box-shadow 0.55s var(--ease-out);
+  }
+  .tile:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow-md);
+  }
+  .stretch {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    border-radius: inherit;
+  }
+  .photo {
+    position: relative;
+    display: grid;
+    place-items: center;
+    aspect-ratio: 4 / 3;
+    margin: 8px 8px 0;
+    border-radius: calc(var(--r-xl) - 8px);
+    background: var(--linen);
+    color: var(--ink-quiet);
+    overflow: hidden;
+  }
+  .photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 1s var(--ease-out);
+  }
+  .tile:hover .photo img {
+    transform: scale(1.05);
+  }
+  .photo .pill {
+    position: absolute;
+    left: 10px;
+    bottom: 10px;
+    background: rgba(250, 250, 248, 0.94);
+    backdrop-filter: blur(6px);
+  }
+  .info {
+    padding: 14px 18px 18px;
+  }
+  .info b {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-family: var(--serif);
+    font-weight: var(--fw-semibold);
+    font-size: 16.5px;
+    line-height: 1.3;
+    color: var(--ink);
+  }
+  .info p {
+    margin-top: 4px;
+    font-size: 14px;
+    color: var(--taupe);
+  }
+  .info .row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-top: 10px;
+  }
+  .info .price {
+    font-family: var(--serif);
+    font-weight: var(--fw-display);
+    font-size: 19px;
+    color: var(--ink);
+  }
+  .info .ref,
+  .info .own {
+    font-size: 13px;
+    color: var(--ink-quiet);
+  }
+  .corner {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    z-index: 2;
+  }
+  .on-photo {
+    background: rgba(250, 250, 248, 0.94);
+    backdrop-filter: blur(6px);
+    color: var(--ink);
+    box-shadow: var(--shadow-xs);
+  }
+  .on-photo:hover {
+    background: var(--white);
+  }
+
+  @media (max-width: 560px) {
+    .seg button span {
+      display: none;
+    }
   }
 </style>

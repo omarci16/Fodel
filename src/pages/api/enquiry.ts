@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { handleForm } from '~/lib/form-handler';
 import { createSupabaseAdminClient } from '~/lib/supabase-server';
 import { deliver, localeOf, templates } from '~/lib/email/send';
+import { pushEnquiryToCrm } from '~/lib/crm';
 
 export const prerender = false;
 
@@ -22,8 +23,12 @@ export const POST: APIRoute = (context) =>
       { name: 'name', label: 'Név / Naam', required: true, maxLength: 120 },
       { name: 'email', label: 'E-mail', type: 'email', required: true, maxLength: 160 },
       { name: 'phone', label: 'Telefon', type: 'tel', maxLength: 40 },
+      { name: 'contact_pref', label: 'Kapcsolatfelvétel (callback = visszahívás)', maxLength: 12 },
       { name: 'message', label: 'Üzenet / Bericht', maxLength: 4000 },
     ],
+    // A callback is useless without a number; an e-mail reply needs none.
+    refine: (values): Record<string, string> =>
+      values.contact_pref !== 'email' && !values.phone ? { phone: 'required' } : {},
     onSuccess: async (values, extras) => {
       const ref = extras.propertyRef;
       if (!ref) return; // enquiry sent without property context — nothing to persist against
@@ -41,15 +46,45 @@ export const POST: APIRoute = (context) =>
       if (lookupError) throw new Error(`property lookup failed: ${lookupError.message}`);
       if (!property) return;
 
-      const { error: insertError } = await admin.from('enquiries').insert({
+      const contactPref = values.contact_pref === 'email' ? 'email' : 'callback';
+      const row = {
         property_id: property.id,
         name: values.name,
         email: values.email,
         phone: values.phone || null,
         message: values.message || null,
         locale: extras.Locale === 'nl' ? 'nl' : 'hu',
+      };
+      // contact_pref arrives with migration 0016; until it runs, save without it.
+      let { data: saved, error: insertError } = await admin
+        .from('enquiries')
+        .insert({ ...row, contact_pref: contactPref })
+        .select('id, created_at')
+        .single();
+      if (insertError && /contact_pref/.test(insertError.message)) {
+        ({ data: saved, error: insertError } = await admin.from('enquiries').insert(row).select('id, created_at').single());
+      }
+      if (insertError || !saved) throw new Error(`enquiry insert failed: ${insertError?.message}`);
+
+      // Straight on to the CRM. Best effort: the enquiry is already safe in
+      // our own database, and the portal shows whether the hand-off worked.
+      const crm = await pushEnquiryToCrm({
+        id: saved.id,
+        name: row.name,
+        email: row.email,
+        phone: row.phone,
+        message: row.message,
+        locale: row.locale,
+        contactPref,
+        property: { ref, title: extras.propertyTitle ?? `#${ref}` },
+        createdAt: saved.created_at,
       });
-      if (insertError) throw new Error(`enquiry insert failed: ${insertError.message}`);
+      if (crm.error !== 'not-configured') {
+        await admin
+          .from('enquiries')
+          .update(crm.ok ? { crm_synced_at: new Date().toISOString(), crm_error: null } : { crm_error: crm.error })
+          .eq('id', saved.id);
+      }
 
       if (property.owner_id) {
         const { data: owner } = await admin

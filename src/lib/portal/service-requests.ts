@@ -57,6 +57,8 @@ export type NewServiceRequest = {
   email?: string | null;
   phone?: string | null;
   note?: string | null;
+  /** Overrides the catalogue price in the emails — a valuation visit can be priced in admin settings. */
+  priceLabel?: Record<'hu' | 'nl', string>;
 };
 
 /**
@@ -94,7 +96,7 @@ export async function createServiceRequest(client: any, request: NewServiceReque
   await deliver(
     officeInbox(),
     templates.adminServiceRequested('hu', {
-      service: `${serviceName(request.serviceId, 'hu')} — ${servicePrice(request.serviceId)}`,
+      service: `${serviceName(request.serviceId, 'hu')} — ${request.priceLabel?.hu ?? servicePrice(request.serviceId)}`,
       name: request.name ?? '',
       email: request.email ?? '',
       phone: request.phone ?? '',
@@ -110,7 +112,7 @@ export async function createServiceRequest(client: any, request: NewServiceReque
       request.email,
       templates.serviceRequested(request.locale, {
         service: serviceName(request.serviceId, request.locale),
-        price: servicePrice(request.serviceId),
+        price: request.priceLabel?.[request.locale] ?? servicePrice(request.serviceId),
       })
     );
   }

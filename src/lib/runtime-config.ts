@@ -57,6 +57,15 @@ export type Services = {
   valuationMinCount?: number | null;
   eurHufRate?: number | null;
   eurHufRateDate?: string | null;
+  /** Admin-edited names and prices of the three valuation packages; see src/lib/valuation/packages.ts. */
+  valuationPackages?: Partial<Record<'indicative' | 'expert_visit' | 'judicial', StoredValuationPackage>>;
+};
+
+export type StoredValuationPackage = {
+  names?: Partial<Record<'hu' | 'nl', string>>;
+  /** Whole euros; null means "on request". */
+  priceEur?: number | null;
+  enabled?: boolean;
 };
 
 export type Automation = {

@@ -10,11 +10,14 @@
  */
 import type { APIRoute } from 'astro';
 import { friendlyError } from '~/lib/portal/labels';
+import { PACKAGE_KINDS, valuationPackages } from '~/lib/valuation/packages';
+import type { StoredValuationPackage } from '~/lib/runtime-config';
 
 export const prerender = false;
 
 const NOTICE_MAX = 800;
 const REFUND_MAX = 2000;
+const NAME_MAX = 120;
 
 export const POST: APIRoute = async ({ request, locals, redirect }) => {
   if (locals.profile?.role !== 'admin') return new Response('Ehhez nincs jogosultsága.', { status: 403 });
@@ -42,6 +45,23 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   const eurHufRateDate = String(form.get('eur_huf_rate_date') ?? '').trim();
   const instantRequested = form.get('instant_valuation') === 'yes';
 
+  // Package names and prices. The free estimate's price is never read: it stays 0.
+  const valuationPackagesStored: Record<string, StoredValuationPackage> = {};
+  const current = valuationPackages(undefined);
+  for (const kind of PACKAGE_KINDS) {
+    const base = current.find((entry) => entry.kind === kind)!;
+    const priceRaw = String(form.get(`pkg_${kind}_price`) ?? '').trim();
+    const price = Number(priceRaw);
+    valuationPackagesStored[kind] = {
+      names: {
+        hu: String(form.get(`pkg_${kind}_name_hu`) ?? '').trim().slice(0, NAME_MAX),
+        nl: String(form.get(`pkg_${kind}_name_nl`) ?? '').trim().slice(0, NAME_MAX),
+      },
+      ...(base.priceLocked ? {} : { priceEur: priceRaw !== '' && Number.isFinite(price) && price >= 0 && price <= 100000 ? Math.round(price) : null }),
+      enabled: kind === 'indicative' ? true : form.get(`pkg_${kind}_enabled`) === 'yes',
+    };
+  }
+
   const { data: existing } = await locals.supabase.from('site_settings').select('services').eq('id', 1).maybeSingle();
   const services = {
     ...(existing?.services ?? {}),
@@ -53,6 +73,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     valuationMinCount,
     eurHufRate,
     eurHufRateDate: /^\d{4}-\d{2}-\d{2}$/.test(eurHufRateDate) ? eurHufRateDate : null,
+    valuationPackages: valuationPackagesStored,
     instantValuation: instantRequested && valuationBandPercent !== null && valuationMinCount !== null,
   };
   const automation = { registrationReminder: false, inviteAutomation: false };

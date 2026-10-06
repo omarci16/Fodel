@@ -4,6 +4,7 @@ export const prerender = false;
 import Portal from '~/layouts/Portal.astro';
 import { path } from '~/i18n/ui';
 import { SITE_URL } from '~/config/site.mjs';
+import { icon } from '~/lib/portal/icons';
 
 const { profile } = Astro.locals;
 const saved = Astro.url.searchParams.get('saved');
@@ -21,11 +22,22 @@ const referralLink = profile?.referral_code
     <h1>Profil</h1>
   </header>
   {profile?.role === 'admin' && (
-    <>
-      <p><a href="/portal/settings/company">Cégadatok és nyilvános elérhetőségek (WhatsApp is) →</a></p>
-      <p><a href="/portal/settings/services">Szolgáltatások és automatizmusok →</a></p>
-      <p><a href="/portal/settings/templates">Meghívólevelek →</a></p>
-    </>
+    <nav class="pt-shortcuts" aria-label="Admin beállítások">
+      {[
+        ['/portal/settings/company', 'Cégadatok', 'Elérhetőségek, WhatsApp, nyilvános adatok', 'building'],
+        ['/portal/settings/services', 'Szolgáltatások', 'Árak, automatizmusok, visszatérítési szöveg', 'gear'],
+        ['/portal/settings/templates', 'Meghívólevelek', 'A tulajdonosoknak küldött levelek szövege', 'mail'],
+        ['/portal/taxonomy', 'Szótár', 'Ingatlantípusok, jellemzők, blogkategóriák fordításai', 'pen'],
+      ].map(([href, title, text, ic]) => (
+        <a class="pt-shortcut" href={href}>
+          <div>
+            <b>{title}</b>
+            <span>{text}</span>
+          </div>
+          <Fragment set:html={icon(ic as any, 20)} />
+        </a>
+      ))}
+    </nav>
   )}
 
   {saved === 'profile' && <p class="notice ok">Profil mentve.</p>}

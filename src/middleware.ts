@@ -27,6 +27,7 @@ const PUBLIC_PORTAL_PATHS = [
 const ADMIN_ONLY_PREFIXES = [
   '/portal/users',
   '/portal/review',
+  '/portal/inbox',
   '/portal/payments',
   '/portal/database',
   '/portal/content',

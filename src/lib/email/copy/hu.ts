@@ -251,6 +251,18 @@ export const HU = {
     cancel: 'Ha meggondolta magát, egyszerűen válaszoljon erre az e-mailre.',
   },
 
+  valuationPaid: {
+    subject: 'Fizetési visszaigazolás — FODEL értékbecslés',
+    preheader: 'Köszönjük, a fizetés megérkezett.',
+    heading: 'Köszönjük, a fizetés megérkezett',
+    body: (service: string) => `Megkaptuk a(z) „${service}” díját.`,
+    orderTitle: 'Tétel',
+    totalLabel: 'Fizetett összeg',
+    paidAtLabel: 'Fizetés dátuma',
+    next: 'Munkatársunk hamarosan felveszi Önnel a kapcsolatot a további lépésekről.',
+    invoice: 'Ha számlára van szüksége, egyszerűen válaszoljon erre az e-mailre.',
+  },
+
   judicialRequested: {
     subject: 'Hivatalos értékbecslési igény — FODEL',
     preheader: 'Munkatársunk felveszi Önnel a kapcsolatot a lehetőségekről.',

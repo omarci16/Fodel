@@ -47,6 +47,8 @@ export type LedgerRow = {
   /** "Standard hirdetés · Fordítás ×2", or null when the order predates itemised lines. */
   items: string | null;
   propertyId: string | null;
+  /** Set for a valuation package paid by card, which has no listing (migration 0017). */
+  valuationId: string | null;
   propertyRef: string | null;
   propertyTitle: string | null;
   settlement: string | null;
@@ -116,6 +118,7 @@ export async function loadLedger(supabase: any, filters: LedgerFilters): Promise
         lines,
         items: lines.length ? lines.map((l) => (l.quantity > 1 ? `${l.label} ×${l.quantity}` : l.label)).join(' · ') : null,
         propertyId: o.property_id ?? null,
+        valuationId: o.valuation_id ?? null,
         propertyRef: property?.ref ?? null,
         propertyTitle:
           (property?.property_translations as { locale: string; title: string }[] | undefined)?.find((t) => t.locale === 'hu')
@@ -123,7 +126,7 @@ export async function loadLedger(supabase: any, filters: LedgerFilters): Promise
         settlement: property?.settlement ?? null,
         ownerId: o.owner_id ?? null,
         ownerName: owner?.full_name ?? null,
-        ownerEmail: owner?.email ?? null,
+        ownerEmail: owner?.email ?? o.contact_email ?? null,
         billingName: o.billing_name ?? null,
         refundRequired: Boolean(o.refund_required),
       };

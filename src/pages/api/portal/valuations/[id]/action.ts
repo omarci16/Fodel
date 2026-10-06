@@ -16,8 +16,22 @@ import { friendlyError } from '~/lib/portal/labels';
 import { estimateValuation } from '~/lib/valuation/estimate';
 import { getCompany } from '~/lib/runtime-config';
 import places from '~/data/market/hu-settlements.json';
+import { geocode, nearbyPlaces } from '~/lib/valuation/nearby';
+import { analyseValuation } from '~/lib/ai/valuation-analysis';
+import { isAiEnabled, AiError } from '~/lib/ai/client';
+import { DOCUMENT_BUCKET, type ValuationDocument } from '~/lib/valuation/documents';
+import { describeAnswer } from '~/data/valuation-questions';
 
 export const prerender = false;
+
+/** Columns from migration 0017 — until it has run, say so instead of showing a raw database error. */
+const NEEDS_0017 = 'Ehhez futtassa le a 0017-es migrációt.';
+const missingColumn = (message: string) => /column|schema cache/i.test(message);
+
+const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp'];
+const PDF_MAX_BYTES = 4.5 * 1024 * 1024;
+const MAX_IMAGES = 10;
+const MAX_PDFS = 3;
 
 const json = (status: number, body: Record<string, unknown>) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -126,6 +140,86 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
     if (error) return json(500, { ok: false, error: friendlyError(error.message) });
 
     return json(200, { ok: true, status: 'needs_review' });
+  }
+
+  if (action === 'nearby') {
+    // The exact address goes to OpenStreetMap's public service only when the admin ticks the box.
+    const useAddress = body.useAddress === true && Boolean(valuation.address_private);
+    let center;
+    try {
+      center = await geocode({ settlement: valuation.settlement ?? '', county: valuation.county, address: useAddress ? valuation.address_private : null });
+    } catch (error) {
+      console.error('[valuation] geocode failed', error);
+      return json(502, { ok: false, error: 'Az OpenStreetMap helykeresője most nem érhető el. Próbálja újra pár perc múlva.' });
+    }
+    if (!center) return json(422, { ok: false, error: 'A település nem található az OpenStreetMap adatai között.' });
+
+    let nearby;
+    try {
+      nearby = await nearbyPlaces(center);
+    } catch (error) {
+      console.error('[valuation] overpass failed', error);
+      return json(502, { ok: false, error: 'Az OpenStreetMap környékadatai most nem érhetők el. Próbálja újra pár perc múlva.' });
+    }
+    const { error } = await admin.from('valuations').update({ nearby, latitude: center.lat, longitude: center.lon }).eq('id', id);
+    if (error) return json(500, { ok: false, error: missingColumn(error.message) ? NEEDS_0017 : friendlyError(error.message) });
+    return json(200, { ok: true });
+  }
+
+  if (action === 'analyse') {
+    if (!isAiEnabled()) return json(422, { ok: false, error: 'Az AI nincs bekapcsolva (AI_ENABLED és OPENAI_API_KEY szükséges).' });
+
+    // Photos and documents sit in private buckets; the model gets short-lived links or the bytes, nothing public.
+    const photoPaths = ((Array.isArray(valuation.photos) ? valuation.photos : []) as { path: string }[]).map((photo) => photo.path);
+    const documents = (Array.isArray(valuation.documents) ? valuation.documents : []) as ValuationDocument[];
+    const imageUrls: string[] = [];
+    if (photoPaths.length) {
+      const { data } = await admin.storage.from('valuation-media').createSignedUrls(photoPaths, 15 * 60);
+      imageUrls.push(...(data ?? []).flatMap((row) => (row.signedUrl ? [row.signedUrl] : [])));
+    }
+    const pdfs: { name: string; base64: string }[] = [];
+    const documentsNotRead: string[] = [];
+    for (const doc of documents) {
+      const extension = doc.name.split('.').pop()?.toLowerCase() ?? '';
+      if (IMAGE_EXTENSIONS.includes(extension) && imageUrls.length < MAX_IMAGES) {
+        const { data } = await admin.storage.from(DOCUMENT_BUCKET).createSignedUrl(doc.path, 15 * 60);
+        if (data?.signedUrl) { imageUrls.push(data.signedUrl); continue; }
+      } else if (extension === 'pdf' && pdfs.length < MAX_PDFS && doc.size > 0 && doc.size <= PDF_MAX_BYTES) {
+        const { data } = await admin.storage.from(DOCUMENT_BUCKET).download(doc.path);
+        if (data) { pdfs.push({ name: doc.name, base64: Buffer.from(await data.arrayBuffer()).toString('base64') }); continue; }
+      }
+      documentsNotRead.push(doc.name);
+    }
+
+    const facts = {
+      category: valuation.category, county: valuation.county, settlement: valuation.settlement,
+      floorM2: valuation.floor_m2, plotM2: valuation.plot_m2, yearBuilt: valuation.year_built,
+      bedrooms: valuation.bedrooms, bathrooms: valuation.bathrooms, parcelCount: valuation.parcel_count,
+      renovatedIn: valuation.renovated_in, renovationExtent: valuation.renovation_extent,
+      condition: valuation.condition_key, heating: valuation.heating_key, energyClass: valuation.epc_class,
+      features: valuation.features,
+      // The exact address is deliberately left out: nothing here needs it.
+      answers: Object.entries((valuation.answers ?? {}) as Record<string, string>).map(([key, value]) => {
+        const { question, answer } = describeAnswer(key, String(value));
+        return { question, answer };
+      }),
+      customerFactors: valuation.factors ?? [],
+    };
+
+    try {
+      const analysis = await analyseValuation({
+        facts, baseline: valuation.baseline ?? null,
+        band: { lowHuf: valuation.low_huf ?? null, midHuf: valuation.mid_huf ?? null, highHuf: valuation.high_huf ?? null },
+        nearby: valuation.nearby ?? null, imageUrls, pdfs, documentsNotRead,
+      });
+      const { error } = await admin.from('valuations').update({ ai_analysis: analysis, ai_analysed_at: new Date().toISOString() }).eq('id', id);
+      if (error) return json(500, { ok: false, error: missingColumn(error.message) ? NEEDS_0017 : friendlyError(error.message) });
+      return json(200, { ok: true });
+    } catch (error) {
+      console.error('[valuation] ai analysis failed', error);
+      const timedOut = error instanceof Error && error.name === 'AbortError';
+      return json(502, { ok: false, error: timedOut ? 'Az AI nem válaszolt időben. Próbálja újra.' : error instanceof AiError ? 'Az AI-szolgáltatás hibát jelzett. Próbálja újra később.' : 'Az elemzés nem sikerült.' });
+    }
   }
 
   if (action === 'approve' || action === 'reject') {

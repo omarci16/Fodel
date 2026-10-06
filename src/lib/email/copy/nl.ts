@@ -247,6 +247,18 @@ export const NL = {
     cancel: 'Bedenkt u zich? Beantwoord dan gewoon deze e-mail.',
   },
 
+  valuationPaid: {
+    subject: 'Betalingsbevestiging — FODEL waardebepaling',
+    preheader: 'Dank u wel, uw betaling is ontvangen.',
+    heading: 'Dank u wel, uw betaling is ontvangen',
+    body: (service: string) => `Wij hebben de betaling voor „${service}” ontvangen.`,
+    orderTitle: 'Onderdeel',
+    totalLabel: 'Betaald bedrag',
+    paidAtLabel: 'Betaald op',
+    next: 'Onze medewerker neemt binnenkort contact met u op over de vervolgstappen.',
+    invoice: 'Hebt u een factuur nodig? Beantwoord dan gewoon deze e-mail.',
+  },
+
   judicialRequested: {
     subject: 'Aanvraag officiële taxatie — FODEL',
     preheader: 'Onze medewerker neemt contact met u op over de mogelijkheden.',

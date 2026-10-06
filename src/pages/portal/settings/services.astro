@@ -9,6 +9,7 @@
 export const prerender = false;
 
 import Portal from '~/layouts/Portal.astro';
+import { valuationPackages } from '~/lib/valuation/packages';
 import { SERVICES_DEFAULT, AUTOMATION_DEFAULT, type Services, type Automation } from '~/lib/runtime-config';
 
 const { supabase, profile } = Astro.locals;
@@ -18,6 +19,12 @@ const { data: row } = await supabase.from('site_settings').select('*').eq('id', 
 const migrated = Boolean(row && 'services' in row);
 const services: Services = { ...SERVICES_DEFAULT, ...(row?.services ?? {}) };
 const automation: Automation = { ...AUTOMATION_DEFAULT, ...(row?.automation ?? {}) };
+const packages = valuationPackages(services);
+const packageHint: Record<string, string> = {
+  indicative: 'Az ingyenes, AI-támogatott tájékoztató becslés. Az ára nem módosítható.',
+  expert_visit: 'Helyszíni látogatás. Üresen hagyott ár esetén „árajánlat alapján” jelenik meg.',
+  judicial: 'Hivatalos / igazságügyi értékbecslés. Üresen hagyott ár esetén „árajánlat alapján” jelenik meg.',
+};
 const saved = Astro.url.searchParams.has('saved');
 const err = Astro.url.searchParams.get('error');
 ---
@@ -61,6 +68,20 @@ const err = Astro.url.searchParams.get('error');
       </p>
       <label class="text">Magyar<textarea name="notice_hu" rows="3" maxlength="800">{services.valuationNotice?.hu ?? ''}</textarea></label>
       <label class="text">Holland<textarea name="notice_nl" rows="3" maxlength="800">{services.valuationNotice?.nl ?? ''}</textarea></label>
+
+      <h3>Becslési csomagok</h3>
+      <p class="hint">A három csomag neve és ára a nyilvános űrlapon, az e-mailekben és a fizetésnél is ezekből jön. Bankkártyás fizetés csak akkor jelenik meg, ha a Stripe be van kapcsolva és a csomagnak van fix ára.</p>
+      {packages.map((pkg) => (
+        <div class="pkg">
+          <p class="pkg-title"><strong>{pkg.names.hu}</strong> <span>{packageHint[pkg.kind]}</span></p>
+          <div class="pkg-row">
+            <label class="text">Név (magyar)<input type="text" name={`pkg_${pkg.kind}_name_hu`} maxlength="120" value={pkg.names.hu} /></label>
+            <label class="text">Név (holland)<input type="text" name={`pkg_${pkg.kind}_name_nl`} maxlength="120" value={pkg.names.nl} /></label>
+            <label class="text">Ár (€)<input type="number" name={`pkg_${pkg.kind}_price`} min="0" max="100000" step="1" value={pkg.priceEur ?? ''} disabled={pkg.priceLocked} placeholder="árajánlat" /></label>
+          </div>
+          {pkg.kind !== 'indicative' && <label class="check"><input type="checkbox" name={`pkg_${pkg.kind}_enabled`} value="yes" checked={pkg.enabled} /><span><strong>Elérhető az űrlapon</strong></span></label>}
+        </div>
+      ))}
 
       <h3>Becslési adatok és megjelenítés</h3>
       <p class="hint">Az azonnali megjelenítés csak akkor kapcsolható be, ha a statisztikai sáv és a minimális adatszám is meg van adva. A módszert Gábornak valós eseteken ellenőriznie kell.</p>
@@ -129,5 +150,11 @@ const err = Astro.url.searchParams.get('error');
   .check.locked { opacity: 0.75; }
   .text { display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; color: var(--taupe); }
   .text textarea { border: 1px solid var(--border); background: #fff; padding: 10px; font-size: var(--fs-small); color: var(--ink); text-transform: none; letter-spacing: 0; font-family: inherit; }
+  .pkg { display: grid; gap: 12px; padding: 16px 18px; border: 1px solid var(--pt-hair); border-radius: var(--r-lg); background: #fff; }
+  .pkg-title { font-size: var(--fs-small); color: var(--ink); line-height: 1.6; }
+  .pkg-title span { display: block; color: var(--taupe); }
+  .pkg-row { display: grid; grid-template-columns: 1fr 1fr 120px; gap: 12px; }
+  .pkg-row input { border: 1px solid var(--border); background: #fff; padding: 10px; font-size: var(--fs-small); color: var(--ink); text-transform: none; letter-spacing: 0; font-family: inherit; width: 100%; }
+  @media (max-width: 720px) { .pkg-row { grid-template-columns: 1fr; } }
   .btn { justify-self: start; margin-top: 8px; padding: 12px 24px; background: var(--ink); color: var(--cream); font-size: var(--fs-micro); letter-spacing: var(--ls-button); text-transform: uppercase; }
 </style>

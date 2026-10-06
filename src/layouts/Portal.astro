@@ -1,51 +1,113 @@
 ---
 /**
- * Portal shell — login, dashboard, property editor, review, users, settings.
+ * Portal shell — sidebar, page ground and the small amount of script every
+ * screen shares (menus, the confirm dialog, the mobile drawer).
  *
- * Reuses the public site's design tokens and typefaces (see src/styles/) so
- * it visually belongs to FODEL, but the layout itself is simpler and denser
- * than the marketing site: a slim top bar instead of the full Nav/Footer, no
- * hero sections, no reveal-on-scroll. This is a tool people use daily, not a
- * page they arrive at from search — density beats editorial spacing here.
+ * 3.0: the top bar became a floating ink sidebar, in the landing page's own
+ * language (slab, radius scale, pill buttons, ink-tinted shadows). Menu items
+ * are grouped by what they ask of you — things waiting on you, the data, the
+ * content, the money — and carry a red counter when somebody is waiting.
  *
  * Always noindex: nothing under /portal/ is for search engines.
  */
-import Logo from '~/components/Logo.astro';
 import '~/styles/global.css';
+import '~/styles/portal.css';
+import { icon, type IconName } from '~/lib/portal/icons';
 
 interface Props {
   title: string;
-  /** Hide the top bar's nav — used by the login and invite-accept screens. */
+  /** Hide the chrome — used by the login and invite-accept screens. */
   bare?: boolean;
   /** Document language. The portal works in Hungarian; only invite acceptance follows the invitee. */
   lang?: string;
 }
 
 const { title, bare = false, lang = 'hu' } = Astro.props;
-const profile = Astro.locals.profile;
+const { profile, supabase } = Astro.locals;
+const isAdmin = profile?.role === 'admin';
 
-const NAV = [
-  { href: '/portal/dashboard', label: 'Áttekintés' },
-  { href: '/portal/properties', label: 'Ingatlanok' },
-  // Owners see their own listings' enquiries, admins see all — the same query
-  // scoped by RLS, so one nav entry serves both.
-  { href: '/portal/enquiries', label: 'Érdeklődők' },
-  ...(profile?.role === 'admin'
-    ? [
-        { href: '/portal/top10', label: 'Top 10' },
-        { href: '/portal/payments', label: 'Fizetések' },
-        { href: '/portal/database', label: 'Adatbázis' },
-        { href: '/portal/content/blog', label: 'Blog' },
-        { href: '/portal/taxonomy', label: 'Szótár' },
-        { href: '/portal/valuations', label: 'Értékbecslések' },
-        { href: '/portal/services', label: 'Helyszíni szolgáltatások' },
-        { href: '/portal/users', label: 'Felhasználók' },
-      ]
-    : []),
-  { href: '/portal/settings', label: 'Beállítások' },
-];
+/** A head-count that can never take a page down: a failed count is a zero. */
+async function count(query: PromiseLike<{ count: number | null }>): Promise<number> {
+  try {
+    return (await query).count ?? 0;
+  } catch {
+    return 0;
+  }
+}
+const head = { count: 'exact', head: true } as const;
 
-const current = Astro.url.pathname;
+let waiting = { inbox: 0, enquiries: 0, valuations: 0, services: 0, payment: 0 };
+if (!bare && profile && supabase) {
+  const [enquiries, inbox, valuations, services, payment] = await Promise.all([
+    count(supabase.from('enquiries').select('id', head).eq('handled', false)),
+    isAdmin ? count(supabase.from('properties').select('id', head).eq('status', 'submitted')) : 0,
+    isAdmin
+      ? count(supabase.from('valuations').select('id', head).in('status', ['queued', 'needs_review', 'insufficient_data']))
+      : 0,
+    isAdmin ? count(supabase.from('service_requests').select('id', head).eq('status', 'requested')) : 0,
+    !isAdmin ? count(supabase.from('properties').select('id', head).eq('status', 'awaiting_payment')) : 0,
+  ]);
+  waiting = { inbox, enquiries, valuations, services, payment };
+}
+
+type Item = { href: string; label: string; icon: IconName; count?: number; match?: string[] };
+type Group = { label?: string; items: Item[] };
+
+const GROUPS: Group[] = isAdmin
+  ? [
+      { items: [{ href: '/portal/dashboard', label: 'Áttekintés', icon: 'home' }] },
+      {
+        label: 'Teendők',
+        items: [
+          { href: '/portal/inbox', label: 'Beérkező hirdetések', icon: 'inbox', count: waiting.inbox, match: ['/portal/review'] },
+          { href: '/portal/enquiries', label: 'Érdeklődők', icon: 'phone', count: waiting.enquiries },
+          { href: '/portal/valuations', label: 'Értékbecslések', icon: 'calc', count: waiting.valuations },
+          { href: '/portal/services', label: 'Helyszíni szolgáltatások', icon: 'camera', count: waiting.services },
+        ],
+      },
+      {
+        label: 'Adatok',
+        items: [
+          { href: '/portal/properties', label: 'Ingatlanok', icon: 'building' },
+          { href: '/portal/database', label: 'Adatbázis', icon: 'database' },
+          { href: '/portal/users', label: 'Felhasználók', icon: 'users' },
+        ],
+      },
+      {
+        label: 'Tartalom és pénz',
+        items: [
+          { href: '/portal/top10', label: 'Top 10', icon: 'star' },
+          { href: '/portal/content/blog', label: 'Blog', icon: 'pen' },
+          { href: '/portal/payments', label: 'Fizetések', icon: 'card', match: ['/portal/invoices'] },
+        ],
+      },
+      { items: [{ href: '/portal/settings', label: 'Beállítások', icon: 'gear', match: ['/portal/taxonomy'] }] },
+    ]
+  : [
+      { items: [{ href: '/portal/dashboard', label: 'Áttekintés', icon: 'home' }] },
+      {
+        label: 'Hirdetéseim',
+        items: [
+          { href: '/portal/properties', label: 'Ingatlanaim', icon: 'building', count: waiting.payment },
+          { href: '/portal/enquiries', label: 'Érdeklődők', icon: 'phone', count: waiting.enquiries },
+        ],
+      },
+      { items: [{ href: '/portal/settings', label: 'Beállítások', icon: 'gear' }] },
+    ];
+
+const current = Astro.url.pathname.replace(/\/$/, '') || '/';
+const isActive = (item: Item) =>
+  [item.href, ...(item.match ?? [])].some((p) => current === p || current.startsWith(`${p}/`));
+
+const urgent = waiting.inbox + waiting.enquiries + waiting.valuations + waiting.services + waiting.payment;
+const displayName = profile?.full_name || profile?.email || '';
+const initials =
+  displayName
+    .split(/[\s@.]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('') || 'F';
 
 // The public homepage in the signed-in person's own language. Plain
 // navigation: the session stays, unlike the logout button beside it.
@@ -61,160 +123,329 @@ const homeHref = profile?.locale === 'nl' ? '/nl/' : '/hu/';
     <meta name="robots" content="noindex, nofollow" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   </head>
-  <body>
+  <body class:list={['portal', { bare }]} data-drawer="closed">
     {
-      !bare && (
-        <header class="topbar">
-          <Logo locale="hu" href="/portal/dashboard" />
-          <nav aria-label="Portál navigáció">
-            <ul>
-              {NAV.map((item) => (
-                <li>
-                  <a href={item.href} aria-current={current.startsWith(item.href) ? 'page' : undefined}>
-                    {item.label}
+      bare ? (
+        <main class="pm bare">
+          <slot />
+        </main>
+      ) : (
+        <div class="pt-shell">
+          <aside class="pt-side" id="pt-side" aria-label="Portál menü">
+            <div class="pt-side-in surface-ink">
+              <div class="pt-brand">
+                <a href="/portal/dashboard" aria-label="FODEL — áttekintés">
+                  <span class="word">FODEL</span>
+                  <span class="rule" aria-hidden="true" />
+                  <span class="sub">Ingatlan</span>
+                </a>
+                <span class="tag">{isAdmin ? 'Admin' : 'Hirdetői portál'}</span>
+              </div>
+
+              <nav class="pt-nav" aria-label="Portál navigáció">
+                <span class="pt-glide" aria-hidden="true" />
+                {GROUPS.map((group) => (
+                  <div class="pt-nav-group">
+                    {group.label && <p class="pt-nav-label">{group.label}</p>}
+                    <ul>
+                      {group.items.map((item) => (
+                        <li>
+                          <a
+                            class="pt-link"
+                            href={item.href}
+                            aria-current={isActive(item) ? 'page' : undefined}
+                          >
+                            <Fragment set:html={icon(item.icon, 19)} />
+                            <span class="txt">{item.label}</span>
+                            {item.count ? (
+                              <span class="pt-count" aria-label={`${item.count} vár`}>
+                                {item.count}
+                              </span>
+                            ) : null}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </nav>
+
+              <div class="pt-side-foot">
+                <div class="pt-me">
+                  <span class="pt-avatar" aria-hidden="true">
+                    {initials}
+                  </span>
+                  <span class="pt-me-name">
+                    <b>{displayName}</b>
+                    <span>{isAdmin ? 'Adminisztrátor' : 'Hirdető'}</span>
+                  </span>
+                  <a class="pt-me-btn" href={homeHref} title="Vissza a weboldalra" aria-label="Vissza a weboldalra">
+                    <Fragment set:html={icon('external', 17)} />
                   </a>
-                </li>
-              ))}
-            </ul>
-          </nav>
-          <div class="who">
-            {profile && (
-              <>
-                <span class="name">{profile.full_name ?? profile.email}</span>
-                <span class="role">{profile.role === 'admin' ? 'Admin' : 'Hirdető'}</span>
-                <a class="home-link" href={homeHref}>Vissza a főoldalra</a>
-                <form method="POST" action="/portal/logout">
-                  <button type="submit" class="logout">Kilépés</button>
-                </form>
-              </>
-            )}
+                  <form method="POST" action="/portal/logout">
+                    <button type="submit" class="pt-me-btn" title="Kilépés" aria-label="Kilépés">
+                      <Fragment set:html={icon('logout', 17)} />
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </aside>
+          <div class="pt-scrim" data-drawer-close />
+
+          <div class="pt-main-wrap">
+            <div class="pt-mobilebar">
+              <span class="word">FODEL</span>
+              <button type="button" class="pt-burger" data-drawer-toggle aria-controls="pt-side" aria-label="Menü megnyitása">
+                <Fragment set:html={icon('menu', 18)} />
+                Menü
+                {urgent > 0 && <span class="pt-count">{urgent}</span>}
+              </button>
+            </div>
+            <main class="pm">
+              <slot />
+            </main>
           </div>
-        </header>
+        </div>
       )
     }
-
-    <main class:list={{ bare }}>
-      <slot />
-    </main>
   </body>
 </html>
 
-<!-- is:global because Astro scopes every selector in a component <style> to
-     that component's cid, including html and body — and <body> here carries
-     no cid attribute, so the scoped versions of these rules matched nothing.
-     global.css already sets the family, colour and background on body; the
-     only thing actually needed here is min-height. -->
+<script>
+  import { icon } from '~/lib/portal/icons';
+
+  /* ── Mobile drawer ─────────────────────────────────────────────────── */
+  const body = document.body;
+  const setDrawer = (open: boolean) => {
+    body.dataset.drawer = open ? 'open' : 'closed';
+    document.querySelector('[data-drawer-toggle]')?.setAttribute('aria-expanded', String(open));
+  };
+  document.addEventListener('click', (event) => {
+    const target = event.target as Element;
+    if (target.closest('[data-drawer-toggle]')) setDrawer(body.dataset.drawer !== 'open');
+    else if (target.closest('[data-drawer-close]')) setDrawer(false);
+  });
+
+  /* ── Gliding hover pill in the sidebar ─────────────────────────────── */
+  const nav = document.querySelector<HTMLElement>('.pt-nav');
+  const glide = nav?.querySelector<HTMLElement>('.pt-glide');
+  if (nav && glide) {
+    const move = (link: HTMLElement) => {
+      glide.style.transform = `translateY(${link.offsetTop}px)`;
+      glide.style.height = `${link.offsetHeight}px`;
+      glide.dataset.on = 'true';
+    };
+    nav.querySelectorAll<HTMLElement>('.pt-link').forEach((link) => {
+      link.addEventListener('pointerenter', () => move(link));
+      link.addEventListener('focus', () => move(link));
+    });
+    nav.addEventListener('pointerleave', () => (glide.dataset.on = 'false'));
+    nav.addEventListener('focusout', () => (glide.dataset.on = 'false'));
+  }
+
+  /* ── Menus (⋯) ─────────────────────────────────────────────────────── */
+  let openMenu: { button: HTMLElement; pop: HTMLElement } | null = null;
+
+  function closeMenu(returnFocus = false) {
+    if (!openMenu) return;
+    openMenu.pop.hidden = true;
+    openMenu.button.setAttribute('aria-expanded', 'false');
+    if (returnFocus) openMenu.button.focus();
+    openMenu = null;
+  }
+
+  function placeMenu(button: HTMLElement, pop: HTMLElement) {
+    const rect = button.getBoundingClientRect();
+    const { offsetWidth: w, offsetHeight: h } = pop;
+    const below = rect.bottom + 6;
+    const top = below + h > window.innerHeight - 12 ? Math.max(12, rect.top - h - 6) : below;
+    const left = Math.min(Math.max(12, rect.right - w), window.innerWidth - w - 12);
+    pop.style.top = `${top}px`;
+    pop.style.left = `${left}px`;
+  }
+
+  document.addEventListener('click', (event) => {
+    const target = event.target as Element;
+    const button = target.closest<HTMLElement>('[data-menu]');
+    if (button) {
+      const pop = button.nextElementSibling as HTMLElement | null;
+      if (!pop) return;
+      const wasOpen = openMenu?.button === button;
+      closeMenu();
+      if (wasOpen) return;
+      pop.hidden = false;
+      button.setAttribute('aria-expanded', 'true');
+      placeMenu(button, pop);
+      openMenu = { button, pop };
+      pop.querySelector<HTMLElement>('a, button')?.focus({ preventScroll: true });
+      return;
+    }
+    if (openMenu && !target.closest('.pt-menu-pop')) closeMenu();
+    // Choosing an item closes the menu; the item's own handler still runs.
+    else if (openMenu && target.closest('.pt-menu-pop :is(a, button)')) closeMenu();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      closeMenu(true);
+      setDrawer(false);
+    }
+    if (openMenu && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+      event.preventDefault();
+      const items = [...openMenu.pop.querySelectorAll<HTMLElement>('a, button')];
+      const at = items.indexOf(document.activeElement as HTMLElement);
+      const next = event.key === 'ArrowDown' ? (at + 1) % items.length : (at - 1 + items.length) % items.length;
+      items[next]?.focus();
+    }
+  });
+  window.addEventListener('resize', () => closeMenu());
+  window.addEventListener('scroll', () => closeMenu(), { passive: true, capture: true });
+
+  /* ── window.pf — the portal's own dialogs ──────────────────────────────
+     One <dialog>, reconfigured per question. Replaces confirm()/prompt(),
+     which look foreign and cannot ask for a typed name. */
+  type Ask = {
+    tone?: 'danger' | 'default';
+    title: string;
+    body: string;
+    /** Typing this exactly is what unlocks the confirm button. */
+    expected?: string;
+    /** A free-text answer (e.g. a note to the owner). */
+    field?: { label: string; multiline?: boolean; required?: boolean };
+    confirmLabel: string;
+    cancelLabel?: string;
+  };
+
+  let dialog: HTMLDialogElement | null = null;
+
+  function ask(options: Ask): Promise<{ ok: boolean; value: string }> {
+    if (!dialog) {
+      dialog = document.createElement('dialog');
+      dialog.className = 'pt-dialog';
+      document.body.append(dialog);
+    }
+    const root = dialog;
+    return new Promise((resolve) => {
+      const danger = options.tone === 'danger';
+      root.dataset.tone = danger ? 'danger' : 'default';
+
+      const form = document.createElement('form');
+      form.method = 'dialog';
+      form.noValidate = true;
+
+      const ic = document.createElement('div');
+      ic.className = 'ic';
+      ic.innerHTML = icon(danger ? 'trash' : 'alert', 22);
+
+      const h2 = document.createElement('h2');
+      h2.textContent = options.title;
+      const lead = document.createElement('p');
+      lead.className = 'lead';
+      lead.textContent = options.body;
+      form.append(ic, h2, lead);
+
+      let input: HTMLInputElement | HTMLTextAreaElement | null = null;
+      if (options.expected) {
+        const expect = document.createElement('strong');
+        expect.className = 'expect';
+        expect.textContent = options.expected;
+        const label = document.createElement('label');
+        label.className = 'tlabel';
+        label.htmlFor = 'pt-ask-input';
+        label.textContent = 'A megerősítéshez írja be a fenti nevet pontosan így:';
+        const text = document.createElement('input');
+        text.id = 'pt-ask-input';
+        text.autocomplete = 'off';
+        text.spellcheck = false;
+        text.setAttribute('autocapitalize', 'none');
+        // The point is to type it. Pasting would defeat the pause.
+        for (const type of ['paste', 'drop']) text.addEventListener(type, (e) => e.preventDefault());
+        input = text;
+        form.append(expect, label, text);
+      } else if (options.field) {
+        const label = document.createElement('label');
+        label.className = 'tlabel';
+        label.htmlFor = 'pt-ask-input';
+        label.textContent = options.field.label;
+        const field = options.field.multiline ? document.createElement('textarea') : document.createElement('input');
+        field.id = 'pt-ask-input';
+        input = field;
+        form.append(label, field);
+      }
+
+      const row = document.createElement('div');
+      row.className = 'row';
+      const cancel = document.createElement('button');
+      cancel.type = 'button';
+      cancel.className = 'btn ghost';
+      cancel.textContent = options.cancelLabel ?? 'Mégse';
+      const go = document.createElement('button');
+      go.type = 'submit';
+      go.className = 'btn go';
+      go.textContent = options.confirmLabel;
+      row.append(cancel, go);
+      form.append(row);
+
+      const sync = () => {
+        const value = input?.value ?? '';
+        const matches = options.expected ? value.trim() === options.expected.trim() : true;
+        const filled = options.field?.required ? value.trim().length > 0 : true;
+        go.disabled = !(matches && filled);
+        if (input && options.expected) input.dataset.match = String(matches && value.length > 0);
+      };
+      input?.addEventListener('input', sync);
+      sync();
+
+      let settled = false;
+      const finish = (ok: boolean) => {
+        if (settled) return;
+        settled = true;
+        const value = input?.value ?? '';
+        root.close();
+        resolve({ ok, value });
+      };
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        if (!go.disabled) finish(true);
+      });
+      cancel.addEventListener('click', () => finish(false));
+      root.oncancel = (event) => {
+        event.preventDefault();
+        finish(false);
+      };
+      root.onclick = (event) => {
+        if (event.target === root) finish(false);
+      };
+
+      root.replaceChildren(form);
+      root.showModal();
+      (input ?? cancel).focus();
+    });
+  }
+
+  (window as any).pf = {
+    /** Permanent actions: the confirm button stays locked until the name is typed. */
+    confirmType: async (o: { title: string; body: string; expected: string; confirmLabel?: string }) =>
+      (await ask({ tone: 'danger', confirmLabel: 'Végleges törlés', ...o })).ok,
+    /** A plain yes/no. */
+    confirm: async (o: { title: string; body: string; confirmLabel?: string; danger?: boolean }) =>
+      (await ask({ tone: o.danger ? 'danger' : 'default', confirmLabel: 'Rendben', ...o })).ok,
+    /** A short free-text answer; resolves to null when cancelled. */
+    askNote: async (o: { title: string; body: string; label: string; confirmLabel?: string; multiline?: boolean }) => {
+      const answer = await ask({
+        title: o.title,
+        body: o.body,
+        field: { label: o.label, multiline: o.multiline ?? true, required: true },
+        confirmLabel: o.confirmLabel ?? 'Küldés',
+      });
+      return answer.ok ? answer.value.trim() : null;
+    },
+  };
+</script>
+
 <style is:global>
   html,
   body {
     min-height: 100%;
-  }
-</style>
-
-<style>
-  .topbar {
-    display: flex;
-    align-items: center;
-    gap: 40px;
-    padding: 18px 32px;
-    border-bottom: 1px solid var(--border);
-    background: var(--cream);
-    position: sticky;
-    top: 0;
-    z-index: 10;
-  }
-  .topbar nav {
-    flex: 1;
-  }
-  .topbar ul {
-    display: flex;
-    gap: 28px;
-    list-style: none;
-  }
-  .topbar a {
-    font-size: var(--fs-small);
-    letter-spacing: 0.04em;
-    color: var(--taupe);
-    padding: 6px 0;
-    border-bottom: 2px solid transparent;
-  }
-  .topbar a:hover,
-  .topbar a[aria-current='page'] {
-    color: var(--ink);
-    border-bottom-color: var(--ink);
-  }
-
-  .who {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    font-size: var(--fs-small);
-  }
-  .who .name {
-    color: var(--ink);
-  }
-  .who .role {
-    font-size: var(--fs-micro);
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--taupe);
-    border: 1px solid var(--border);
-    padding: 2px 8px;
-  }
-  /* .topbar-prefixed to outrank the nav's own `.topbar a` underline rule. */
-  .topbar .home-link {
-    font-size: var(--fs-micro);
-    letter-spacing: 0.04em;
-    color: var(--ink);
-    padding: 5px 12px;
-    border: 1px solid var(--border);
-    white-space: nowrap;
-  }
-  .topbar .home-link:hover {
-    border-color: var(--ink);
-  }
-  .logout {
-    font-size: var(--fs-micro);
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--taupe);
-    text-decoration: underline;
-    text-underline-offset: 3px;
-  }
-  .logout:hover {
-    color: var(--ink);
-  }
-
-  main {
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 40px 32px 80px;
-  }
-  main.bare {
-    max-width: 420px;
-    padding: 0;
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  @media (max-width: 720px) {
-    .topbar {
-      flex-wrap: wrap;
-      gap: 16px;
-      padding: 16px 20px;
-    }
-    .topbar nav {
-      order: 3;
-      width: 100%;
-    }
-    .topbar ul {
-      gap: 18px;
-      flex-wrap: wrap;
-    }
-    main {
-      padding: 28px 20px 60px;
-    }
   }
 </style>

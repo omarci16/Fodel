@@ -31,8 +31,12 @@ export async function callOpenAiJson<T>(opts: {
   user: string;
   schema: Record<string, unknown>;
   schemaName: string;
+  /** Images / files sent with the text (OpenAI content parts). The text in `user` always goes first. */
+  userParts?: Record<string, unknown>[];
   maxTokens?: number;
   timeoutMs?: number;
+  /** Heavier calls (images, PDFs) set false: a second 40s attempt would outlive the function. */
+  retry?: boolean;
 }): Promise<T> {
   if (!isAiEnabled()) throw new AiError('ai-disabled');
   const key = import.meta.env.OPENAI_API_KEY;
@@ -48,7 +52,7 @@ export async function callOpenAiJson<T>(opts: {
           model: MODEL,
           messages: [
             { role: 'system', content: opts.system },
-            { role: 'user', content: opts.user },
+            { role: 'user', content: opts.userParts?.length ? [{ type: 'text', text: opts.user }, ...opts.userParts] : opts.user },
           ],
           max_tokens: opts.maxTokens ?? 900,
           response_format: {
@@ -71,6 +75,7 @@ export async function callOpenAiJson<T>(opts: {
   try {
     return await attempt();
   } catch (firstError) {
+    if (opts.retry === false) throw firstError;
     try {
       return await attempt();
     } catch {

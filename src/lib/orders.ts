@@ -39,7 +39,8 @@ export type OrderLocale = 'hu' | 'nl';
 
 /** One line of a stored order, exactly as it lives in `payments.line_items`. */
 export type OrderLine = {
-  kind: 'package' | 'extra';
+  /** `service` is a standalone purchase (a valuation package), not part of a listing order. */
+  kind: 'package' | 'extra' | 'service';
   id: string;
   quantity: number;
   unitCents: number;

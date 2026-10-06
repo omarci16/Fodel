@@ -25,6 +25,8 @@ import { createSupabaseAdminClient } from '~/lib/supabase-server';
 import { publishProperty, listingTitle } from '~/lib/portal/publish';
 import { deliver, localeOf, templates } from '~/lib/email/send';
 import { linesForEmail, formatCents, type OrderLine } from '~/lib/orders';
+import { officeInbox } from '~/lib/email/routing';
+import { SITE_URL } from '~/config/site.mjs';
 
 export const prerender = false;
 
@@ -50,13 +52,19 @@ export const POST: APIRoute = async ({ request }) => {
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as {
       id: string;
-      metadata?: { orderId?: string; propertyId?: string } | null;
+      metadata?: { orderId?: string; propertyId?: string; kind?: string; valuationId?: string } | null;
       payment_status?: string;
     };
 
     // `completed` fires for delayed payment methods before the money is
     // actually there; only `paid` means settled.
     if (session.payment_status && session.payment_status !== 'paid') {
+      return new Response(null, { status: 200 });
+    }
+
+    // A valuation package has no listing to publish: its own, much shorter path.
+    if (session.metadata?.kind === 'valuation') {
+      await settleValuationPayment(admin, session.id);
       return new Response(null, { status: 200 });
     }
 
@@ -165,6 +173,55 @@ async function sendReceipt(
         month: 'long',
         day: 'numeric',
       }),
+    })
+  );
+}
+
+/**
+ * Marks a valuation-package payment paid, tells the customer and the office.
+ * Safe to run twice: the receipt and the office note only go out on the first
+ * transition from pending, so a retried delivery sends nothing new.
+ */
+async function settleValuationPayment(admin: any, sessionId: string): Promise<void> {
+  const { data: order } = await admin
+    .from('payments')
+    .select('id, valuation_id, amount_cents, line_items, status, contact_email, billing_name, locale')
+    .eq('stripe_session_id', sessionId)
+    .maybeSingle();
+  if (!order) {
+    console.error(`[stripe] no valuation order found for session ${sessionId}`);
+    return;
+  }
+  if (['paid', 'manual', 'refunded'].includes(order.status)) return;
+
+  const paidAt = new Date();
+  await admin.from('payments').update({ status: 'paid', paid_at: paidAt.toISOString() }).eq('id', order.id);
+
+  const lines = (order.line_items ?? []) as OrderLine[];
+  const label = lines.map((line) => line.label).join(', ') || 'Értékbecslés';
+  const locale = order.locale === 'nl' ? 'nl' : 'hu';
+
+  if (order.contact_email) {
+    await deliver(
+      order.contact_email,
+      templates.valuationPaid(locale, {
+        service: label,
+        items: linesForEmail(lines),
+        total: formatCents(order.amount_cents),
+        paidAt: paidAt.toLocaleDateString(locale === 'nl' ? 'nl-NL' : 'hu-HU', { year: 'numeric', month: 'long', day: 'numeric' }),
+      })
+    );
+  }
+  await deliver(
+    officeInbox(),
+    templates.adminServiceRequested('hu', {
+      service: `Kártyás fizetés érkezett — ${label} (${formatCents(order.amount_cents)})`,
+      name: order.billing_name ?? '',
+      email: order.contact_email ?? '',
+      phone: '',
+      source: 'valuation',
+      note: '',
+      url: `${SITE_URL}/portal/valuations/${order.valuation_id}`,
     })
   );
 }

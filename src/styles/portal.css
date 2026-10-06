@@ -1,0 +1,1096 @@
+/**
+ * FODEL portal — 3.0 design system.
+ *
+ * The admin borrows the landing page's language: cream ground, white rounded
+ * cards, a dark ink slab (the sidebar), pill buttons, the same radius scale
+ * and ink-tinted shadows. Three layers live here:
+ *
+ *   1. the shell      — sidebar, mobile drawer, page ground
+ *   2. the kit        — menus, dialogs, avatars, badges used by new screens
+ *   3. the skin       — restyles the class names the older screens already use
+ *                       (.btn, .pill, .filters, .list …) so every page, old or
+ *                       new, reads as one product without being rewritten.
+ *
+ * The skin selectors carry `.pm.pm` (the main element's class, doubled) on
+ * purpose: Astro scopes each page's own <style> to (0,2,0), and this has to
+ * out-rank those without !important.
+ */
+
+:root {
+  --pt-red: #b3261e;
+  --pt-red-bg: rgba(179, 38, 30, 0.08);
+  --pt-amber: #8a6408;
+  --pt-amber-bg: rgba(200, 150, 0, 0.14);
+  --pt-green: #1f6f4a;
+  --pt-green-bg: rgba(31, 111, 74, 0.1);
+  --pt-hair: rgba(16, 42, 67, 0.08);
+  --pt-side-w: 272px;
+}
+
+/* ── 1. Shell ────────────────────────────────────────────────────────── */
+
+body.portal {
+  background: var(--cream);
+  color: var(--ink);
+}
+
+.pt-shell {
+  display: grid;
+  grid-template-columns: var(--pt-side-w) minmax(0, 1fr);
+  min-height: 100dvh;
+}
+
+.pt-side {
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  padding: 12px 0 12px 12px;
+  z-index: 40;
+}
+.pt-side-in {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border-radius: var(--r-xl);
+  color: var(--on-dark-body);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+/* The slab's light: a soft glow in the top corner, a hairline inside the edge. */
+.pt-side-in::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgba(244, 244, 242, 0.06);
+  pointer-events: none;
+}
+.pt-brand {
+  padding: 26px 26px 18px;
+}
+.pt-brand a {
+  display: inline-block;
+  line-height: 1;
+}
+.pt-brand .word {
+  display: block;
+  margin-right: -0.38em;
+  font-family: var(--serif);
+  font-weight: var(--fw-medium);
+  font-size: 20px;
+  letter-spacing: 0.38em;
+  color: var(--cream);
+}
+.pt-brand .rule {
+  display: block;
+  height: 1px;
+  background: rgba(244, 244, 242, 0.5);
+  margin: 5px 0 4px;
+}
+.pt-brand .sub {
+  display: block;
+  font-family: var(--sans);
+  font-size: 9px;
+  letter-spacing: 0.42em;
+  color: var(--on-dark-muted);
+  text-transform: uppercase;
+}
+.pt-brand .tag {
+  display: inline-block;
+  margin-top: 14px;
+  padding: 3px 10px;
+  border-radius: var(--r-pill);
+  background: rgba(244, 244, 242, 0.09);
+  color: var(--on-dark-body);
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+}
+
+.pt-nav {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 12px 12px;
+  scrollbar-width: none;
+}
+.pt-nav::-webkit-scrollbar {
+  display: none;
+}
+.pt-nav-group + .pt-nav-group {
+  margin-top: 18px;
+}
+.pt-nav-label {
+  padding: 0 14px 8px;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--on-dark-faint);
+}
+.pt-nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+.pt-link {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--r-pill);
+  font-size: 15px;
+  line-height: 1.2;
+  color: var(--on-dark-body);
+  transition: color 0.3s var(--ease-out);
+}
+.pt-link svg {
+  flex-shrink: 0;
+  width: 19px;
+  height: 19px;
+  opacity: 0.8;
+}
+.pt-link:hover {
+  color: var(--cream);
+}
+.pt-link[aria-current='page'] {
+  background: var(--cream);
+  color: var(--ink);
+  font-weight: var(--fw-medium);
+  box-shadow: 0 6px 18px -6px rgba(0, 0, 0, 0.45);
+}
+.pt-link[aria-current='page'] svg {
+  opacity: 1;
+}
+.pt-link .txt {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Counters: red = somebody is waiting on you. */
+.pt-count {
+  min-width: 22px;
+  padding: 2px 7px;
+  border-radius: var(--r-pill);
+  background: #e0473d;
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: var(--fw-semibold);
+  text-align: center;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+}
+.pt-link[aria-current='page'] .pt-count {
+  background: var(--pt-red);
+}
+/* The gliding hover pill — one element that follows the pointer. */
+.pt-glide {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 0;
+  height: 40px;
+  border-radius: var(--r-pill);
+  background: rgba(244, 244, 242, 0.09);
+  opacity: 0;
+  transform: translateY(0);
+  transition:
+    transform 0.45s var(--ease-out),
+    height 0.45s var(--ease-out),
+    opacity 0.3s var(--ease-out);
+  pointer-events: none;
+}
+.pt-glide[data-on='true'] {
+  opacity: 1;
+}
+
+.pt-side-foot {
+  padding: 12px;
+  border-top: 1px solid rgba(244, 244, 242, 0.1);
+}
+.pt-me {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 8px 8px 10px;
+  border-radius: var(--r-lg);
+  background: rgba(244, 244, 242, 0.06);
+}
+.pt-avatar {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--cream);
+  color: var(--ink);
+  font-weight: var(--fw-semibold);
+  font-size: 14px;
+  letter-spacing: 0.02em;
+}
+.pt-me-name {
+  flex: 1;
+  min-width: 0;
+}
+.pt-me-name b {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--fw-medium);
+  font-size: 14px;
+  color: var(--cream);
+}
+.pt-me-name span {
+  display: block;
+  font-size: 12px;
+  color: var(--on-dark-muted);
+}
+.pt-me form {
+  display: contents;
+}
+.pt-me-btn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  color: var(--on-dark-body);
+  transition:
+    background-color 0.3s var(--ease-out),
+    color 0.3s var(--ease-out);
+}
+.pt-me-btn:hover {
+  background: rgba(244, 244, 242, 0.14);
+  color: var(--cream);
+}
+.pt-me-btn svg {
+  width: 17px;
+  height: 17px;
+}
+
+.pt-main-wrap {
+  min-width: 0;
+}
+.pt-mobilebar {
+  display: none;
+}
+.pt-scrim {
+  display: none;
+}
+
+main.pm {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 44px clamp(24px, 4vw, 56px) 112px;
+}
+
+/* Pages arrive, they don't pop. Backwards-fill only, so nothing keeps a
+   transform (and the stacking context it brings) after it has landed. */
+@keyframes pt-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  main.pm > * {
+    animation: pt-rise 0.7s var(--ease-out) backwards;
+  }
+  main.pm > :nth-child(2) {
+    animation-delay: 0.05s;
+  }
+  main.pm > :nth-child(3) {
+    animation-delay: 0.1s;
+  }
+  main.pm > :nth-child(4) {
+    animation-delay: 0.15s;
+  }
+  main.pm > :nth-child(n + 5) {
+    animation-delay: 0.2s;
+  }
+}
+
+@media (max-width: 1000px) {
+  .pt-shell {
+    display: block;
+  }
+  .pt-side {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: min(88vw, 320px);
+    padding: 8px 0 8px 8px;
+    transform: translateX(-104%);
+    /* Hidden once it has slid away, so its links leave the tab order. */
+    visibility: hidden;
+    transition:
+      transform 0.55s var(--ease-out),
+      visibility 0s linear 0.55s;
+  }
+  body[data-drawer='open'] .pt-side {
+    transform: none;
+    visibility: visible;
+    transition-delay: 0s;
+  }
+  .pt-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 39;
+    background: rgba(10, 29, 48, 0.45);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s var(--ease-out);
+  }
+  body[data-drawer='open'] .pt-scrim {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .pt-mobilebar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 8px 8px 0;
+    padding: 8px 8px 8px 20px;
+    border-radius: var(--r-pill);
+    background: rgba(250, 250, 248, 0.86);
+    backdrop-filter: blur(14px) saturate(1.4);
+    -webkit-backdrop-filter: blur(14px) saturate(1.4);
+    box-shadow: var(--shadow-md);
+  }
+  .pt-mobilebar .word {
+    font-family: var(--serif);
+    font-weight: var(--fw-medium);
+    font-size: 17px;
+    letter-spacing: 0.34em;
+    color: var(--ink);
+  }
+  .pt-burger {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 16px 9px 14px;
+    border-radius: var(--r-pill);
+    background: var(--ink);
+    color: var(--cream);
+    font-size: 14px;
+    font-weight: var(--fw-medium);
+  }
+  .pt-burger svg {
+    width: 18px;
+    height: 18px;
+  }
+  .pt-burger .pt-count {
+    background: #e0473d;
+  }
+  main.pm {
+    padding: 28px 18px 96px;
+  }
+}
+
+/* Signed-out screens: no chrome, one quiet card on a glowing ground. */
+body.portal.bare {
+  background:
+    radial-gradient(70% 55% at 85% 0%, rgba(26, 58, 90, 0.16) 0%, transparent 60%),
+    radial-gradient(60% 50% at 0% 100%, rgba(26, 58, 90, 0.1) 0%, transparent 60%), var(--cream);
+}
+main.pm.bare {
+  max-width: 460px;
+  min-height: 100dvh;
+  padding: 24px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── 2. Kit ──────────────────────────────────────────────────────────── */
+
+.pt-card {
+  background: var(--white);
+  border-radius: var(--r-lg);
+  border: 1px solid var(--pt-hair);
+  box-shadow: var(--shadow-xs);
+}
+
+.pt-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: var(--taupe);
+  cursor: pointer;
+  transition:
+    background-color 0.25s var(--ease-out),
+    color 0.25s var(--ease-out);
+}
+.pt-icon-btn:hover,
+.pt-icon-btn[aria-expanded='true'] {
+  background: var(--linen);
+  color: var(--ink);
+}
+.pt-icon-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* A menu is a button and a popover; the popover is fixed-positioned by
+   script so tables and scroll containers never clip it. */
+.pt-menu {
+  display: inline-block;
+}
+.pt-menu-pop {
+  position: fixed;
+  z-index: 200;
+  min-width: 220px;
+  padding: 6px;
+  border-radius: var(--r-md);
+  background: var(--white);
+  border: 1px solid var(--pt-hair);
+  box-shadow: var(--shadow-float);
+  animation: pt-pop 0.22s var(--ease-out);
+}
+.pt-menu-pop[hidden] {
+  display: none;
+}
+@keyframes pt-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+.pt-menu-pop :is(a, button) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  font-size: 14.5px;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+  transition: background-color 0.2s var(--ease-out);
+}
+.pt-menu-pop :is(a, button):hover,
+.pt-menu-pop :is(a, button):focus-visible {
+  background: var(--linen);
+}
+.pt-menu-pop svg {
+  width: 17px;
+  height: 17px;
+  color: var(--ink-quiet);
+}
+.pt-menu-pop hr {
+  height: 1px;
+  margin: 6px 4px;
+  border: 0;
+  background: var(--pt-hair);
+}
+.pt-menu-pop .danger {
+  color: var(--pt-red);
+}
+.pt-menu-pop .danger svg {
+  color: var(--pt-red);
+}
+.pt-menu-pop .danger:hover {
+  background: var(--pt-red-bg);
+}
+.pt-menu-pop .cap {
+  padding: 8px 12px 4px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-quiet);
+}
+
+/* Dialog: one element, reconfigured per question, by window.pf (Portal.astro). */
+.pt-dialog {
+  width: min(480px, calc(100vw - 32px));
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-xl);
+  background: var(--white);
+  color: var(--ink);
+  box-shadow: var(--shadow-float);
+  animation: pt-dialog 0.4s var(--ease-out);
+}
+.pt-dialog::backdrop {
+  background: rgba(10, 29, 48, 0.5);
+  backdrop-filter: blur(3px);
+  animation: pt-fade 0.3s var(--ease-out);
+}
+@keyframes pt-dialog {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+}
+@keyframes pt-fade {
+  from {
+    opacity: 0;
+  }
+}
+.pt-dialog form {
+  padding: 30px 30px 26px;
+}
+.pt-dialog .ic {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  margin-bottom: 18px;
+  border-radius: 50%;
+  background: var(--linen);
+  color: var(--ink);
+}
+.pt-dialog .ic svg {
+  width: 22px;
+  height: 22px;
+}
+.pt-dialog[data-tone='danger'] .ic {
+  background: var(--pt-red-bg);
+  color: var(--pt-red);
+}
+.pt-dialog h2 {
+  font-family: var(--serif);
+  font-weight: var(--fw-display);
+  font-size: 24px;
+  letter-spacing: var(--ls-heading);
+  line-height: 1.2;
+  margin-bottom: 10px;
+}
+.pt-dialog .lead {
+  font-size: 15.5px;
+  line-height: 1.65;
+  color: var(--taupe);
+}
+.pt-dialog .expect {
+  display: block;
+  margin: 18px 0 8px;
+  padding: 12px 16px;
+  border-radius: var(--r-sm);
+  background: var(--linen);
+  font-family: var(--serif);
+  font-weight: var(--fw-semibold);
+  font-size: 16px;
+  line-height: 1.4;
+  word-break: break-word;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.pt-dialog .tlabel {
+  display: block;
+  margin: 18px 0 8px;
+  font-size: 13px;
+  color: var(--ink-quiet);
+}
+.pt-dialog input,
+.pt-dialog textarea {
+  width: 100%;
+  padding: 13px 16px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--paper);
+  font-size: 16px;
+  color: var(--ink);
+  transition:
+    border-color 0.25s var(--ease-out),
+    box-shadow 0.25s var(--ease-out);
+}
+.pt-dialog textarea {
+  min-height: 110px;
+  resize: vertical;
+  line-height: 1.55;
+}
+.pt-dialog input:focus,
+.pt-dialog textarea:focus {
+  outline: none;
+  border-color: var(--ink);
+  box-shadow: 0 0 0 4px rgba(16, 42, 67, 0.08);
+}
+.pt-dialog[data-tone='danger'] input:focus {
+  border-color: var(--pt-red);
+  box-shadow: 0 0 0 4px var(--pt-red-bg);
+}
+.pt-dialog input[data-match='true'] {
+  border-color: var(--pt-green);
+}
+.pt-dialog .row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+}
+.pt-dialog .go:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+.pt-dialog[data-tone='danger'] .go {
+  background: var(--pt-red);
+  border-color: var(--pt-red);
+  color: #fff;
+}
+
+/* Status dot + label pairs used on cards and rows. */
+.pt-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.pt-live {
+  position: relative;
+}
+.pt-live::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  opacity: 0;
+  animation: pt-ping 2.2s var(--ease-out) infinite;
+}
+@keyframes pt-ping {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pt-live::after {
+    animation: none;
+  }
+}
+
+/* ── 3. Skin for the existing screens ────────────────────────────────── */
+
+/* Page heads */
+main.pm.pm .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: var(--fw-medium);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-quiet);
+}
+main.pm.pm .eyebrow::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink);
+}
+main.pm.pm h1 {
+  font-family: var(--serif);
+  font-weight: var(--fw-display);
+  font-size: clamp(28px, 3vw, 38px);
+  line-height: 1.12;
+  letter-spacing: var(--ls-display);
+  color: var(--ink);
+}
+main.pm.pm h2 {
+  letter-spacing: var(--ls-heading);
+}
+main.pm.pm .lede,
+main.pm.pm .intro {
+  color: var(--taupe);
+}
+
+/* Buttons */
+main.pm.pm .btn,
+.pt-dialog .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 11px 22px;
+  border: 1px solid var(--ink);
+  border-radius: var(--r-pill);
+  background: var(--ink);
+  color: var(--cream);
+  font-family: var(--serif);
+  font-size: 14.5px;
+  font-weight: var(--fw-medium);
+  letter-spacing: 0;
+  text-transform: none;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    transform 0.4s var(--ease-out),
+    box-shadow 0.4s var(--ease-out),
+    background-color 0.3s var(--ease-out),
+    border-color 0.3s var(--ease-out),
+    color 0.3s var(--ease-out);
+}
+main.pm.pm .btn:hover:not(:disabled),
+.pt-dialog .btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+  background: var(--ink-soft);
+  border-color: var(--ink-soft);
+}
+main.pm.pm .btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+main.pm.pm .btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+main.pm.pm .btn.ghost,
+.pt-dialog .btn.ghost {
+  background: transparent;
+  color: var(--ink);
+  border-color: rgba(16, 42, 67, 0.22);
+}
+main.pm.pm .btn.ghost:hover:not(:disabled),
+.pt-dialog .btn.ghost:hover:not(:disabled) {
+  background: var(--white);
+  border-color: var(--ink);
+  color: var(--ink);
+}
+main.pm.pm .btn.small,
+main.pm.pm .btn.sm {
+  padding: 7px 15px;
+  font-size: 13.5px;
+}
+main.pm.pm .btn.danger,
+main.pm.pm .btn.ghost.danger {
+  background: transparent;
+  color: var(--pt-red);
+  border-color: rgba(179, 38, 30, 0.4);
+}
+main.pm.pm .btn.danger:hover:not(:disabled) {
+  background: var(--pt-red);
+  border-color: var(--pt-red);
+  color: #fff;
+}
+/* A primary action with an arrow chip: the chip is cream on ink. */
+main.pm.pm .btn .arrow-chip {
+  --chip: 26px;
+  --chip-bg: var(--cream);
+  --chip-fg: var(--ink);
+  margin: -4px -12px -4px 0;
+}
+main.pm.pm .btn.ghost .arrow-chip {
+  --chip-bg: var(--ink);
+  --chip-fg: var(--cream);
+}
+/* Quiet row buttons that never had a class. */
+main.pm.pm :is(.card-foot, .row-actions, .pick-actions) button:not(.btn) {
+  border-radius: var(--r-pill);
+  padding: 7px 15px;
+  font-size: 13.5px;
+  transition:
+    border-color 0.25s var(--ease-out),
+    background-color 0.25s var(--ease-out),
+    color 0.25s var(--ease-out);
+}
+main.pm.pm :is(.card-foot, .row-actions, .pick-actions) button:not(.btn):hover:not(:disabled) {
+  background: var(--white);
+}
+
+/* Filter chips and view toggles → pills */
+main.pm.pm :is(.filters, .chips, .tabs, .view-toggle) > a,
+main.pm.pm .pt-chips > a {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 16px;
+  border: 1px solid var(--pt-hair);
+  border-radius: var(--r-pill);
+  background: var(--white);
+  font-size: 14px;
+  letter-spacing: 0;
+  color: var(--taupe);
+  transition:
+    background-color 0.3s var(--ease-out),
+    border-color 0.3s var(--ease-out),
+    color 0.3s var(--ease-out),
+    transform 0.3s var(--ease-out);
+}
+main.pm.pm :is(.filters, .chips, .tabs, .view-toggle) > a:hover,
+main.pm.pm .pt-chips > a:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+main.pm.pm :is(.filters, .chips, .tabs, .view-toggle) > a[aria-current='page'],
+main.pm.pm .pt-chips > a[aria-current='page'] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--cream);
+}
+main.pm.pm :is(.filters, .tabs) {
+  gap: 8px;
+}
+main.pm.pm .chips {
+  gap: 8px;
+}
+
+/* Tables → one soft card. Corners are rounded cell by cell, never with
+   overflow: hidden, so menus can still escape the table. */
+main.pm.pm table.list {
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--white);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-xs), 0 0 0 1px var(--pt-hair);
+}
+main.pm.pm table.list th {
+  padding: 14px 16px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--pt-hair);
+  font-size: 12px;
+  font-weight: var(--fw-medium);
+  letter-spacing: 0.08em;
+  color: var(--ink-quiet);
+  white-space: nowrap;
+}
+main.pm.pm table.list th:first-child {
+  border-top-left-radius: var(--r-lg);
+}
+main.pm.pm table.list th:last-child {
+  border-top-right-radius: var(--r-lg);
+}
+main.pm.pm table.list td {
+  padding: 15px 16px;
+  border-bottom: 1px solid var(--pt-hair);
+  transition: background-color 0.2s var(--ease-out);
+}
+main.pm.pm table.list tbody tr:last-child td {
+  border-bottom: 0;
+}
+main.pm.pm table.list tbody tr:last-child td:first-child {
+  border-bottom-left-radius: var(--r-lg);
+}
+main.pm.pm table.list tbody tr:last-child td:last-child {
+  border-bottom-right-radius: var(--r-lg);
+}
+main.pm.pm table.list tbody tr:hover td {
+  background: var(--paper);
+}
+main.pm.pm table.list a {
+  text-decoration: none;
+  font-weight: var(--fw-medium);
+}
+main.pm.pm table.list a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Status pills */
+main.pm.pm .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 12px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: rgba(16, 42, 67, 0.07);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+}
+main.pm.pm .pill::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.85;
+}
+main.pm.pm :is(.pill-published, .pill-paid, .pill-manual, .pill-live, .pill-approved) {
+  background: var(--pt-green-bg);
+  color: var(--pt-green);
+  border: 0;
+}
+main.pm.pm :is(.pill-submitted, .pill-awaiting_payment, .pill-pending, .pill-needs_review, .pill-queued) {
+  background: var(--pt-amber-bg);
+  color: var(--pt-amber);
+  border: 0;
+}
+main.pm.pm :is(.pill-changes_requested, .pill-rejected, .pill-refunded, .pill-refund) {
+  background: var(--pt-red-bg);
+  color: var(--pt-red);
+  border: 0;
+}
+main.pm.pm :is(.pill-sold, .pill-archived, .pill-draft, .pill-off, .pill-cancelled) {
+  background: rgba(16, 42, 67, 0.07);
+  color: var(--ink-quiet);
+  border: 0;
+}
+
+/* Notices */
+main.pm.pm .notice {
+  padding: 14px 18px;
+  border: 0;
+  border-radius: var(--r-md);
+  font-size: 15px;
+  line-height: 1.6;
+}
+main.pm.pm .notice.ok {
+  background: var(--pt-green-bg);
+  color: #164f35;
+  border-left: 0;
+}
+main.pm.pm .notice.error {
+  background: var(--pt-red-bg);
+  color: var(--pt-red);
+  border-left: 0;
+}
+main.pm.pm .notice.warn,
+main.pm.pm .soft-warn {
+  border-radius: var(--r-md);
+}
+
+/* Form controls */
+main.pm.pm
+  :is(input, select, textarea):not([type='checkbox']):not([type='radio']):not([type='file']):not(
+    [type='range']
+  ):not([type='color']) {
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--white);
+  transition:
+    border-color 0.25s var(--ease-out),
+    box-shadow 0.25s var(--ease-out);
+}
+main.pm.pm
+  :is(input, select, textarea):not([type='checkbox']):not([type='radio']):not([type='file']):focus-visible {
+  outline: none;
+  border-color: var(--ink);
+  box-shadow: 0 0 0 4px rgba(16, 42, 67, 0.08);
+}
+main.pm.pm :is(.field label, label.field) {
+  letter-spacing: 0.08em;
+}
+
+/* Panels and cards that older pages draw with hairlines */
+main.pm.pm:not(.bare) .panel {
+  background: var(--white);
+  border: 1px solid var(--pt-hair);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-xs);
+}
+main.pm.pm:not(.bare) form.panel {
+  padding: 28px;
+}
+main.pm.pm .card {
+  border: 1px solid var(--pt-hair);
+  border-radius: var(--r-lg);
+  background: var(--white);
+  box-shadow: var(--shadow-xs);
+}
+
+/* Payments totals: tiles, the first one inked. */
+main.pm.pm .totals {
+  gap: 12px;
+  background: none;
+  border: 0;
+  max-width: none;
+}
+main.pm.pm .totals .total {
+  border-radius: var(--r-lg);
+  background: var(--white);
+  border: 1px solid var(--pt-hair);
+  box-shadow: var(--shadow-xs);
+  padding: 22px 24px;
+}
+main.pm.pm .totals .total:first-child {
+  background: linear-gradient(180deg, var(--ink) 0%, var(--ink-deep) 100%);
+  border-color: transparent;
+}
+main.pm.pm .totals .total:first-child .n {
+  color: var(--cream);
+}
+main.pm.pm .totals .total:first-child .label {
+  color: var(--on-dark-muted);
+}
+main.pm.pm .totals .total .n {
+  font-size: 28px;
+  letter-spacing: var(--ls-heading);
+}
+main.pm.pm .cal-grid {
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+
+/* Settings: the admin shortcuts as a card grid. */
+.pt-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  margin-bottom: 32px;
+}
+.pt-shortcut {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+  border-radius: var(--r-lg);
+  background: var(--white);
+  border: 1px solid var(--pt-hair);
+  box-shadow: var(--shadow-xs);
+  transition:
+    transform 0.45s var(--ease-out),
+    box-shadow 0.45s var(--ease-out);
+}
+.pt-shortcut:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+}
+.pt-shortcut b {
+  display: block;
+  font-family: var(--serif);
+  font-weight: var(--fw-semibold);
+  font-size: 15.5px;
+  color: var(--ink);
+}
+.pt-shortcut span {
+  display: block;
+  margin-top: 2px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--taupe);
+}
+.pt-shortcut > div {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Small screens: tables scroll inside themselves. */
+@media (max-width: 860px) {
+  main.pm.pm table.list {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+.pt-menu-pop [hidden] {
+  display: none;
+}
+.pt-dialog .expect {
+  white-space: pre-wrap;
+}

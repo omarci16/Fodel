@@ -15,6 +15,9 @@ interface ImportMetaEnv {
   readonly PMTILES_URL: string;
   readonly OPENAI_API_KEY: string;
   readonly AI_ENABLED: string;
+  /** Optional: where new enquiries are POSTed as JSON (the CRM's incoming webhook). */
+  readonly CRM_WEBHOOK_URL?: string;
+  readonly CRM_WEBHOOK_TOKEN?: string;
 }
 
 interface ImportMeta {
