@@ -16,15 +16,18 @@ const SOURCE_NOTE = {
 ---
 
 <Portal title="Meghívás">
-  <header class="head">
-    <p class="eyebrow">Felhasználók</p>
-    <h1>Új felhasználó meghívása</h1>
+  <header class="ph">
+    <div>
+      <p class="eyebrow"><a href="/portal/users">← Felhasználók</a></p>
+      <h1>Új felhasználó <em>meghívása</em></h1>
+      <p class="lede">A meghívott e-mailben kapja a belépési linket, és maga állítja be a jelszavát.</p>
+    </div>
   </header>
 
   {sent && <p class="notice ok">Meghívó elküldve: {decodeURIComponent(sent)}</p>}
   {err && <p class="notice error">{decodeURIComponent(err)}</p>}
 
-  <form method="POST" action="/api/portal/users/invite" class="panel">
+  <form method="POST" action="/api/portal/users/invite" class="invite-card">
     <div class="field">
       <label for="email">E-mail cím</label>
       <input id="email" name="email" type="email" required />
@@ -72,7 +75,7 @@ const SOURCE_NOTE = {
     <button type="submit" class="btn">Meghívó küldése</button>
   </form>
 
-  <a href="/portal/users" class="back">← Vissza a felhasználókhoz</a>
+  
 </Portal>
 
 <script>
@@ -104,23 +107,13 @@ const SOURCE_NOTE = {
 </script>
 
 <style>
-  .head { margin-bottom: 24px; }
-  .eyebrow { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--taupe); margin-bottom: 8px; }
-  h1 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 26px; color: var(--ink); }
-
-  .notice { padding: 12px 16px; font-size: var(--fs-small); margin-bottom: 20px; }
-  .notice.ok { background: rgba(16, 42, 67, 0.06); border-left: 2px solid var(--ink); }
-  .notice.error { background: rgba(179, 38, 30, 0.06); border-left: 2px solid #b3261e; color: #b3261e; }
-
-  .panel { max-width: 460px; }
-  .field { display: flex; flex-direction: column; margin-bottom: 18px; }
-  label { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--taupe); margin-bottom: 8px; }
-  input, select { border: 1px solid var(--border); background: #fff; padding: 11px 12px; font-size: var(--fs-body); color: var(--ink); }
-
-  .hint { margin-top: 8px; font-size: var(--fs-micro); line-height: 1.6; color: var(--taupe); }
-  .hint a { text-decoration: underline; }
-  label.check { display: flex; gap: 10px; align-items: center; text-transform: none; letter-spacing: 0; font-size: var(--fs-small); color: var(--ink); margin-bottom: 0; }
-
-  .btn { padding: 12px 24px; background: var(--ink); color: var(--cream); font-size: var(--fs-micro); letter-spacing: var(--ls-button); text-transform: uppercase; }
-  .back { display: inline-block; margin-top: 24px; font-size: var(--fs-small); text-decoration: underline; color: var(--taupe); }
+  .invite-card { max-width: 560px; padding: clamp(24px, 3vw, 36px); border-radius: var(--r-xl); background: var(--white); box-shadow: var(--shadow-md), 0 0 0 1px var(--pt-hair); }
+  .field { display: grid; gap: 8px; margin-bottom: 22px; }
+  label { font-size: var(--fs-small); font-weight: var(--fw-medium); color: var(--ink); }
+  input:not([type='checkbox']), select { width: 100%; min-height: 52px; padding: 12px 16px; font-size: var(--fs-body); color: var(--ink); font-family: inherit; }
+  .hint { font-size: 14px; line-height: 1.65; color: var(--ink-quiet); }
+  .hint a { text-decoration: underline; text-underline-offset: 3px; }
+  label.check { display: flex; gap: 12px; align-items: center; padding: 14px 16px; border-radius: var(--r-md); background: var(--paper); font-weight: var(--fw-regular); cursor: pointer; }
+  #free-field[hidden] { display: none; }
+  .invite-card .btn { width: 100%; padding: 14px 24px; }
 </style>

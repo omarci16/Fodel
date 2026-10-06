@@ -67,8 +67,8 @@
      optical-size files are deliberately NOT used: at display sizes they
      switch DM Sans to its condensed display cut, which reads as a different
      typeface from the one FODEL has always set. */
-  --serif: 'DM Sans Variable', 'DM Sans', 'Helvetica Neue', sans-serif;
-  --sans: 'Jost Variable', 'Jost', 'Helvetica Neue', sans-serif;
+  --serif: 'DM Sans Variable', 'DM Sans Fallback', 'DM Sans', 'Helvetica Neue', sans-serif;
+  --sans: 'Jost Variable', 'Jost Fallback', 'Jost', 'Helvetica Neue', sans-serif;
 
   /* ── Type scale ──
      ADJUSTED AGAIN in 1.2. The prototype used 13–14px body and 9.5–10.5px

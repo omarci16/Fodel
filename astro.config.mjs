@@ -30,6 +30,9 @@ import { SITE_URL, LOCALES, DEFAULT_LOCALE } from './src/config/site.mjs';
 export default defineConfig({
   site: SITE_URL,
   output: 'server',
+  // Portal sidebar links opt in with data-astro-prefetch="hover": the page is
+  // already on its way when the click lands. Nothing else prefetches.
+  prefetch: { prefetchAll: false, defaultStrategy: 'hover' },
   // Every POST form on the site (portal login, enquiries, ad submission,
   // search requests…) was returning "Cross-site POST form submissions are
   // forbidden" in production. Not a bug in the form code: Astro's CSRF check

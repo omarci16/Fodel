@@ -2,13 +2,15 @@
 /**
  * Blog admin — articles and case studies in four languages.
  *
- * Each row is one language version. The "Nyelvek" column shows the versions
- * linked to it, so a missing or unpublished translation is visible at a
- * glance rather than discovered from the public site.
+ * One card per article, not per language version: the language chips on each
+ * card show at a glance which versions exist, which are live and which are
+ * still waiting for a translation, and each chip opens that version.
  */
 export const prerender = false;
 
 import Portal from '~/layouts/Portal.astro';
+import { icon } from '~/lib/portal/icons';
+import { timeAgo } from '~/lib/portal/time';
 import { BLOG_LOCALES, isBlogLocale, PLACEHOLDER_PREFIX } from '~/lib/blog';
 
 const { supabase, profile } = Astro.locals;
@@ -21,12 +23,37 @@ const kindFilter = params.get('kind') === 'case_study' ? 'case_study' : params.g
 const { data: rows } = await supabase.from('blog_posts').select('*').order('updated_at', { ascending: false });
 const all = (rows ?? []).map((row: any) => ({ ...row, kind: row.kind === 'case_study' ? 'case_study' : 'article' }));
 
-const posts = all.filter(
-  (post) => (!localeFilter || post.locale === localeFilter) && (!kindFilter || post.kind === kindFilter)
-);
-const count = (locale: string) => all.filter((post) => post.locale === locale && (!kindFilter || post.kind === kindFilter)).length;
-const versionsOf = (post: (typeof all)[number]) =>
-  post.group_id ? all.filter((other) => other.group_id === post.group_id && other.id !== post.id) : [];
+type Post = (typeof all)[number];
+type State = 'live' | 'scheduled' | 'draft' | 'waiting';
+const stateOf = (post: Post): State => {
+  if (!post.published) return String(post.title).startsWith(PLACEHOLDER_PREFIX) ? 'waiting' : 'draft';
+  if (post.published_at && new Date(post.published_at).getTime() > Date.now()) return 'scheduled';
+  return 'live';
+};
+const STATE_LABEL: Record<State, string> = { live: 'Publikus', scheduled: 'Időzítve', draft: 'Piszkozat', waiting: 'Fordításra vár' };
+
+// Versions of one article share a group_id; a post with none stands alone.
+const groups = new Map<string, Post[]>();
+for (const post of all) {
+  const key = post.group_id ?? post.id;
+  groups.set(key, [...(groups.get(key) ?? []), post]);
+}
+const articles = [...groups.values()]
+  .map((versions) => {
+    const primary = versions.find((v) => v.locale === 'hu') ?? versions[0];
+    const updated = versions.reduce((latest, v) => (v.updated_at > latest ? v.updated_at : latest), versions[0].updated_at);
+    return { primary, versions, updated };
+  })
+  .filter(({ primary, versions }) => (!kindFilter || primary.kind === kindFilter) && (!localeFilter || versions.some((v) => v.locale === localeFilter)))
+  .sort((a, b) => (a.updated < b.updated ? 1 : -1));
+
+const countByState = (state: State) => all.filter((post) => stateOf(post) === state).length;
+const stats = [
+  { n: articles.length, label: 'Írás', tone: '' },
+  { n: countByState('live'), label: 'Publikus', tone: 'good' },
+  { n: countByState('draft'), label: 'Piszkozat', tone: '' },
+  { n: countByState('waiting') + countByState('scheduled'), label: 'Fordításra vár / időzített', tone: 'warn' },
+];
 
 const query = (changes: Record<string, string>) => {
   const next = new URLSearchParams(params);
@@ -36,114 +63,171 @@ const query = (changes: Record<string, string>) => {
   }
   return `/portal/content/blog${next.size ? `?${next}` : ''}`;
 };
-
-const statusOf = (post: (typeof all)[number]) => {
-  if (!post.published) return String(post.title).startsWith(PLACEHOLDER_PREFIX) ? 'Fordításra vár' : 'Piszkozat';
-  if (post.published_at && new Date(post.published_at).getTime() > Date.now()) return 'Időzítve';
-  return 'Publikus';
-};
-
-const dateFmt = new Intl.DateTimeFormat('hu-HU', { year: 'numeric', month: 'short', day: 'numeric' });
 const LANG = { hu: 'Magyar', nl: 'Holland', en: 'Angol', de: 'Német' } as const;
 ---
 
 <Portal title="Blog">
-  <header class="head">
-    <p class="eyebrow">Tartalom</p>
-    <h1>Blog és esettanulmányok</h1>
+  <header class="ph">
+    <div>
+      <p class="eyebrow">Tartalom</p>
+      <h1>Blog és <em>esettanulmányok</em></h1>
+    </div>
+    <ul class="stats" aria-label="Összesítés">
+      {stats.map((stat) => (
+        <li data-tone={stat.tone}><b>{stat.n}</b><span>{stat.label}</span></li>
+      ))}
+    </ul>
   </header>
 
-  <form class="create" method="GET" action="/portal/content/blog/new">
-    <label>Új
-      <select name="kind">
-        <option value="article">cikk</option>
-        <option value="case_study">esettanulmány</option>
-      </select>
-    </label>
-    <label>nyelve
-      <select name="locale">
-        {BLOG_LOCALES.map((locale) => <option value={locale}>{LANG[locale]}</option>)}
-      </select>
-    </label>
-    <button type="submit" class="btn">+ Létrehozás</button>
-    <p class="hint">A többi nyelvi változatot a szerkesztőből lehet egy kattintással létrehozni — üres piszkozatként, fordítás nélkül.</p>
+  <form class="composer" method="GET" action="/portal/content/blog/new">
+    <div class="composer-head">
+      <span class="composer-ic" set:html={icon('pen', 20)} />
+      <div>
+        <h2>Új írás</h2>
+        <p>A többi nyelvi változatot a szerkesztőből egy kattintással hozhatja létre — üres piszkozatként, fordítás nélkül.</p>
+      </div>
+    </div>
+    <div class="composer-row">
+      <fieldset class="seg">
+        <legend>Mi legyen?</legend>
+        <label><input type="radio" name="kind" value="article" checked /><span>Cikk</span></label>
+        <label><input type="radio" name="kind" value="case_study" /><span>Esettanulmány</span></label>
+      </fieldset>
+      <fieldset class="seg">
+        <legend>Milyen nyelven?</legend>
+        {BLOG_LOCALES.map((locale, index) => (
+          <label><input type="radio" name="locale" value={locale} checked={index === 0} /><span>{LANG[locale]}</span></label>
+        ))}
+      </fieldset>
+      <button type="submit" class="btn composer-go">Létrehozás <span set:html={icon('plus', 16)} /></button>
+    </div>
   </form>
 
-  <div class="filters">
-    <a href={query({ kind: '' })} aria-current={!kindFilter ? 'page' : undefined}>Minden típus</a>
-    <a href={query({ kind: 'article' })} aria-current={kindFilter === 'article' ? 'page' : undefined}>Cikkek</a>
-    <a href={query({ kind: 'case_study' })} aria-current={kindFilter === 'case_study' ? 'page' : undefined}>Esettanulmányok</a>
-  </div>
-  <div class="filters">
-    <a href={query({ locale: '' })} aria-current={!localeFilter ? 'page' : undefined}>Minden nyelv</a>
-    {BLOG_LOCALES.map((locale) => (
-      <a href={query({ locale })} aria-current={localeFilter === locale ? 'page' : undefined}>
-        {locale.toUpperCase()} <span>{count(locale)}</span>
-      </a>
-    ))}
+  <div class="filter-bar">
+    <div class="filters" aria-label="Típus">
+      <a href={query({ kind: '' })} aria-current={!kindFilter ? 'page' : undefined}>Minden típus</a>
+      <a href={query({ kind: 'article' })} aria-current={kindFilter === 'article' ? 'page' : undefined}>Cikkek</a>
+      <a href={query({ kind: 'case_study' })} aria-current={kindFilter === 'case_study' ? 'page' : undefined}>Esettanulmányok</a>
+    </div>
+    <div class="filters" aria-label="Nyelv">
+      <a href={query({ locale: '' })} aria-current={!localeFilter ? 'page' : undefined}>Minden nyelv</a>
+      {BLOG_LOCALES.map((locale) => (
+        <a href={query({ locale })} aria-current={localeFilter === locale ? 'page' : undefined}>{locale.toUpperCase()}</a>
+      ))}
+    </div>
   </div>
 
-  {posts.length > 0 ? (
-    <table class="list">
-      <thead><tr><th>Cím</th><th>Típus</th><th>Nyelv</th><th>Nyelvi változatok</th><th>Kategória</th><th>Állapot</th><th>Frissítve</th></tr></thead>
-      <tbody>
-        {posts.map((post) => (
-          <tr>
-            <td><a href={`/portal/content/blog/${post.id}`}>{post.title || '(névtelen)'}</a></td>
-            <td>{post.kind === 'case_study' ? 'Esettanulmány' : 'Cikk'}</td>
-            <td>{String(post.locale).toUpperCase()}</td>
-            <td>
-              {versionsOf(post).length === 0
-                ? <span class="sub">—</span>
-                : versionsOf(post).map((other) => (
-                    <a class:list={['version', { live: other.published }]} href={`/portal/content/blog/${other.id}`} title={statusOf(other)}>
-                      {String(other.locale).toUpperCase()}
+  {articles.length > 0 ? (
+    <ul class="articles">
+      {articles.map(({ primary, versions, updated }) => (
+        <li class="art">
+          <a class="art-main" href={`/portal/content/blog/${primary.id}`}>
+            <span class="art-kind">{primary.kind === 'case_study' ? 'Esettanulmány' : 'Cikk'}{primary.category ? ` · ${primary.category}` : ''}</span>
+            <h3>{primary.title || '(névtelen)'}</h3>
+            <span class="art-meta">
+              <span class="state" data-state={stateOf(primary)}>{STATE_LABEL[stateOf(primary)]}</span>
+              <span>Frissítve {timeAgo(updated)}</span>
+            </span>
+          </a>
+          <ul class="langs" aria-label="Nyelvi változatok">
+            {BLOG_LOCALES.map((locale) => {
+              const version = versions.find((v) => v.locale === locale);
+              return (
+                <li>
+                  {version ? (
+                    <a class="lang" data-state={stateOf(version)} data-current={version.id === primary.id ? 'true' : undefined} href={`/portal/content/blog/${version.id}`} title={`${LANG[locale]} — ${STATE_LABEL[stateOf(version)]}`}>
+                      {locale.toUpperCase()}
                     </a>
-                  ))}
-            </td>
-            <td>{post.category || '—'}</td>
-            <td><span class:list={['pill', { published: statusOf(post) === 'Publikus' }]}>{statusOf(post)}</span></td>
-            <td class="sub">{dateFmt.format(new Date(post.updated_at))}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+                  ) : (
+                    <span class="lang" data-state="missing" title={`${LANG[locale]} — még nincs`}>{locale.toUpperCase()}</span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </li>
+      ))}
+    </ul>
   ) : (
-    <p class="empty">Ehhez a szűréshez nincs tartalom.</p>
+    <div class="empty">
+      <span class="empty-ic" set:html={icon('pen', 26)} />
+      <p>Ehhez a szűréshez nincs tartalom.</p>
+      <a class="btn ghost" href="/portal/content/blog">Szűrők törlése</a>
+    </div>
   )}
 </Portal>
 
 <style>
-  .head { margin-bottom: 20px; }
-  .eyebrow { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--taupe); margin-bottom: 4px; }
-  h1 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 26px; color: var(--ink); }
-  .btn { padding: 9px 18px; background: var(--ink); color: var(--cream); font-size: var(--fs-micro); letter-spacing: var(--ls-button); text-transform: uppercase; }
+  .ph { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 24px 40px; margin-bottom: 32px; }
+  .eyebrow { margin-bottom: 14px; }
+  h1 em { font-style: normal; font-weight: inherit; color: var(--ink-quiet); }
 
-  .create { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin-bottom: 24px; padding: 16px; border: 1px solid var(--border); }
-  .create label { display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; color: var(--taupe); }
-  .create select { border: 1px solid var(--border); background: #fff; padding: 8px 10px; font-size: var(--fs-small); color: var(--ink); }
-  .hint { flex-basis: 100%; font-size: var(--fs-micro); color: var(--taupe); }
+  .stats { list-style: none; display: flex; gap: 10px; flex-wrap: wrap; }
+  .stats li { display: grid; gap: 2px; min-width: 104px; padding: 12px 18px; border-radius: var(--r-lg); background: var(--white); box-shadow: var(--shadow-xs), 0 0 0 1px var(--pt-hair); }
+  .stats b { font-family: var(--serif); font-weight: var(--fw-display); font-size: 28px; line-height: 1; color: var(--ink); }
+  .stats span { font-size: 12.5px; color: var(--ink-quiet); max-width: 15ch; line-height: 1.3; }
+  .stats li[data-tone='good'] b { color: var(--pt-green); }
+  .stats li[data-tone='warn'] b { color: var(--pt-amber); }
 
-  .filters { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 10px; }
-  .filters + .filters { margin-bottom: 22px; }
-  .filters a { padding: 7px 14px; font-size: var(--fs-micro); letter-spacing: 0.04em; color: var(--taupe); border: 1px solid var(--border); }
-  .filters a[aria-current='page'] { background: var(--ink); color: var(--cream); border-color: var(--ink); }
-  .filters span { margin-left: 5px; opacity: 0.65; }
+  /* The composer: pick what and in which language, then go. */
+  .composer { margin-bottom: 28px; padding: clamp(20px, 2.6vw, 30px); border-radius: var(--r-xl); background: var(--ink); color: var(--cream); box-shadow: var(--shadow-lg); background-image: radial-gradient(70% 120% at 100% 0%, rgba(80, 130, 180, 0.28), transparent 60%); }
+  .composer-head { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 22px; }
+  .composer-ic { display: grid; place-items: center; flex: none; width: 46px; height: 46px; border-radius: 50%; background: rgba(244, 244, 242, 0.12); }
+  .composer-ic :global(svg) { width: 21px; height: 21px; }
+  .composer h2 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 22px; color: var(--cream); margin-bottom: 4px; }
+  .composer-head p { font-size: 14.5px; line-height: 1.6; color: rgba(244, 244, 242, 0.7); max-width: 60ch; }
+  .composer-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 18px 28px; }
+  .seg { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 4px; border: 0; border-radius: var(--r-pill); background: rgba(244, 244, 242, 0.1); position: relative; margin-top: 22px; }
+  .seg legend { position: absolute; top: -24px; left: 6px; padding: 0; font-size: 12.5px; letter-spacing: 0.04em; color: rgba(244, 244, 242, 0.65); }
+  .seg label { position: relative; cursor: pointer; }
+  .seg input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; margin: 0; }
+  .seg span { display: block; padding: 9px 18px; border-radius: var(--r-pill); font-size: 14.5px; color: rgba(244, 244, 242, 0.78); transition: background-color 0.3s var(--ease-out), color 0.3s var(--ease-out); }
+  .seg label:hover span { color: var(--cream); }
+  .seg input:checked + span { background: var(--cream); color: var(--ink); font-weight: var(--fw-medium); }
+  .seg input:focus-visible + span { outline: 2px solid var(--cream); outline-offset: 2px; }
+  /* Out-ranks the portal skin's .btn, which is dark on light. */
+  main.pm .composer .composer-go.btn { margin-left: auto; background: var(--cream); border-color: var(--cream); color: var(--ink); }
+  main.pm .composer .composer-go.btn:hover:not(:disabled) { background: #fff; border-color: #fff; }
+  .composer-go :global(svg) { width: 16px; height: 16px; }
 
-  .empty { color: var(--taupe); font-size: var(--fs-small); padding: 32px 0; }
+  .filter-bar { display: flex; flex-wrap: wrap; gap: 10px 28px; margin-bottom: 20px; }
 
-  .list { width: 100%; border-collapse: collapse; font-size: var(--fs-small); }
-  .list th { text-align: left; font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; color: var(--taupe); padding: 10px 12px; border-bottom: 1px solid var(--border); }
-  .list td { padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--ink); }
-  .list a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
-  .sub { font-size: var(--fs-micro); color: var(--taupe); }
-  .version { display: inline-block; margin-right: 4px; padding: 1px 6px; font-size: var(--fs-micro); border: 1px dashed var(--border); text-decoration: none !important; }
-  .version.live { border-style: solid; border-color: var(--ink); }
+  /* One card per article. */
+  .articles { list-style: none; display: grid; gap: 12px; }
+  .art { display: flex; align-items: center; gap: 20px; border-radius: var(--r-lg); background: var(--white); box-shadow: var(--shadow-xs), 0 0 0 1px var(--pt-hair); transition: box-shadow 0.35s var(--ease-out), transform 0.35s var(--ease-out); }
+  .art:hover { box-shadow: var(--shadow-md), 0 0 0 1px rgba(16, 42, 67, 0.16); transform: translateY(-2px); }
+  .art-main { flex: 1; min-width: 0; display: grid; gap: 8px; padding: 22px 0 22px 26px; text-decoration: none; color: inherit; }
+  .art-kind { font-size: 12.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-quiet); }
+  .art h3 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 19px; line-height: 1.3; letter-spacing: var(--ls-heading); color: var(--ink); text-wrap: balance; }
+  .art-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font-size: 14px; color: var(--ink-quiet); }
+  .state { display: inline-flex; align-items: center; gap: 7px; padding: 3px 12px 3px 10px; border-radius: var(--r-pill); background: var(--linen); color: var(--ink); font-size: 13px; font-weight: var(--fw-medium); }
+  .state::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: 0.5; }
+  .state[data-state='live'] { background: var(--pt-green-bg); color: var(--pt-green); }
+  .state[data-state='live']::before { opacity: 1; }
+  .state[data-state='scheduled'], .state[data-state='waiting'] { background: var(--pt-amber-bg); color: var(--pt-amber); }
 
-  .pill { display: inline-block; font-size: var(--fs-micro); padding: 3px 10px; border: 1px solid var(--border); white-space: nowrap; }
-  .pill.published { background: rgba(16, 42, 67, 0.08); border-color: var(--ink); }
+  .langs { list-style: none; display: flex; gap: 6px; padding: 0 26px 0 0; }
+  .lang { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; font-size: 12.5px; font-weight: var(--fw-medium); letter-spacing: 0.04em; text-decoration: none; color: var(--ink-quiet); background: var(--paper); border: 1.5px solid transparent; transition: transform 0.25s var(--ease-out), background-color 0.25s var(--ease-out), color 0.25s var(--ease-out); }
+  a.lang:hover { transform: translateY(-2px) scale(1.05); }
+  .lang[data-state='live'] { background: var(--pt-green-bg); color: var(--pt-green); border-color: rgba(31, 111, 74, 0.35); }
+  .lang[data-state='scheduled'], .lang[data-state='waiting'] { background: var(--pt-amber-bg); color: var(--pt-amber); border-color: rgba(138, 100, 8, 0.3); }
+  .lang[data-state='draft'] { background: var(--white); color: var(--ink); border: 1.5px dashed rgba(16, 42, 67, 0.35); }
+  .lang[data-state='missing'] { background: transparent; color: rgba(16, 42, 67, 0.28); border: 1.5px dotted rgba(16, 42, 67, 0.2); }
+  .lang[data-current='true'] { box-shadow: 0 0 0 3px rgba(16, 42, 67, 0.12); }
 
-  @media (max-width: 860px) {
-    .list { display: block; overflow-x: auto; white-space: nowrap; }
+  .empty { display: grid; justify-items: center; gap: 14px; padding: 64px 20px; border-radius: var(--r-xl); background: var(--paper); box-shadow: 0 0 0 1px var(--pt-hair); text-align: center; color: var(--ink-quiet); }
+  .empty-ic { display: grid; place-items: center; width: 60px; height: 60px; border-radius: 50%; background: var(--white); color: var(--ink); box-shadow: var(--shadow-sm); }
+
+  @media (max-width: 720px) {
+    .art { flex-direction: column; align-items: stretch; gap: 0; }
+    .art-main { padding: 20px 20px 12px; }
+    .langs { padding: 0 20px 20px; }
+    main.pm .composer .composer-go.btn { margin-left: 0; width: 100%; }
+    .seg { width: 100%; }
+    .seg label { flex: 1; text-align: center; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .art, .lang { transition: none; }
+    .art:hover, a.lang:hover { transform: none; }
   }
 </style>

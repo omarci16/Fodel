@@ -11,6 +11,7 @@
  * same rules independently at the database. See supabase/migrations/0001_init.sql.
  */
 import { defineMiddleware } from 'astro/middleware';
+import type { User } from '@supabase/supabase-js';
 import { createSupabaseServerClient } from '~/lib/supabase-server';
 
 const PUBLIC_PORTAL_PATHS = [
@@ -64,9 +65,13 @@ export const onRequest = defineMiddleware(async (context, next) => {
   const supabase = createSupabaseServerClient(context.request, context.cookies);
   context.locals.supabase = supabase;
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // `getClaims` checks the session token's signature and expiry on the server
+  // itself, so a signed-in request no longer waits on a round trip to Supabase
+  // Auth before anything else can start. Only the id and email are ever read
+  // from `locals.user`; the database still enforces access through RLS.
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const claims = claimsData?.claims;
+  const user = claims?.sub ? ({ id: claims.sub, email: claims.email ?? undefined } as User) : null;
   context.locals.user = user;
 
   let profile: App.Locals['profile'] = null;

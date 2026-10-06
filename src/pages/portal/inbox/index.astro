@@ -20,16 +20,18 @@ import { timeAgo, hoursSince, listingName } from '~/lib/portal/time';
 
 const { supabase } = Astro.locals;
 
-const { data: rows } = await supabase
-  .from('properties')
-  .select(
-    'id, ref, status, settlement, price_eur, owner_id, created_at, submitted_at, property_translations(locale, title), property_media(storage_path, is_hero, sort_order)'
-  )
-  .in('status', ['draft', 'submitted', 'changes_requested', 'rejected'])
-  .order('created_at', { ascending: false });
+const [{ data: rows }, { data: people }] = await Promise.all([
+  supabase
+    .from('properties')
+    .select(
+      'id, ref, status, settlement, price_eur, owner_id, created_at, submitted_at, property_translations(locale, title), property_media(storage_path, is_hero, sort_order)'
+    )
+    .in('status', ['draft', 'submitted', 'changes_requested', 'rejected'])
+    .order('created_at', { ascending: false }),
+  supabase.from('profiles').select('id, full_name, email'),
+]);
 const properties = rows ?? [];
 
-const { data: people } = await supabase.from('profiles').select('id, full_name, email');
 const ownerName = new Map<string, string>((people ?? []).map((p: any) => [p.id, p.full_name || p.email]));
 
 const COLUMNS = [

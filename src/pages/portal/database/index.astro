@@ -15,6 +15,7 @@ export const prerender = false;
 
 import Portal from '~/layouts/Portal.astro';
 import { EVENT_LABEL, eventLabel } from '~/lib/portal/labels';
+import { icon } from '~/lib/portal/icons';
 
 const { supabase, profile } = Astro.locals;
 if (profile?.role !== 'admin') return Astro.redirect('/portal/dashboard');
@@ -76,6 +77,24 @@ const exportParams = new URLSearchParams(params);
 exportParams.delete('before');
 const exportHref = `/api/portal/database/export${exportParams.size ? `?${exportParams}` : ''}`;
 
+// Events grouped by calendar day, newest first — an activity log reads as a timeline.
+const dayFmt = new Intl.DateTimeFormat('hu-HU', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+const timeFmt = new Intl.DateTimeFormat('hu-HU', { hour: '2-digit', minute: '2-digit' });
+const dayKey = (iso: string) => new Date(iso).toLocaleDateString('sv-SE');
+const todayKey = new Date().toLocaleDateString('sv-SE');
+const yesterdayKey = new Date(Date.now() - 86400_000).toLocaleDateString('sv-SE');
+const days: { key: string; label: string; items: NonNullable<typeof events> }[] = [];
+for (const event of events ?? []) {
+  const key = dayKey(event.occurred_at);
+  let day = days.find((entry) => entry.key === key);
+  if (!day) {
+    day = { key, label: key === todayKey ? 'Ma' : key === yesterdayKey ? 'Tegnap' : dayFmt.format(new Date(event.occurred_at)), items: [] };
+    days.push(day);
+  }
+  day.items.push(event);
+}
+const filtered = Boolean(kind || locale || source || actor || from || to);
+
 const withParam = (key: string, value: string) => {
   const next = new URLSearchParams(params);
   next.delete('before');
@@ -86,15 +105,19 @@ const withParam = (key: string, value: string) => {
 ---
 
 <Portal title="Adatbázis">
-  <header class="head">
-    <p class="eyebrow">Adatbázis</p>
-    <h1>Aktivitási napló</h1>
-    <a href={exportHref} class="export-link">CSV export (aktuális szűrés, max. 10 000 sor) →</a>
+  <header class="ph">
+    <div>
+      <p class="eyebrow">Adatbázis</p>
+      <h1>Aktivitási <em>napló</em></h1>
+    </div>
+    <a href={exportHref} class="btn ghost" data-no-progress>
+      <Fragment set:html={icon('archive', 17)} /> CSV export
+    </a>
   </header>
 
-  <form method="GET" class="filters">
+  <form method="GET" class="filter-card">
     <input type="hidden" name="kind" value={kind} />
-    <div class="chips">
+    <div class="chips" aria-label="Esemény típusa">
       <a href={withParam('kind', '')} aria-current={!kind ? 'page' : undefined}>Mind</a>
       {KNOWN_KINDS.map((k) => (
         <a href={withParam('kind', k)} aria-current={kind === k ? 'page' : undefined}>{eventLabel(k)}</a>
@@ -127,67 +150,93 @@ const withParam = (key: string, value: string) => {
         Ig
         <input type="date" name="to" value={to} />
       </label>
-      <button type="submit" class="btn">Szűrés</button>
+      <div class="row-go">
+        <button type="submit" class="btn">Szűrés</button>
+        {filtered && <a class="clear" href="/portal/database">Törlés</a>}
+      </div>
     </div>
   </form>
 
-  {events && events.length > 0 ? (
-    <table class="list">
-      <thead>
-        <tr><th>Időpont</th><th>Esemény</th><th>Ki</th><th>Hirdetés</th><th>Forrás</th></tr>
-      </thead>
-      <tbody>
-        {events.map((e) => (
-          <tr>
-            <td class="nowrap">{dateFmt.format(new Date(e.occurred_at))}</td>
-            <td><span class="pill" title={e.kind}>{eventLabel(e.kind)}</span></td>
-            <td>
-              {e.actor_email ? <a href={`/portal/database/people/${encodeURIComponent(e.actor_email)}`}>{e.actor_email}</a> : '—'}
-            </td>
-            <td>{e.property_id ? <a href={`/portal/properties/${e.property_id}`}>#{refById.get(e.property_id) ?? '—'}</a> : '—'}</td>
-            <td class="sub">{e.source ?? '—'}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+  {days.length > 0 ? (
+    <div class="timeline">
+      {days.map((day) => (
+        <section class="day">
+          <h2><span>{day.label}</span><small>{day.items.length} esemény</small></h2>
+          <ul>
+            {day.items.map((e) => (
+              <li class="ev">
+                <time datetime={e.occurred_at}>{timeFmt.format(new Date(e.occurred_at))}</time>
+                <span class="node" aria-hidden="true"></span>
+                <div class="ev-body">
+                  <span class="pill" title={e.kind}>{eventLabel(e.kind)}</span>
+                  <span class="ev-who">
+                    {e.actor_email ? <a href={`/portal/database/people/${encodeURIComponent(e.actor_email)}`}>{e.actor_email}</a> : <span class="sub">Rendszer / látogató</span>}
+                    {e.property_id && <> · <a class="ref" href={`/portal/properties/${e.property_id}`}>#{refById.get(e.property_id) ?? '—'}</a></>}
+                  </span>
+                </div>
+                <span class="ev-src" title={e.source ?? ''}>{e.source ?? ''}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
   ) : (
-    <p class="empty">Ehhez a szűréshez nincs esemény.</p>
+    <div class="empty">
+      <p>Ehhez a szűréshez nincs esemény.</p>
+      <a class="btn ghost" href="/portal/database">Szűrők törlése</a>
+    </div>
   )}
 
   {nextCursor && (
-    <a class="more" href={withParam('before', nextCursor)}>Régebbi események →</a>
+    <a class="more btn ghost" href={withParam('before', nextCursor)}>Régebbi események <Fragment set:html={icon('move', 16)} /></a>
   )}
 </Portal>
 
 <style>
-  .head { margin-bottom: 20px; }
-  .eyebrow { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--taupe); margin-bottom: 8px; }
-  h1 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 26px; color: var(--ink); display: inline-block; margin-right: 16px; }
-  .export-link { font-size: var(--fs-small); text-decoration: underline; text-underline-offset: 2px; }
+  .ph { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 20px 40px; margin-bottom: 30px; }
+  .eyebrow { margin-bottom: 14px; }
+  h1 em { font-style: normal; font-weight: inherit; color: var(--ink-quiet); }
+  .btn :global(svg) { width: 17px; height: 17px; }
 
-  .filters { margin-bottom: 24px; }
-  .chips { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 14px; }
-  .chips a { padding: 6px 12px; font-size: var(--fs-micro); letter-spacing: 0.03em; color: var(--taupe); border: 1px solid var(--border); }
-  .chips a[aria-current='page'] { background: var(--ink); color: var(--cream); border-color: var(--ink); }
+  .filter-card { display: grid; gap: 18px; margin-bottom: 36px; padding: clamp(18px, 2.4vw, 26px); border-radius: var(--r-xl); background: var(--white); box-shadow: var(--shadow-xs), 0 0 0 1px var(--pt-hair); }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chips a { padding: 7px 16px; border-radius: var(--r-pill); border: 1px solid var(--pt-hair); background: var(--white); font-size: 14px; color: var(--ink-quiet); text-decoration: none; transition: background-color 0.25s var(--ease-out), border-color 0.25s var(--ease-out), color 0.25s var(--ease-out); }
+  .chips a:hover { border-color: var(--ink); color: var(--ink); }
+  .chips a[aria-current='page'] { background: var(--ink); border-color: var(--ink); color: var(--cream); }
+  .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; align-items: end; }
+  .row label { display: grid; gap: 7px; font-size: 13.5px; color: var(--ink-quiet); }
+  .row input, .row select { width: 100%; min-height: 46px; padding: 10px 14px; font-size: var(--fs-small); color: var(--ink); }
+  .row-go { display: flex; align-items: center; gap: 16px; }
+  .clear { font-size: 14px; color: var(--ink-quiet); text-decoration: underline; text-underline-offset: 3px; }
 
-  .row { display: flex; gap: 16px; flex-wrap: wrap; align-items: end; }
-  .row label { display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; color: var(--taupe); }
-  .row input, .row select { border: 1px solid var(--border); background: #fff; padding: 8px 10px; font-size: var(--fs-small); color: var(--ink); min-width: 120px; }
-  .btn { padding: 9px 20px; background: var(--ink); color: var(--cream); font-size: var(--fs-micro); letter-spacing: var(--ls-button); text-transform: uppercase; height: 37px; }
+  /* A timeline: day by day, newest first. */
+  .timeline { display: grid; gap: 36px; }
+  .day h2 { display: flex; align-items: baseline; gap: 14px; margin-bottom: 14px; font-family: var(--serif); font-weight: var(--fw-display); font-size: 20px; letter-spacing: var(--ls-heading); color: var(--ink); text-transform: capitalize; }
+  .day h2 small { font-size: 13.5px; font-weight: var(--fw-regular); color: var(--ink-quiet); text-transform: none; letter-spacing: 0; }
+  .day ul { list-style: none; position: relative; border-radius: var(--r-lg); background: var(--white); box-shadow: var(--shadow-xs), 0 0 0 1px var(--pt-hair); }
+  .ev { display: grid; grid-template-columns: 56px 14px minmax(0, 1fr) minmax(0, 220px); align-items: center; gap: 14px; padding: 13px 20px; transition: background-color 0.2s var(--ease-out); }
+  .ev:first-child { border-radius: var(--r-lg) var(--r-lg) 0 0; }
+  .ev:last-child { border-radius: 0 0 var(--r-lg) var(--r-lg); }
+  .ev + .ev { border-top: 1px solid var(--pt-hair); }
+  .ev:hover { background: var(--paper); }
+  .ev time { font-size: 14px; color: var(--ink-quiet); font-variant-numeric: tabular-nums; }
+  .node { width: 9px; height: 9px; border-radius: 50%; background: var(--ink); opacity: 0.7; box-shadow: 0 0 0 4px rgba(16, 42, 67, 0.08); }
+  .ev-body { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; min-width: 0; }
+  .ev-who { font-size: 14.5px; color: var(--ink); overflow-wrap: anywhere; }
+  .ev-who a { text-decoration: underline; text-underline-offset: 3px; }
+  .ref { font-weight: var(--fw-medium); }
+  .ev-src { font-size: 13px; color: var(--ink-quiet); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sub { font-size: 14px; color: var(--ink-quiet); }
 
-  .empty { color: var(--taupe); font-size: var(--fs-small); padding: 32px 0; }
+  .empty { display: grid; justify-items: center; gap: 14px; padding: 56px 20px; border-radius: var(--r-xl); background: var(--paper); box-shadow: 0 0 0 1px var(--pt-hair); text-align: center; color: var(--ink-quiet); }
+  .more { margin-top: 28px; }
+  .more :global(svg) { width: 16px; height: 16px; }
 
-  .list { width: 100%; border-collapse: collapse; font-size: var(--fs-small); }
-  .list th { text-align: left; font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; color: var(--taupe); padding: 10px 12px; border-bottom: 1px solid var(--border); }
-  .list td { padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--ink); vertical-align: top; }
-  .list a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
-  .nowrap { white-space: nowrap; }
-  .sub { font-size: var(--fs-micro); color: var(--taupe); }
-  .pill { display: inline-block; font-size: var(--fs-micro); padding: 3px 10px; border: 1px solid var(--border); white-space: nowrap; background: rgba(16, 42, 67, 0.05); }
-
-  .more { display: block; margin-top: 20px; font-size: var(--fs-small); text-decoration: underline; text-underline-offset: 2px; }
-
-  @media (max-width: 860px) {
-    .list { display: block; overflow-x: auto; }
+  @media (max-width: 720px) {
+    .ev { grid-template-columns: 48px minmax(0, 1fr); gap: 4px 12px; }
+    .node { display: none; }
+    .ev-src { grid-column: 2; text-align: left; }
   }
+  @media (prefers-reduced-motion: reduce) { .ev { transition: none; } }
 </style>

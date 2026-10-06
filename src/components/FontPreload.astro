@@ -1,0 +1,19 @@
+---
+/**
+ * Starts the two typefaces downloading with the HTML instead of when the CSS
+ * is parsed, so text is set in DM Sans and Jost from the first paint. Only the
+ * Latin and Latin-extended subsets are preloaded: Hungarian needs the second
+ * one for ő and ű, and the browser fetches nothing else it doesn't use.
+ *
+ * The matching size-adjusted fallbacks live in global.css, so on a slow
+ * connection the swap does not move any line either.
+ */
+import dmLatin from '~/assets/fonts/dm-sans-latin-wght-normal.woff2?url';
+import dmLatinExt from '~/assets/fonts/dm-sans-latin-ext-wght-normal.woff2?url';
+import jostLatin from '~/assets/fonts/jost-latin-wght-normal.woff2?url';
+import jostLatinExt from '~/assets/fonts/jost-latin-ext-wght-normal.woff2?url';
+
+const files = [dmLatin, dmLatinExt, jostLatin, jostLatinExt];
+---
+
+{files.map((href) => <link rel="preload" as="font" type="font/woff2" href={href} crossorigin="anonymous" />)}

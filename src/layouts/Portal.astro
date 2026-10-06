@@ -13,6 +13,7 @@
 import '~/styles/global.css';
 import '~/styles/portal.css';
 import { icon, type IconName } from '~/lib/portal/icons';
+import FontPreload from '~/components/FontPreload.astro';
 
 interface Props {
   title: string;
@@ -122,8 +123,10 @@ const homeHref = profile?.locale === 'nl' ? '/nl/' : '/hu/';
     <title>{title} — {lang === 'hu' ? 'FODEL portál' : 'FODEL'}</title>
     <meta name="robots" content="noindex, nofollow" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <FontPreload />
   </head>
   <body class:list={['portal', { bare }]} data-drawer="closed">
+    <div class="pt-progress" aria-hidden="true"><i></i></div>
     {
       bare ? (
         <main class="pm bare">
@@ -139,8 +142,14 @@ const homeHref = profile?.locale === 'nl' ? '/nl/' : '/hu/';
                   <span class="rule" aria-hidden="true" />
                   <span class="sub">Ingatlan</span>
                 </a>
-                <span class="tag">{isAdmin ? 'Admin' : 'Hirdetői portál'}</span>
+                <span class="tag">{isAdmin ? 'Admin' : 'Hirdető'}</span>
               </div>
+
+              <button type="button" class="pt-search" data-palette-open aria-label="Gyors ugrás megnyitása">
+                <Fragment set:html={icon('search', 17)} />
+                <span>Ugrás bárhová</span>
+                <kbd>⌘K</kbd>
+              </button>
 
               <nav class="pt-nav" aria-label="Portál navigáció">
                 <span class="pt-glide" aria-hidden="true" />
@@ -153,6 +162,7 @@ const homeHref = profile?.locale === 'nl' ? '/nl/' : '/hu/';
                           <a
                             class="pt-link"
                             href={item.href}
+                            data-astro-prefetch="hover"
                             aria-current={isActive(item) ? 'page' : undefined}
                           >
                             <Fragment set:html={icon(item.icon, 19)} />
@@ -213,7 +223,78 @@ const homeHref = profile?.locale === 'nl' ? '/nl/' : '/hu/';
 </html>
 
 <script>
-  import { icon } from '~/lib/portal/icons';
+  import { icon, type IconName } from '~/lib/portal/icons';
+
+  /* ── Feedback the moment something is pressed ────────────────────────────
+     Navigations and requests start a progress bar at once; if a page takes
+     longer than a blink, a skeleton stands in for it. Pages that arrive from
+     a prefetch show neither — they are already there. */
+  let busy = 0;
+  let leaveTimer: number | undefined;
+  const setBusy = (on: boolean) => {
+    busy = Math.max(0, busy + (on ? 1 : -1));
+    body.dataset.busy = busy > 0 ? 'true' : 'false';
+  };
+  const reset = () => {
+    window.clearTimeout(leaveTimer);
+    busy = 0;
+    body.dataset.busy = 'false';
+    document.querySelectorAll('.is-pending').forEach((el) => el.classList.remove('is-pending'));
+    const main = document.querySelector<HTMLElement>('main.pm');
+    main?.removeAttribute('data-leaving');
+    main?.querySelector(':scope > .pt-skel')?.remove();
+  };
+  // Back/forward restores the page from memory: undo whatever was showing when it was left.
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted) reset();
+  });
+
+  const showSkeleton = () => {
+    const main = document.querySelector<HTMLElement>('main.pm');
+    if (!main || main.classList.contains('bare') || main.querySelector(':scope > .pt-skel')) return;
+    const skeleton = document.createElement('div');
+    skeleton.className = 'pt-skel';
+    skeleton.setAttribute('aria-hidden', 'true');
+    skeleton.innerHTML =
+      '<b class="s-eyebrow"></b><b class="s-title"></b>' +
+      '<div class="s-stats"><b></b><b></b><b></b></div>' +
+      '<div class="s-rows"><b></b><b></b><b></b><b></b></div>';
+    main.dataset.leaving = '';
+    main.append(skeleton);
+  };
+
+  document.addEventListener('click', (event) => {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const link = (event.target as Element).closest<HTMLAnchorElement>('a[href]');
+    if (!link || link.target === '_blank' || link.hasAttribute('download') || link.dataset.noProgress !== undefined) return;
+    const url = new URL(link.href, location.href);
+    if (url.origin !== location.origin || !url.pathname.startsWith('/portal/') || url.pathname.startsWith('/portal/logout')) return;
+    if (url.pathname === location.pathname && url.search === location.search) return;
+    setBusy(true);
+    leaveTimer = window.setTimeout(showSkeleton, 140);
+    // A navigation that never lands (a blocked download, say) must not leave the bar running.
+    window.setTimeout(reset, 15000);
+  });
+
+  document.addEventListener('submit', (event) => {
+    if (event.defaultPrevented) return;
+    const form = event.target as HTMLFormElement;
+    if (form.target === '_blank') return;
+    const submitter = (event as SubmitEvent).submitter as HTMLElement | null;
+    // The class, never `disabled`: a disabled submitter would be left out of the form data.
+    (submitter ?? form.querySelector<HTMLElement>('button[type="submit"], button:not([type])'))?.classList.add('is-pending');
+    setBusy(true);
+    window.setTimeout(reset, 15000);
+  });
+
+  // Requests the page makes itself (approve, move, save…) show the same bar.
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = (input, init) => {
+    const target = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+    if (!target.includes('/api/portal')) return nativeFetch(input, init);
+    setBusy(true);
+    return nativeFetch(input, init).finally(() => setBusy(false));
+  };
 
   /* ── Mobile drawer ─────────────────────────────────────────────────── */
   const body = document.body;
@@ -311,7 +392,8 @@ const homeHref = profile?.locale === 'nl' ? '/nl/' : '/hu/';
     /** Typing this exactly is what unlocks the confirm button. */
     expected?: string;
     /** A free-text answer (e.g. a note to the owner). */
-    field?: { label: string; multiline?: boolean; required?: boolean };
+    field?: { label: string; multiline?: boolean; required?: boolean; value?: string; placeholder?: string };
+    icon?: IconName;
     confirmLabel: string;
     cancelLabel?: string;
   };
@@ -335,7 +417,7 @@ const homeHref = profile?.locale === 'nl' ? '/nl/' : '/hu/';
 
       const ic = document.createElement('div');
       ic.className = 'ic';
-      ic.innerHTML = icon(danger ? 'trash' : 'alert', 22);
+      ic.innerHTML = icon(options.icon ?? (danger ? 'trash' : 'alert'), 22);
 
       const h2 = document.createElement('h2');
       h2.textContent = options.title;
@@ -369,6 +451,8 @@ const homeHref = profile?.locale === 'nl' ? '/nl/' : '/hu/';
         label.textContent = options.field.label;
         const field = options.field.multiline ? document.createElement('textarea') : document.createElement('input');
         field.id = 'pt-ask-input';
+        if (options.field.value) field.value = options.field.value;
+        if (options.field.placeholder) field.placeholder = options.field.placeholder;
         input = field;
         form.append(label, field);
       }
@@ -423,7 +507,142 @@ const homeHref = profile?.locale === 'nl' ? '/nl/' : '/hu/';
     });
   }
 
+  /* ── Toasts ────────────────────────────────────────────────────────────
+     A short, self-dismissing confirmation that does not move the page.
+     Any server banner marked data-toast is lifted into one on arrival. */
+  let toastHost: HTMLElement | null = null;
+  const toast = (message: string, tone: 'ok' | 'error' | 'warn' = 'ok') => {
+    if (!toastHost) {
+      toastHost = document.createElement('div');
+      toastHost.className = 'pt-toasts';
+      toastHost.setAttribute('role', 'status');
+      toastHost.setAttribute('aria-live', 'polite');
+      document.body.append(toastHost);
+    }
+    const node = document.createElement('div');
+    node.className = 'pt-toast';
+    node.dataset.tone = tone;
+    node.innerHTML = `<span class="pt-toast-ic">${icon(tone === 'ok' ? 'check' : 'alert', 16)}</span><span></span>`;
+    (node.lastElementChild as HTMLElement).textContent = message;
+    toastHost.append(node);
+    const leave = () => {
+      node.dataset.leaving = 'true';
+      node.addEventListener('animationend', () => node.remove(), { once: true });
+      window.setTimeout(() => node.remove(), 600);
+    };
+    window.setTimeout(leave, tone === 'error' ? 7000 : 3600);
+    node.addEventListener('click', leave);
+  };
+  document.querySelectorAll<HTMLElement>('[data-toast]').forEach((banner) => {
+    toast(banner.textContent?.trim() ?? '', (banner.dataset.toast as 'ok' | 'error' | 'warn') || 'ok');
+    banner.remove();
+  });
+
+  /* ── Quick jump (⌘K) ───────────────────────────────────────────────────
+     Every sidebar destination plus the things you do most, one keystroke away. */
+  type Jump = { label: string; hint?: string; href: string; icon: string };
+  let palette: HTMLDialogElement | null = null;
+  const jumps = (): Jump[] => {
+    const fromNav = [...document.querySelectorAll<HTMLAnchorElement>('.pt-link')].map((link) => ({
+      label: link.querySelector('.txt')?.textContent?.trim() ?? '',
+      href: link.getAttribute('href') ?? '',
+      icon: link.querySelector('svg')?.outerHTML ?? '',
+    }));
+    return [
+      ...fromNav,
+      { label: 'Új ingatlan felvétele', hint: 'Üres piszkozat', href: '/portal/properties/new', icon: icon('plus', 19) },
+      { label: 'Vissza a weboldalra', href: document.querySelector<HTMLAnchorElement>('.pt-me-btn')?.getAttribute('href') ?? '/hu/', icon: icon('external', 19) },
+    ].filter((entry) => entry.label && entry.href);
+  };
+  const openPalette = () => {
+    if (!palette) {
+      palette = document.createElement('dialog');
+      palette.className = 'pt-dialog pt-palette';
+      palette.setAttribute('aria-label', 'Gyors ugrás');
+      document.body.append(palette);
+    }
+    const root = palette;
+    const items = jumps();
+    root.innerHTML = `<div class="pt-pal-box"><div class="pt-pal-field">${icon('search', 19)}<input type="text" placeholder="Hová szeretne ugrani?" aria-label="Keresés" autocomplete="off" spellcheck="false" /><kbd>Esc</kbd></div><ul class="pt-pal-list" role="listbox"></ul></div>`;
+    const input = root.querySelector('input') as HTMLInputElement;
+    const list = root.querySelector('ul') as HTMLUListElement;
+    let at = 0;
+    const render = () => {
+      const needle = input.value.trim().toLowerCase();
+      const shown = items.filter((entry) => !needle || entry.label.toLowerCase().includes(needle));
+      at = Math.min(at, Math.max(0, shown.length - 1));
+      list.replaceChildren(
+        ...shown.map((entry, index) => {
+          const li = document.createElement('li');
+          li.setAttribute('role', 'option');
+          li.setAttribute('aria-selected', String(index === at));
+          li.innerHTML = `<a href="${entry.href}"><span class="ic">${entry.icon}</span><span class="t"></span><span class="h"></span></a>`;
+          (li.querySelector('.t') as HTMLElement).textContent = entry.label;
+          (li.querySelector('.h') as HTMLElement).textContent = entry.hint ?? '';
+          li.addEventListener('pointermove', () => {
+            at = index;
+            list.querySelectorAll('li').forEach((row, i) => row.setAttribute('aria-selected', String(i === at)));
+          });
+          return li;
+        })
+      );
+      if (shown.length === 0) list.innerHTML = '<li class="empty">Nincs találat</li>';
+    };
+    input.addEventListener('input', () => {
+      at = 0;
+      render();
+    });
+    input.addEventListener('keydown', (event) => {
+      const rows = list.querySelectorAll<HTMLElement>('li[role="option"]');
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        at = (at + (event.key === 'ArrowDown' ? 1 : -1) + rows.length) % Math.max(1, rows.length);
+        rows.forEach((row, i) => row.setAttribute('aria-selected', String(i === at)));
+        rows[at]?.scrollIntoView({ block: 'nearest' });
+      } else if (event.key === 'Enter') {
+        event.preventDefault();
+        rows[at]?.querySelector('a')?.click();
+      }
+    });
+    root.addEventListener('click', (event) => {
+      if (event.target === root) root.close();
+      else if ((event.target as Element).closest('a')) root.close();
+    });
+    render();
+    if (!root.open) root.showModal();
+    input.focus();
+  };
+  document.addEventListener('click', (event) => {
+    if ((event.target as Element).closest('[data-palette-open]')) {
+      setDrawer(false);
+      openPalette();
+    }
+  });
+  document.addEventListener('keydown', (event) => {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+      event.preventDefault();
+      if (palette?.open) palette.close();
+      else openPalette();
+    }
+  });
+
   (window as any).pf = {
+    toast,
+    /** A short single-line answer (a link, a caption); resolves to null when cancelled. */
+    prompt: async (o: { title: string; body: string; label: string; confirmLabel?: string; value?: string; placeholder?: string; required?: boolean; multiline?: boolean }) => {
+      const answer = await ask({
+        title: o.title,
+        body: o.body,
+        icon: 'edit',
+        field: { label: o.label, multiline: o.multiline ?? false, required: o.required ?? true, value: o.value, placeholder: o.placeholder },
+        confirmLabel: o.confirmLabel ?? 'Rendben',
+      });
+      return answer.ok ? answer.value.trim() : null;
+    },
+    /** Replaces alert(): says one thing and waits to be dismissed. */
+    alert: async (o: { title: string; body: string }) => {
+      await ask({ title: o.title, body: o.body, confirmLabel: 'Rendben', cancelLabel: 'Bezár' });
+    },
     /** Permanent actions: the confirm button stays locked until the name is typed. */
     confirmType: async (o: { title: string; body: string; expected: string; confirmLabel?: string }) =>
       (await ask({ tone: 'danger', confirmLabel: 'Végleges törlés', ...o })).ok,

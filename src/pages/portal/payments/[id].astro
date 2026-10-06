@@ -196,7 +196,8 @@ const lines = (Array.isArray(order.line_items) ? order.line_items : []) as Order
       billingName: form.billingName.value,
       billingAddress: form.billingAddress.value,
     });
-    billingStatus.textContent = ok && json.ok ? 'Mentve.' : 'Nem sikerült menteni.';
+    billingStatus.textContent = '';
+    window.pf.toast(ok && json.ok ? 'Számlázási adatok mentve.' : 'Nem sikerült menteni.', ok && json.ok ? 'ok' : 'error');
   });
 
   document.getElementById('invoice-btn')?.addEventListener('click', async () => {
@@ -208,7 +209,7 @@ const lines = (Array.isArray(order.line_items) ? order.line_items : []) as Order
 
   document.getElementById('credit-note-btn')?.addEventListener('click', async (e) => {
     const correctsId = e.currentTarget.dataset.corrects;
-    if (!confirm('Biztosan kiállítja a jóváíró számlát?')) return;
+    if (!(await window.pf.confirm({ title: 'Jóváíró számla kiállítása', body: 'Biztosan kiállítja a jóváíró számlát? A számlát ez nem törli, csak ellentételezi.', confirmLabel: 'Kiállítás' }))) return;
     actionStatus.textContent = 'Jóváírás kiállítása…';
     const { ok, json } = await post('issue_credit_note', { correctsId });
     if (ok && json.ok) location.reload();
@@ -218,11 +219,12 @@ const lines = (Array.isArray(order.line_items) ? order.line_items : []) as Order
   document.getElementById('resend-btn')?.addEventListener('click', async () => {
     actionStatus.textContent = 'Küldés…';
     const { ok } = await post('resend_email');
-    actionStatus.textContent = ok ? 'Elküldve.' : 'Nem sikerült elküldeni.';
+    actionStatus.textContent = '';
+    window.pf.toast(ok ? 'Elküldve.' : 'Nem sikerült elküldeni.', ok ? 'ok' : 'error');
   });
 
   document.getElementById('cancel-btn')?.addEventListener('click', async () => {
-    if (!confirm('Biztosan visszavonja ezt a rendelést?')) return;
+    if (!(await window.pf.confirm({ title: 'Rendelés visszavonása', body: 'Biztosan visszavonja ezt a rendelést? A hirdető nem fizethet rá tovább.', confirmLabel: 'Visszavonás', danger: true }))) return;
     const { ok, json } = await post('cancel');
     if (ok && json.ok) location.reload();
     else actionStatus.textContent = 'Nem sikerült visszavonni.';
@@ -230,14 +232,14 @@ const lines = (Array.isArray(order.line_items) ? order.line_items : []) as Order
   document.getElementById('refund-btn')?.addEventListener('click', async () => {
     const note = document.getElementById('refund-note').value.trim();
     if (!note) { actionStatus.textContent = 'Írja be, mikor és hogyan történt a visszatérítés.'; return; }
-    if (!confirm('Rögzíti, hogy az összeget visszatérítették? Ez nem indít utalást.')) return;
+    if (!(await window.pf.confirm({ title: 'Visszatérítés rögzítése', body: 'Rögzíti, hogy az összeget visszatérítették? Ez nem indít utalást — csak a nyilvántartást frissíti.', confirmLabel: 'Rögzítés' }))) return;
     const { ok, json } = await post('mark_refunded', { note });
     if (ok && json.ok) location.reload();
     else actionStatus.textContent = 'Nem sikerült rögzíteni.';
   });
 
   document.getElementById('mark-paid-btn')?.addEventListener('click', async () => {
-    if (!confirm('Biztosan beérkezett az átutalás?')) return;
+    if (!(await window.pf.confirm({ title: 'Átutalás beérkezett', body: 'Biztosan beérkezett az átutalás? A rendelés fizetettre áll, és a hirdetés élesedhet.', confirmLabel: 'Igen, beérkezett' }))) return;
     actionStatus.textContent = 'Rögzítés…';
     const { ok, json } = await post('mark_paid');
     if (ok && json.ok) location.reload();
@@ -246,54 +248,61 @@ const lines = (Array.isArray(order.line_items) ? order.line_items : []) as Order
 </script>
 
 <style>
-  .head { margin-bottom: 24px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-  .eyebrow { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--taupe); flex-basis: 100%; margin-bottom: 4px; }
-  .eyebrow a { text-decoration: underline; text-underline-offset: 2px; }
-  h1 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 26px; color: var(--ink); }
-  h2 { font-family: var(--serif); font-size: 16px; color: var(--ink); margin-bottom: 14px; }
+  .head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin-bottom: 30px; }
+  .eyebrow { flex-basis: 100%; margin-bottom: 6px; }
+  .eyebrow a { text-decoration: none; }
+  .eyebrow a:hover { text-decoration: underline; text-underline-offset: 3px; }
+  h2 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 19px; letter-spacing: var(--ls-heading); color: var(--ink); margin-bottom: 16px; }
 
-  .pill { display: inline-block; font-size: var(--fs-micro); padding: 3px 10px; border: 1px solid var(--border); white-space: nowrap; }
-  .pill-paid, .pill-manual { background: rgba(16, 42, 67, 0.08); border-color: var(--ink); }
-  .pill-pending { background: rgba(200, 150, 0, 0.1); border-color: #96700b; color: #6b4f08; }
+  .grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: clamp(20px, 3vw, 40px); align-items: start; }
+  .grid > .col:first-child { display: grid; gap: 28px; padding: clamp(22px, 3vw, 36px); border-radius: var(--r-xl); background: var(--white); box-shadow: var(--shadow-xs), 0 0 0 1px var(--pt-hair); min-width: 0; }
+  .grid > .col:last-child { padding: 26px; border-radius: var(--r-xl); background: var(--white); box-shadow: var(--shadow-xs), 0 0 0 1px var(--pt-hair); position: sticky; top: 24px; }
 
-  .grid { display: grid; grid-template-columns: 1fr 340px; gap: 48px; }
-  .col > * + * { margin-top: 28px; }
+  .lines { width: 100%; border-collapse: collapse; }
+  .lines td { padding: 14px 0; border-bottom: 1px solid var(--pt-hair); font-size: var(--fs-body); color: var(--ink); }
+  .lines tr.discount td { color: var(--pt-green); }
+  .lines tr.total td { padding-top: 20px; border-bottom: 0; font-family: var(--serif); font-weight: var(--fw-display); font-size: 26px; letter-spacing: var(--ls-heading); }
+  .right { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .missing { color: var(--pt-red); font-size: var(--fs-small); }
 
-  .lines { width: 100%; border-collapse: collapse; font-size: var(--fs-small); }
-  .lines td { padding: 8px 0; border-bottom: 1px solid var(--border); color: var(--ink); }
-  .lines .discount td { color: var(--ink); }
-  .lines .total td { font-weight: 600; border-top: 1px solid var(--ink); border-bottom: none; padding-top: 12px; }
-  .right { text-align: right; font-variant-numeric: tabular-nums; }
+  .facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .facts > div { padding: 13px 16px; border-radius: var(--r-md); background: var(--paper); min-width: 0; }
+  .facts dt { font-size: 12.5px; color: var(--ink-quiet); margin-bottom: 3px; }
+  .facts dd { font-size: var(--fs-small); color: var(--ink); overflow-wrap: anywhere; }
+  .facts a { text-decoration: underline; text-underline-offset: 3px; }
+  .refund-flag { padding: 14px 18px; border-radius: var(--r-md); background: var(--pt-red-bg); color: var(--pt-red); font-size: var(--fs-small); line-height: 1.65; }
 
-  .facts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
-  .facts dt { font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: 0.06em; color: var(--taupe); }
-  .facts dd { font-size: var(--fs-small); color: var(--ink); }
+  .billing { display: grid; gap: 4px; padding: 22px; border-radius: var(--r-lg); background: var(--paper); }
+  .billing h2 { font-size: 17px; margin-bottom: 8px; }
+  .billing label { display: grid; gap: 7px; margin-top: 12px; font-size: 13.5px; color: var(--ink-quiet); }
+  .billing input { width: 100%; padding: 11px 14px; font-size: var(--fs-small); color: var(--ink); }
+  .billing .btn { justify-self: start; margin-top: 14px; }
 
-  .billing label { display: block; font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; color: var(--taupe); margin-bottom: 6px; margin-top: 12px; }
-  .billing input { width: 100%; border: 1px solid var(--border); background: #fff; padding: 9px 10px; font-size: var(--fs-small); color: var(--ink); }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .actions h2 { flex-basis: 100%; margin-bottom: 6px; }
+  .btn { margin: 0; }
+  .btn.small { margin-left: 10px; }
+  .invoice-line { flex-basis: 100%; font-size: var(--fs-small); display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .invoice-line a { text-decoration: underline; text-underline-offset: 3px; font-weight: var(--fw-medium); }
+  .refund { flex-basis: 100%; display: grid; gap: 10px; margin-top: 8px; max-width: 460px; }
+  .refund label { display: grid; gap: 7px; font-size: 13.5px; color: var(--ink-quiet); }
+  .refund input { width: 100%; padding: 11px 14px; font-size: var(--fs-small); color: var(--ink); }
+  .refund .btn { justify-self: start; }
+  .action-status { flex-basis: 100%; min-height: 0; font-size: 14px; color: var(--ink-quiet); }
 
-  .btn { display: inline-block; padding: 10px 20px; background: var(--ink); color: var(--cream); font-size: var(--fs-micro); letter-spacing: var(--ls-button); text-transform: uppercase; margin-right: 10px; margin-bottom: 10px; }
-  .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--ink); }
-  .btn.small { padding: 5px 12px; font-size: 10px; margin-left: 10px; }
-  .invoice-line { font-size: var(--fs-small); margin-bottom: 12px; }
-  .invoice-line a { text-decoration: underline; text-underline-offset: 2px; }
-  .action-status { font-size: var(--fs-small); color: var(--taupe); min-height: 1.5em; }
-
-  .timeline { list-style: none; font-size: var(--fs-small); }
-  .timeline li { padding: 8px 0; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 2px; }
-  .t-time { font-size: var(--fs-micro); color: var(--taupe); }
-  .t-kind { color: var(--ink); }
-  .t-actor { font-size: var(--fs-micro); color: var(--taupe); }
-  .empty { color: var(--taupe); font-size: var(--fs-small); }
-  .missing { color: #b3261e; font-size: var(--fs-small); }
-  .facts a { text-decoration: underline; text-underline-offset: 2px; }
-  .refund-flag { padding: 12px 16px; font-size: var(--fs-small); line-height: 1.6; background: rgba(179, 38, 30, 0.06); border-left: 2px solid #b3261e; color: #b3261e; }
-  .refund { margin-top: 12px; max-width: 420px; }
-  .refund label { display: block; font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; color: var(--taupe); margin-bottom: 6px; }
-  .refund input { width: 100%; margin-top: 6px; border: 1px solid var(--border); background: #fff; padding: 9px 10px; font-size: var(--fs-small); color: var(--ink); text-transform: none; letter-spacing: 0; }
-  .pill-refunded { background: rgba(179, 38, 30, 0.06); border-color: #b3261e; color: #b3261e; }
+  /* The order's history, as a quiet vertical line. */
+  .timeline { list-style: none; position: relative; display: grid; gap: 18px; padding-left: 22px; }
+  .timeline::before { content: ''; position: absolute; left: 4px; top: 6px; bottom: 6px; width: 1.5px; background: var(--pt-hair); }
+  .timeline li { position: relative; display: grid; gap: 2px; }
+  .timeline li::before { content: ''; position: absolute; left: -22px; top: 6px; width: 9px; height: 9px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 4px var(--white); }
+  .t-time { font-size: 13px; color: var(--ink-quiet); }
+  .t-kind { font-size: var(--fs-small); color: var(--ink); }
+  .t-actor { font-size: 13px; color: var(--ink-quiet); }
+  .empty { padding: 16px; border-radius: var(--r-md); background: var(--paper); color: var(--ink-quiet); font-size: var(--fs-small); }
 
   @media (max-width: 900px) {
     .grid { grid-template-columns: 1fr; }
+    .grid > .col:last-child { position: static; }
   }
+  @media (max-width: 600px) { .facts { grid-template-columns: 1fr; } }
 </style>

@@ -32,14 +32,13 @@ if (isAdmin && statusFilter && !REVIEWED.includes(statusFilter)) {
   return Astro.redirect('/portal/inbox');
 }
 
-const all = await listProperties(supabase, statusFilter ? { status: statusFilter } : {});
+const [all, taxonomy] = await Promise.all([listProperties(supabase, statusFilter ? { status: statusFilter } : {}), getTaxonomy()]);
 const scoped = isAdmin && !statusFilter ? all.filter((p) => REVIEWED.includes(p.status)) : all;
 const properties =
   view === 'curation'
     ? scoped.filter((p) => p.editors_pick || p.bargain).sort((a, b) => a.editors_pick_order - b.editors_pick_order)
     : scoped;
 
-const taxonomy = await getTaxonomy();
 const categoryLabel = (key: string) => termLabel(taxonomy.category.find((term) => term.key === key), 'hu') || key;
 
 const ownerIds = isAdmin ? [...new Set(properties.map((p) => p.owner_id).filter(Boolean))] : [];

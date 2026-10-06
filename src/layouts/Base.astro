@@ -6,6 +6,7 @@
  * description, canonical, hreflang, Open Graph, and JSON-LD. The prototype
  * shipped one static <title> for all nine screens and an empty <div id="root">.
  */
+import FontPreload from '~/components/FontPreload.astro';
 import { LOCALE_META, BRAND, UI, type Locale } from '~/i18n/ui';
 import { graph, organisationSchema, abs } from '~/lib/seo';
 import Nav from '~/components/Nav.astro';
@@ -98,6 +99,7 @@ const jsonLd = graph([organisationSchema(locale, company), ...schema]);
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={socialImage} />
 
+    <FontPreload />
     <meta name="theme-color" content="#102A43" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />

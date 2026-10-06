@@ -12,6 +12,7 @@ import Portal from '~/layouts/Portal.astro';
 import { SITE_URL } from '~/config/site.mjs';
 import { BLOG_LOCALES, BLOG_PATH, PLACEHOLDER_PREFIX, isBlogLocale, type BlogLocale } from '~/lib/blog';
 import { MAX_UPLOAD_MB } from '~/lib/media';
+import { icon } from '~/lib/portal/icons';
 
 const { supabase, profile } = Astro.locals;
 if (profile?.role !== 'admin') return Astro.redirect('/portal/dashboard');
@@ -57,10 +58,12 @@ const LANG = { hu: 'Magyar', nl: 'Holland', en: 'Angol', de: 'Német' } as const
 ---
 
 <Portal title={post.title || 'Új cikk'}>
-  <header class="head">
-    <p class="eyebrow"><a href="/portal/content/blog">← Blog</a></p>
-    <h1>{post.title || '(névtelen)'}</h1>
-    <span class:list={['pill', { published: post.published }]} id="status-pill">{post.published ? 'Publikus' : 'Piszkozat'}</span>
+  <header class="ph">
+    <p class="crumbs"><a href="/portal/content/blog">← Blog</a><span>{kind === 'case_study' ? 'Esettanulmány' : 'Cikk'} · {locale.toUpperCase()}</span></p>
+    <div class="ph-row">
+      <h1 id="page-title">{post.title || '(névtelen)'}</h1>
+      <span class:list={['state', { live: post.published }]} id="status-pill">{post.published ? 'Publikus' : 'Piszkozat'}</span>
+    </div>
   </header>
 
   {placeholder && (
@@ -72,7 +75,8 @@ const LANG = { hu: 'Magyar', nl: 'Holland', en: 'Angol', de: 'Német' } as const
 
   <form id="editor" class="editor">
     <div class="col main">
-      <label>Cím <input name="title" value={post.title} required /></label>
+      <section class="ed-card writer">
+      <label class="title-field">Cím <input name="title" value={post.title} required placeholder="Mi a cikk címe?" /></label>
       <div class="row">
         <label>URL (slug) <input name="slug" value={post.slug} required /></label>
         <label>Nyelv
@@ -109,9 +113,9 @@ const LANG = { hu: 'Magyar', nl: 'Holland', en: 'Angol', de: 'Német' } as const
       <div class="toolbar" role="toolbar" aria-label="Beszúrás a szövegbe">
         <label class="tool">
           <input type="file" id="inline-file" accept="image/jpeg,image/png,image/webp" hidden />
-          <span>Kép beszúrása</span>
+          <span><Fragment set:html={icon('image', 16)} /> Kép beszúrása</span>
         </label>
-        <button type="button" class="tool" id="insert-link">Link beszúrása</button>
+        <button type="button" class="tool" id="insert-link"><Fragment set:html={icon('link', 16)} /> Link beszúrása</button>
         <span class="hint" id="toolbar-status">JPG, PNG vagy WebP, legfeljebb {MAX_UPLOAD_MB} MB.</span>
       </div>
 
@@ -125,7 +129,9 @@ const LANG = { hu: 'Magyar', nl: 'Holland', en: 'Angol', de: 'Német' } as const
         </div>
       </div>
 
-      <fieldset class="case-fields" id="case-fields" hidden={kind !== 'case_study'} disabled={!migrated}>
+      </section>
+
+      <fieldset class="case-fields ed-card" id="case-fields" hidden={kind !== 'case_study'} disabled={!migrated}>
         <legend>Esettanulmány</legend>
         <p class="hint">
           Csak valós, ellenőrizhető adatot írjon ide. A kitöltött részek külön fejezetként jelennek meg a
@@ -136,8 +142,8 @@ const LANG = { hu: 'Magyar', nl: 'Holland', en: 'Angol', de: 'Német' } as const
         <label>Források <textarea name="caseSources" rows="3" placeholder="Egy forrás soronként, lehetőleg linkkel">{post.case_sources ?? ''}</textarea></label>
       </fieldset>
 
-      <div class="seo-panel">
-        <h2>SEO</h2>
+      <div class="seo-panel ed-card">
+        <h2>Keresőbarát megjelenés (SEO)</h2>
         <label>SEO cím <input name="seoTitle" id="seo-title" value={post.seo_title ?? ''} maxlength="70" /></label>
         <p class="meter" id="seo-title-meter"></p>
         <label>SEO leírás <textarea name="seoDescription" id="seo-desc" rows="2" maxlength="160">{post.seo_description ?? ''}</textarea></label>
@@ -156,25 +162,23 @@ const LANG = { hu: 'Magyar', nl: 'Holland', en: 'Angol', de: 'Német' } as const
         </ul>
       </div>
 
-      <label class="checkbox"><input type="checkbox" name="featured" checked={post.featured} /> Kiemelt</label>
-
-      <div class="actions">
-        <button type="submit" class="btn">Mentés</button>
-        <button type="button" class="btn ghost" id="publish-btn" data-published={post.published ? 'yes' : 'no'}>{post.published ? 'Visszavonás' : 'Publikálás'}</button>
-        <button type="button" class="btn ghost danger" id="delete-btn">Törlés</button>
-        <p class="action-status" id="action-status" role="status"></p>
-      </div>
     </div>
 
     <div class="col side">
-      <section class="panel">
+      <section class="panel ed-card">
+        <h2>Megjelenés</h2>
+        <label class="checkbox"><input type="checkbox" name="featured" checked={post.featured} /> Kiemelt írás</label>
+        <p class="hint">A kiemelt írások előrébb jelennek meg a blog főoldalán.</p>
+      </section>
+
+      <section class="panel ed-card">
         <h2>Borítókép</h2>
         {post.cover_url && <img src={post.cover_url} alt="" class="thumb" />}
         <input type="file" id="cover-file" accept="image/jpeg,image/png,image/webp" />
         <p class="hint" id="cover-status"></p>
       </section>
 
-      <section class="panel">
+      <section class="panel ed-card">
         <h2>OG kép (megosztáshoz)</h2>
         {post.og_image_url && <img src={post.og_image_url} alt="" class="thumb" />}
         <input type="file" id="og-file" accept="image/jpeg,image/png,image/webp" />
@@ -190,7 +194,7 @@ const LANG = { hu: 'Magyar', nl: 'Holland', en: 'Angol', de: 'Német' } as const
         </div>
       </section>
 
-      <section class="panel">
+      <section class="panel ed-card">
         <h2>Nyelvi változatok</h2>
         <ul class="versions">
           <li><strong>{locale.toUpperCase()}</strong> — ez a változat</li>
@@ -231,14 +235,29 @@ const LANG = { hu: 'Magyar', nl: 'Holland', en: 'Angol', de: 'Német' } as const
       </section>
 
       {publicUrl && (
-        <section class="panel">
+        <section class="panel ed-card">
           <h2>Publikus link</h2>
           <input class="readonly-input" id="public-link" value={publicUrl} readonly />
           <button type="button" class="btn ghost small" id="copy-link-btn">Másolás</button>
         </section>
       )}
     </div>
+    <div class="pt-savebar" id="savebar" data-state="clean">
+      <div class="pt-savebar-in">
+        <p class="pt-savebar-msg" role="status"><span class="dot"></span><span id="action-status" class="action-status">Minden módosítás mentve</span></p>
+        <button type="button" class="btn ghost" id="publish-btn" data-published={post.published ? 'yes' : 'no'}>{post.published ? 'Visszavonás' : 'Publikálás'}</button>
+        <button type="submit" class="btn">Mentés <kbd>⌘S</kbd></button>
+      </div>
+    </div>
   </form>
+
+  <section class="danger-zone">
+    <div>
+      <h2>Írás törlése</h2>
+      <p>A törlés végleges: a cikk és ennek a nyelvi változatnak a tartalma elvész.</p>
+    </div>
+    <button type="button" class="btn ghost danger" id="delete-btn">Törlés</button>
+  </section>
 </Portal>
 
 <script>
@@ -248,7 +267,26 @@ const LANG = { hu: 'Magyar', nl: 'Holland', en: 'Angol', de: 'Német' } as const
 
 <script define:vars={{ postId: post.id, blogPaths: BLOG_PATH }}>
   const form = document.getElementById('editor');
+  form.addEventListener('input', () => {
+    dirty = true;
+    setBar('dirty', 'Nem mentett módosítások');
+  });
+  window.addEventListener('beforeunload', (event) => {
+    if (dirty) event.preventDefault();
+  });
+  document.addEventListener('keydown', (event) => {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
+      event.preventDefault();
+      form.requestSubmit();
+    }
+  });
   const actionStatus = document.getElementById('action-status');
+  const bar = document.getElementById('savebar');
+  let dirty = false;
+  function setBar(state, text) {
+    bar.dataset.state = state;
+    actionStatus.textContent = text;
+  }
   const bodyMd = document.getElementById('body-md');
   const preview = document.getElementById('preview');
   const seoTitle = document.getElementById('seo-title');
@@ -326,7 +364,7 @@ const LANG = { hu: 'Magyar', nl: 'Holland', en: 'Angol', de: 'Német' } as const
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    actionStatus.textContent = 'Mentés…';
+    setBar('saving', 'Mentés…');
     const fd = new FormData(form);
     const { ok, json } = await post(`/api/portal/content/blog/${postId}`, {
       action: 'save',
@@ -344,12 +382,23 @@ const LANG = { hu: 'Magyar', nl: 'Holland', en: 'Angol', de: 'Német' } as const
       caseSources: fd.get('caseSources') ?? '',
       featured: fd.get('featured') === 'on',
     });
-    actionStatus.textContent = ok && json.ok ? 'Mentve.' : json.error || 'Nem sikerült menteni.';
+    if (ok && json.ok) {
+      dirty = false;
+      setBar('clean', 'Minden módosítás mentve');
+      window.pf.toast('Mentve.');
+    } else {
+      setBar('dirty', json.error || 'Nem sikerült menteni.');
+      window.pf.toast(json.error || 'Nem sikerült menteni.', 'error');
+    }
   });
 
   document.getElementById('publish-btn')?.addEventListener('click', async (event) => {
     const willPublish = event.currentTarget.dataset.published !== 'yes';
-    if (willPublish && !confirm('Mentette a legutóbbi módosításokat? A publikálás a mentett változatot teszi közzé.')) return;
+    if (willPublish && !(await window.pf.confirm({
+      title: 'Publikálja az írást?',
+      body: dirty ? 'Vannak még nem mentett módosítások — a publikálás csak a legutóbb mentett változatot teszi közzé. Előbb mentsen.' : 'A mentett változat azonnal nyilvános lesz a weboldalon.',
+      confirmLabel: 'Publikálás',
+    }))) return;
     actionStatus.textContent = willPublish ? 'Publikálás…' : 'Visszavonás…';
     const { ok, json } = await post(`/api/portal/content/blog/${postId}`, { action: willPublish ? 'publish' : 'unpublish' });
     if (ok && json.ok) location.reload();
@@ -390,7 +439,7 @@ const LANG = { hu: 'Magyar', nl: 'Holland', en: 'Angol', de: 'Német' } as const
   });
 
   document.getElementById('unlink-btn')?.addEventListener('click', async () => {
-    if (!confirm('Leválasztja ezt a változatot a többi nyelvi változatról?')) return;
+    if (!(await window.pf.confirm({ title: 'Leválasztja a nyelvi változatot?', body: 'Ez a változat önálló írás lesz, a többi nyelvi változattól függetlenül.', confirmLabel: 'Leválasztás', danger: true }))) return;
     await post(`/api/portal/content/blog/${postId}`, { action: 'link_translation', targetId: null });
     location.reload();
   });
@@ -410,7 +459,7 @@ const LANG = { hu: 'Magyar', nl: 'Holland', en: 'Angol', de: 'Német' } as const
   inlineFile?.addEventListener('change', async () => {
     const file = inlineFile.files?.[0];
     if (!file) return;
-    const alt = prompt('Rövid képleírás (mi látható a képen)?', '') ?? '';
+    const alt = (await window.pf.prompt({ title: 'Mi látható a képen?', body: 'Rövid leírás a képernyőolvasóknak és a keresőknek. Üresen is hagyhatja.', label: 'Képleírás', required: false, confirmLabel: 'Kép beszúrása' })) ?? '';
     toolbarStatus.textContent = 'Kép feltöltése…';
     // Phone photos are scaled down first: the server accepts ~4.5 MB per request.
     const prepared = window.fodelShrinkImage ? await window.fodelShrinkImage(file) : file;
@@ -427,11 +476,11 @@ const LANG = { hu: 'Magyar', nl: 'Holland', en: 'Angol', de: 'Német' } as const
     toolbarStatus.textContent = 'Kép beszúrva — ne felejtsen el menteni.';
   });
 
-  document.getElementById('insert-link')?.addEventListener('click', () => {
+  document.getElementById('insert-link')?.addEventListener('click', async () => {
     const selected = bodyMd.value.slice(bodyMd.selectionStart, bodyMd.selectionEnd);
-    const href = prompt('Link címe (pl. https://… vagy /hu/ingatlanok/)', 'https://');
+    const href = await window.pf.prompt({ title: 'Link beszúrása', body: 'Teljes cím (https://…) vagy a weboldalon belüli útvonal (/hu/ingatlanok/).', label: 'Link címe', value: 'https://', confirmLabel: 'Tovább' });
     if (!href || href === 'https://') return;
-    const label = selected || prompt('A link szövege', '') || href;
+    const label = selected || (await window.pf.prompt({ title: 'A link szövege', body: 'Ezt látja majd az olvasó.', label: 'Szöveg', required: false, confirmLabel: 'Beszúrás' })) || href;
     insertAtCursor(`[${label.replace(/[\[\]]/g, '')}](${href.trim()})`);
   });
 
@@ -465,76 +514,109 @@ const LANG = { hu: 'Magyar', nl: 'Holland', en: 'Angol', de: 'Német' } as const
 </script>
 
 <style>
-  .head { margin-bottom: 20px; display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
-  .eyebrow { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--taupe); flex-basis: 100%; margin-bottom: 4px; }
-  .eyebrow a { text-decoration: underline; text-underline-offset: 2px; }
-  .notice { padding: 12px 16px; margin-bottom: 18px; font-size: var(--fs-small); line-height: 1.6; background: rgba(200, 150, 0, 0.08); border-left: 2px solid #96700b; color: #6b4f08; }
-  .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 8px; }
-  .tool { display: inline-flex; align-items: center; padding: 6px 12px; font-size: var(--fs-micro); letter-spacing: 0.04em; border: 1px solid var(--border); color: var(--ink); background: #fff; cursor: pointer; }
-  .tool:hover { border-color: var(--ink); }
-  .case-fields { display: grid; gap: 12px; margin: 20px 0; padding: 16px; border: 1px solid var(--border); }
-  .case-fields legend { padding: 0 6px; font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; color: var(--taupe); }
-  .versions { list-style: none; font-size: var(--fs-small); margin-bottom: 12px; }
-  .versions li { padding: 4px 0; }
-  .versions a { text-decoration: underline; }
-  .version-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
-  .version-actions .hint { flex-basis: 100%; }
-  .link-existing { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
-  h1 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 24px; color: var(--ink); }
-  h2 { font-family: var(--serif); font-size: 15px; color: var(--ink); margin-bottom: 12px; }
+  .ph { margin-bottom: 28px; }
+  .crumbs { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; font-size: 14px; color: var(--ink-quiet); }
+  .crumbs a { text-decoration: none; }
+  .crumbs a:hover { color: var(--ink); }
+  .crumbs span { padding: 2px 11px; border-radius: var(--r-pill); background: var(--linen); font-size: 12.5px; letter-spacing: 0.04em; }
+  .ph-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; }
+  h1 { text-wrap: balance; }
+  .state { display: inline-flex; align-items: center; gap: 8px; padding: 5px 14px 5px 12px; border-radius: var(--r-pill); background: var(--linen); color: var(--ink); font-size: 13.5px; font-weight: var(--fw-medium); }
+  .state::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: currentColor; opacity: 0.5; }
+  .state.live { background: var(--pt-green-bg); color: var(--pt-green); }
+  .state.live::before { opacity: 1; }
+  .notice { margin-bottom: 20px; }
 
-  .pill { display: inline-block; font-size: var(--fs-micro); padding: 3px 10px; border: 1px solid var(--border); }
-  .pill.published { background: rgba(16, 42, 67, 0.08); border-color: var(--ink); }
+  .editor { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: clamp(20px, 2.6vw, 36px); align-items: start; }
+  .col { display: grid; gap: 20px; min-width: 0; }
+  .side { position: sticky; top: 24px; }
+  .ed-card { padding: clamp(20px, 2.6vw, 32px); border-radius: var(--r-xl); background: var(--white); box-shadow: var(--shadow-xs), 0 0 0 1px var(--pt-hair); border: 0; min-width: 0; }
+  .ed-card h2 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 18px; letter-spacing: var(--ls-heading); color: var(--ink); margin-bottom: 14px; }
+  .panel h2 { font-size: 16px; }
 
-  .editor { display: grid; grid-template-columns: 1fr 300px; gap: 40px; align-items: start; }
-  .col.main label, .panel label { display: block; font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; color: var(--taupe); margin-bottom: 6px; margin-top: 16px; }
-  .col.main input, .col.main select, .col.main textarea, .panel input, .panel select { width: 100%; border: 1px solid var(--border); background: #fff; padding: 9px 10px; font-size: var(--fs-small); color: var(--ink); font-family: inherit; }
-  .row { display: flex; gap: 16px; }
-  .row label { flex: 1; }
+  label { display: grid; gap: 7px; font-size: 13.5px; font-weight: var(--fw-medium); color: var(--ink-quiet); margin-top: 16px; }
+  label:first-child { margin-top: 0; }
+  .ed-card input:not([type='checkbox']):not([type='file']), .ed-card select, .ed-card textarea { width: 100%; padding: 11px 14px; font-size: var(--fs-small); color: var(--ink); font-family: inherit; font-weight: var(--fw-body); }
+  .ed-card textarea { resize: vertical; line-height: 1.6; }
+  .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0 16px; margin-top: 4px; }
+  .hint { font-size: 13.5px; line-height: 1.6; color: var(--ink-quiet); margin-top: 8px; font-weight: var(--fw-regular); }
+  .hint a { text-decoration: underline; text-underline-offset: 3px; }
 
-  .body-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
-  .body-label { grid-column: 1; }
-  #body-md { font-family: ui-monospace, monospace; font-size: 13px; line-height: 1.6; }
-  .preview-pane { border: 1px solid var(--border); padding: 12px; max-height: 480px; overflow-y: auto; margin-top: 22px; }
-  .preview-label { font-size: var(--fs-micro); text-transform: uppercase; color: var(--taupe); margin-bottom: 8px; }
-  .prose :global(h2) { font-family: var(--serif); font-size: 18px; margin: 16px 0 8px; }
-  .prose :global(p) { font-size: 13px; line-height: 1.6; color: var(--taupe); margin-bottom: 10px; }
+  /* The headline is the page: big, quiet, no box until it is focused. */
+  .title-field { margin-bottom: 4px; }
+  .title-field input { padding: 8px 0 12px; border: 0; border-bottom: 1.5px solid var(--pt-hair); border-radius: 0; background: transparent; font-family: var(--serif); font-weight: var(--fw-display); font-size: clamp(24px, 3vw, 34px); letter-spacing: var(--ls-heading); color: var(--ink); box-shadow: none; }
+  .title-field input:focus { border-bottom-color: var(--ink); box-shadow: none; }
+  .writer .row { margin-top: 12px; }
 
-  .seo-panel { margin-top: 28px; padding: 20px; background: var(--linen); }
-  .meter { font-size: var(--fs-micro); color: var(--taupe); margin-top: -12px; margin-bottom: 4px; }
-  .serp { margin-top: 12px; padding: 12px; background: #fff; border: 1px solid var(--border); }
-  .serp-title { color: #1a0dab; font-size: 15px; }
-  .serp-url { color: #006621; font-size: 12px; }
-  .serp-desc { color: #545454; font-size: 12px; }
-  .seo-checks { list-style: none; margin-top: 12px; font-size: var(--fs-micro); color: var(--taupe); }
-  .seo-checks li { padding: 3px 0; }
+  .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 20px 0 10px; }
+  .tool { display: inline-flex; align-items: center; gap: 8px; margin: 0; padding: 8px 15px; border-radius: var(--r-pill); background: var(--paper); box-shadow: 0 0 0 1px var(--pt-hair); font-size: 14px; font-weight: var(--fw-regular); color: var(--ink); cursor: pointer; transition: background-color 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out); }
+  .tool:hover { background: var(--white); box-shadow: 0 0 0 1px var(--ink); }
+  .tool :global(svg) { width: 16px; height: 16px; color: var(--ink-quiet); }
+  .tool span { display: inline-flex; align-items: center; gap: 8px; }
 
-  .checkbox { display: flex; align-items: center; gap: 8px; margin-top: 16px; text-transform: none; }
-  .checkbox input { width: auto; }
+  .body-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 4px; }
+  .body-label { margin-top: 0; }
+  #body-md { min-height: 520px; padding: 18px 20px; border-radius: var(--r-lg); background: var(--paper); font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 13.5px; line-height: 1.75; }
+  #body-md:focus { background: var(--white); }
+  .preview-pane { position: relative; max-height: 620px; overflow-y: auto; padding: 22px 24px; border-radius: var(--r-lg); box-shadow: 0 0 0 1px var(--pt-hair); }
+  .preview-label { position: sticky; top: -22px; margin: -22px -24px 12px; padding: 12px 24px; background: rgba(255, 255, 255, 0.92); backdrop-filter: blur(6px); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-quiet); }
+  .prose :global(h1), .prose :global(h2) { font-family: var(--serif); font-weight: var(--fw-display); font-size: 21px; margin: 22px 0 10px; color: var(--ink); }
+  .prose :global(h3) { font-family: var(--serif); font-size: 17px; margin: 18px 0 8px; color: var(--ink); }
+  .prose :global(p), .prose :global(li) { font-size: 15.5px; line-height: 1.75; color: var(--ink); margin-bottom: 12px; }
+  .prose :global(ul), .prose :global(ol) { padding-left: 22px; }
+  .prose :global(img) { max-width: 100%; border-radius: var(--r-md); }
+  .prose :global(a) { text-decoration: underline; text-underline-offset: 3px; }
+  .prose :global(blockquote) { margin: 16px 0; padding: 4px 0 4px 18px; border-left: 3px solid var(--linen); color: var(--ink-quiet); }
 
-  .actions { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
-  .btn { padding: 10px 20px; background: var(--ink); color: var(--cream); font-size: var(--fs-micro); letter-spacing: var(--ls-button); text-transform: uppercase; margin-right: 10px; }
-  .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--ink); }
-  .btn.ghost.danger { color: #b3261e; border-color: #b3261e; }
-  .btn.small { padding: 6px 14px; font-size: 10px; margin-top: 10px; }
-  .action-status { font-size: var(--fs-small); color: var(--taupe); margin-top: 12px; min-height: 1.5em; }
+  .case-fields { display: grid; gap: 4px; }
+  .case-fields[hidden] { display: none; }
+  .case-fields legend { padding: 0 8px; font-family: var(--serif); font-weight: var(--fw-display); font-size: 18px; color: var(--ink); float: none; }
 
-  .panel { margin-bottom: 28px; }
-  .thumb { width: 100%; aspect-ratio: 16/9; object-fit: cover; margin-bottom: 10px; background: var(--mist); }
-  .hint { font-size: var(--fs-micro); color: var(--taupe); margin-top: 8px; }
+  .seo-panel .meter { margin: 6px 0 0; font-size: 13px; color: var(--ink-quiet); font-variant-numeric: tabular-nums; }
+  .serp { margin-top: 20px; padding: 18px 20px; border-radius: var(--r-lg); background: var(--paper); }
+  .serp-title { color: #1a0dab; font-size: 18px; line-height: 1.3; font-family: arial, sans-serif; }
+  .serp-url { color: #006621; font-size: 13px; margin: 2px 0 4px; font-family: arial, sans-serif; }
+  .serp-desc { color: #545454; font-size: 13.5px; line-height: 1.5; font-family: arial, sans-serif; }
+  .seo-checks { list-style: none; margin-top: 16px; display: grid; gap: 6px; font-size: 14px; color: var(--ink-quiet); }
+  .seo-checks li { padding: 8px 14px; border-radius: var(--r-md); background: var(--paper); }
 
-  .fb-preview { margin-top: 14px; border: 1px solid var(--border); }
-  .fb-media { aspect-ratio: 1.9/1; background: var(--mist); overflow: hidden; }
+  .checkbox { display: flex; align-items: center; gap: 12px; margin: 0; font-size: var(--fs-small); font-weight: var(--fw-regular); color: var(--ink); cursor: pointer; }
+  .thumb { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; margin-bottom: 12px; border-radius: var(--r-md); background: var(--linen); }
+  .panel input[type='file'] { padding: 9px 12px; font-size: 13.5px; }
+  .fb-preview { margin-top: 18px; overflow: hidden; border-radius: var(--r-md); box-shadow: 0 0 0 1px var(--pt-hair); }
+  .fb-media { aspect-ratio: 1.9 / 1; background: var(--linen); overflow: hidden; }
   .fb-media img { width: 100%; height: 100%; object-fit: cover; }
-  .fb-body { padding: 10px 12px; background: #f2f3f5; }
-  .fb-domain { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: #606770; }
-  .fb-title { font-size: 13px; font-weight: 600; color: #1c1e21; margin: 2px 0; }
-  .fb-desc { font-size: 12px; color: #606770; }
+  .fb-body { padding: 10px 14px; background: #f2f3f5; }
+  .fb-domain { font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; color: #606770; }
+  .fb-title { font-size: 14px; font-weight: 600; color: #1c1e21; margin: 2px 0; }
+  .fb-desc { font-size: 12.5px; color: #606770; }
 
-  .readonly-input { margin-bottom: 8px; font-size: var(--fs-micro); }
+  .versions { list-style: none; display: grid; gap: 6px; margin-bottom: 14px; font-size: var(--fs-small); }
+  .versions li { padding: 9px 14px; border-radius: var(--r-md); background: var(--paper); color: var(--ink-quiet); }
+  .versions strong { color: var(--ink); }
+  .versions a { text-decoration: underline; text-underline-offset: 3px; color: var(--ink); }
+  .version-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+  .version-actions .hint { flex-basis: 100%; margin: 0 0 4px; }
+  .link-existing { margin: 12px 0; }
+  .btn.small { margin: 0; }
+  .readonly-input { margin-bottom: 10px; font-size: 13.5px; }
 
-  @media (max-width: 1000px) {
+  .danger-zone { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; margin-top: 64px; padding: 22px 28px; border-radius: var(--r-xl); background: var(--pt-red-bg); }
+  .danger-zone h2 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 17px; color: var(--pt-red); margin-bottom: 4px; }
+  .danger-zone p { font-size: 14px; color: var(--ink-quiet); }
+
+  .action-status { font-size: 14.5px; }
+  .pt-savebar .btn { margin: 0; }
+
+  @media (max-width: 1100px) {
     .editor { grid-template-columns: 1fr; }
+    .side { position: static; }
     .body-grid { grid-template-columns: 1fr; }
+    #body-md { min-height: 360px; }
+    .preview-pane { max-height: 420px; }
+  }
+  @media (max-width: 720px) {
+    .pt-savebar-in { gap: 8px; padding-left: 14px; }
+    .pt-savebar .action-status { max-width: 11ch; overflow: hidden; text-overflow: ellipsis; }
   }
 </style>

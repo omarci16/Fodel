@@ -22,6 +22,7 @@ import { getProperty, STATUS_LABEL, EPC_OPTIONS, LOCALE_OPTIONS, OWNER_EDITABLE 
 import { getTaxonomy, getCompany, termLabel } from '~/lib/runtime-config';
 import { resolveImage } from '~/lib/property-images';
 import { formatCents, type OrderLine } from '~/lib/orders';
+import { eur } from '~/lib/format';
 import { isStripeEnabled } from '~/lib/stripe';
 import { isAiEnabled } from '~/lib/ai/client';
 import { COMPANY } from '~/config/company';
@@ -43,7 +44,28 @@ const property = await getProperty(supabase, id!);
 if (!property) {
   return new Response('Ingatlan nem található, vagy nincs hozzáférése.', { status: 404 });
 }
-const taxonomy = await getTaxonomy();
+const isOwnProperty = property.owner_id === user?.id;
+if (!isAdmin && !isOwnProperty) {
+  return new Response('Nincs hozzáférése ehhez az ingatlanhoz.', { status: 403 });
+}
+
+
+// Everything the page reads besides the listing itself is independent, so it
+// is fetched together: one round trip to the database instead of six.
+const needsNote = property.status === 'changes_requested' || property.status === 'rejected';
+const [taxonomy, suggestionsResult, notesResult, orderResult, company, serviceResult] = await Promise.all([
+  getTaxonomy(),
+  supabase.from('ai_suggestions').select('id, locale, suggested, issues').eq('property_id', id).eq('status', 'pending'),
+  needsNote
+    ? supabase.from('review_notes').select('note, created_at').eq('property_id', property.id).order('created_at', { ascending: false }).limit(1)
+    : Promise.resolve({ data: null }),
+  // What is outstanding on this listing, if anything.
+  supabase.from('payments').select('amount_cents, line_items, status').eq('property_id', property.id).in('status', ['pending', 'paid', 'manual']).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+  getCompany(),
+  // The on-site service for this listing, if one is open (0015). A read error
+  // (migration not yet run) simply hides the section's status.
+  supabase.from('service_requests').select('id, service_id, status, scheduled_for').eq('property_id', property.id).in('status', ['requested', 'scheduled']).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+]);
 // County is stored as a free-text label on properties (no FK — see 0011's
 // rationale), so options are keyed by label. A saved county whose taxonomy
 // term was disabled — or that predates the taxonomy entirely — must stay
@@ -55,11 +77,6 @@ if (property.county && !countyOptions.some((o) => o.value === property.county)) 
   countyOptions.push({ value: property.county, label: property.county });
 }
 
-const isOwnProperty = property.owner_id === user?.id;
-if (!isAdmin && !isOwnProperty) {
-  return new Response('Nincs hozzáférése ehhez az ingatlanhoz.', { status: 403 });
-}
-
 const editable = isAdmin || OWNER_EDITABLE.includes(property.status);
 
 const saved = Astro.url.searchParams.get('saved') === '1';
@@ -68,12 +85,7 @@ const payment = Astro.url.searchParams.get('payment');
 
 const trByLocale = Object.fromEntries(property.translations.map((t) => [t.locale, t]));
 
-const { data: pendingSuggestions } = await supabase
-  .from('ai_suggestions')
-  .select('id, locale, suggested, issues')
-  .eq('property_id', id)
-  .eq('status', 'pending');
-const suggestionByLocale = Object.fromEntries((pendingSuggestions ?? []).map((s) => [s.locale, s]));
+const suggestionByLocale = Object.fromEntries((suggestionsResult.data ?? []).map((s) => [s.locale, s]));
 const hero = property.media.find((m) => m.is_hero) ?? property.media[0];
 const gallery = property.media.filter((m) => m !== hero);
 
@@ -81,33 +93,12 @@ const gallery = property.media.filter((m) => m !== hero);
 const captionOf = (m: (typeof property.media)[number]) =>
   (m.alt as Record<string, string> | null)?.hu ?? '';
 
-// Why the listing was sent back. In 1.0 the changes-requested email quoted the
-// admin's note but this screen — the one the email tells them to go to —
-// could not read it back, because review_notes was admin-only. Migration 0005
-// opens it to the listing's owner; this is what that fixes.
-const { data: reviewNotes } =
-  property.status === 'changes_requested' || property.status === 'rejected'
-    ? await supabase
-        .from('review_notes')
-        .select('note, created_at')
-        .eq('property_id', property.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-    : { data: null };
-const latestNote = reviewNotes?.[0] ?? null;
+// Why the listing was sent back — the owner can read it back since migration 0005.
+const latestNote = notesResult.data?.[0] ?? null;
 
-// What is outstanding on this listing, if anything.
-const { data: order } = await supabase
-  .from('payments')
-  .select('amount_cents, line_items, status')
-  .eq('property_id', property.id)
-  .in('status', ['pending', 'paid', 'manual'])
-  .order('created_at', { ascending: false })
-  .limit(1)
-  .maybeSingle();
-
+const order = orderResult.data;
 const awaitingPayment = property.status === 'awaiting_payment';
-const refundPolicy = (await getCompany()).services.refundPolicy?.hu?.trim();
+const refundPolicy = company.services.refundPolicy?.hu?.trim();
 const orderLines = (order?.line_items ?? []) as OrderLine[];
 const cardEnabled = isStripeEnabled();
 
@@ -127,18 +118,33 @@ if (!property.settlement || !property.county || !property.region) {
 }
 if (property.price_eur <= 1 || property.price_huf <= 1) blockers.push('Adja meg az irányárat.');
 
-// The on-site service for this listing, if one is open (0015). A read error
-// (migration not yet run) simply hides the section's status.
-const { data: openService, error: serviceTableError } = await supabase
-  .from('service_requests')
-  .select('id, service_id, status, scheduled_for')
-  .eq('property_id', property.id)
-  .in('status', ['requested', 'scheduled'])
-  .order('created_at', { ascending: false })
-  .limit(1)
-  .maybeSingle();
-const servicesAvailable = !serviceTableError;
+const openService = serviceResult.data;
+const servicesAvailable = !serviceResult.error;
 const canRequestService = servicesAvailable && isOwnProperty && OWNER_EDITABLE.includes(property.status) && !openService;
+
+// The same rules as `blockers`, shown as a checklist so progress is visible, not only what is left.
+const checks = [
+  { label: 'Magyar cím', done: Boolean(trByLocale.hu?.title?.trim()) },
+  { label: 'Rövid leírás', done: Boolean(trByLocale.hu?.description?.trim()) },
+  { label: 'Település, megye és régió', done: Boolean(property.settlement && property.county && property.region) },
+  { label: 'Irányár', done: property.price_eur > 1 && property.price_huf > 1 },
+  { label: 'Legalább egy fénykép', done: property.media.length > 0 },
+];
+const doneCount = checks.filter((check) => check.done).length;
+const readyPct = Math.round((doneCount / checks.length) * 100);
+const RING = 2 * Math.PI * 26;
+
+const railItems = [
+  { id: 'basics', label: 'Alapadatok' },
+  { id: 'location', label: 'Elhelyezkedés' },
+  { id: 'details', label: 'Részletek' },
+  ...(isAdmin ? [{ id: 'curation', label: 'Kiemelések' }] : []),
+  { id: 'features', label: 'Jellemzők' },
+  { id: 'seller', label: 'Eladó' },
+  { id: 'translations', label: 'Szövegek' },
+  { id: 'media', label: 'Fényképek' },
+  ...(servicesAvailable && (openService || canRequestService) ? [{ id: 'service', label: 'Szolgáltatás' }] : []),
+];
 
 const photoHintCounts = photoHints(property.media);
 
@@ -147,17 +153,32 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
 ---
 
 <Portal title={`Ingatlan #${property.ref}`}>
-  <header class="head">
-    <p class="eyebrow">
-      #{property.ref} · <span class="status">{STATUS_LABEL[property.status] ?? property.status}</span>
-    </p>
-    <h1>{trByLocale.hu?.title || 'Névtelen hirdetés'}</h1>
-    {isAdmin && property.status === 'submitted' && (
-      <a class="review-link" href={`/portal/review/${property.id}`}>Elbírálás megnyitása →</a>
+  <header class="hero">
+    <div class="hero-main">
+      <p class="crumbs"><a href="/portal/properties">← Ingatlanok</a><span>#{property.ref}</span></p>
+      <h1>{trByLocale.hu?.title || 'Névtelen hirdetés'}</h1>
+      <p class="hero-meta">
+        <span class="status-pill" data-status={property.status}>{STATUS_LABEL[property.status] ?? property.status}</span>
+        {property.settlement && <span>{property.settlement}{property.county ? `, ${property.county}` : ''}</span>}
+        {property.price_eur > 1 && <span>{eur(property.price_eur)}</span>}
+      </p>
+      {isAdmin && property.status === 'submitted' && (
+        <a class="btn review-link" href={`/portal/review/${property.id}`}>Elbírálás megnyitása</a>
+      )}
+    </div>
+    {OWNER_EDITABLE.includes(property.status) && (
+      <div class="ring" role="img" aria-label={`Beküldésre kész: ${doneCount} / ${checks.length}`}>
+        <svg viewBox="0 0 64 64" aria-hidden="true">
+          <circle class="ring-bg" cx="32" cy="32" r="26" />
+          <circle class="ring-fg" cx="32" cy="32" r="26" stroke-dasharray={RING} stroke-dashoffset={RING * (1 - readyPct / 100)} />
+        </svg>
+        <span class="ring-n">{doneCount}<small>/{checks.length}</small></span>
+        <span class="ring-l">kész</span>
+      </div>
     )}
   </header>
 
-  {saved && <p class="notice ok">Mentve.</p>}
+  {saved && <p class="notice ok" data-toast="ok">Mentve.</p>}
   {err && <p class="notice error">Nem sikerült menteni: {err}</p>}
   {payment === 'success' && (
     <p class="notice ok">
@@ -202,11 +223,20 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
     </p>
   )}
 
-  <form method="POST" action={`/api/portal/properties/${property.id}/update`} class="editor">
+  <div class="ed-layout">
+  <nav class="ed-rail" aria-label="Szerkesztő szakaszai">
+    <ul>
+      {railItems.map((item, index) => (
+        <li><a href={`#${item.id}`} data-rail={item.id}><span class="n">{index + 1}</span>{item.label}</a></li>
+      ))}
+    </ul>
+  </nav>
+  <div class="ed-body">
+  <form method="POST" action={`/api/portal/properties/${property.id}/update`} class="editor" id="editor-form">
     <fieldset disabled={!editable}>
 
-      <section id="basics">
-        <h2>Alapadatok</h2>
+      <section id="basics" class="ed-card">
+        <header class="card-head"><div><h2>Alapadatok</h2><p>Mi ez az ingatlan, és hogyan azonosítjuk.</p></div></header>
         <div class="grid-2">
           <Field locale="hu" name="category" label="Típus" type="select" required
             options={taxonomy.category.filter((term) => term.enabled || term.key === property.category).map((term) => ({ value: term.key, label: termLabel(term, 'hu') }))}
@@ -218,8 +248,8 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
         </div>
       </section>
 
-      <section id="location">
-        <h2>Elhelyezkedés</h2>
+      <section id="location" class="ed-card">
+        <header class="card-head"><div><h2>Elhelyezkedés</h2><p>Hol található — a pontos cím nem jelenik meg, ha közelítőt választ.</p></div></header>
         <div class="grid-2">
           <Field locale="hu" name="settlement" label="Település" required value={property.settlement} />
           <Field locale="hu" name="country" label="Ország" type="select" required value={property.country}
@@ -238,8 +268,8 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
         </div>
       </section>
 
-      <section id="details">
-        <h2>Részletek</h2>
+      <section id="details" class="ed-card">
+        <header class="card-head"><div><h2>Részletek</h2><p>Ár, méretek és állapot. Ezek alapján szűrnek a vevők.</p></div></header>
         <div class="grid-2">
           <Field locale="hu" name="price_eur" label="Ár (EUR)" type="number" required value={String(property.price_eur)} />
           <Field locale="hu" name="price_huf" label="Ár (HUF)" type="number" required value={String(property.price_huf)} />
@@ -271,7 +301,7 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
         )}
       </section>
 
-      {isAdmin && <section id="curation"><h2>Kiemelések</h2><div class="checkbox-grid">
+      {isAdmin && <section id="curation" class="ed-card"><header class="card-head"><div><h2>Kiemelések</h2><p>Csak az adminisztrátorok látják.</p></div></header><div class="checkbox-grid">
         <label class="checkbox"><input type="checkbox" name="featured" value="yes" checked={property.featured} /> Fizetős kategória-kiemelés</label>
         <label class="checkbox"><input type="checkbox" name="homepage_featured" value="yes" checked={property.homepage_featured} /> Fizetős főoldali kiemelés</label>
         <label class="checkbox"><input type="checkbox" name="bargain" value="yes" checked={property.bargain} /> Alkalmi vétel</label>
@@ -281,8 +311,8 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
         a szerkesztői válogatás a <a href="/portal/top10">Top 10</a> oldalon kezelhető.
       </p></section>}
 
-      <section id="features">
-        <h2>Jellemzők</h2>
+      <section id="features" class="ed-card">
+        <header class="card-head"><div><h2>Jellemzők</h2><p>Jelölje be, ami igaz az ingatlanra.</p></div></header>
         <div class="checkbox-grid">
           {taxonomy.feature.filter((term) => term.enabled || property.features.includes(term.key)).map((term) => (
             <label class="checkbox">
@@ -293,8 +323,8 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
         </div>
       </section>
 
-      <section id="seller">
-        <h2>Eladó elérhetősége</h2>
+      <section id="seller" class="ed-card">
+        <header class="card-head"><div><h2>Eladó elérhetősége</h2><p>Ha engedi, a vevő közvetlenül is felveheti Önnel a kapcsolatot.</p></div></header>
         <p class="hint">
           A FODEL egyedi modellje: ha ehhez hozzájárul, a neve és telefonszáma megjelenik a
           hirdetésen, hogy a vevő közvetlenül is felvehesse Önnel a kapcsolatot.
@@ -317,8 +347,8 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
         </div>
       </section>
 
-      <section id="translations">
-        <h2>Szövegek</h2>
+      <section id="translations" class="ed-card">
+        <header class="card-head"><div><h2>Szövegek</h2><p>Minden nyelven külön szöveg. A magyar kötelező, a többi bővíti az elérést.</p></div></header>
         <div class="locale-tabs" role="tablist">
           {LOCALE_OPTIONS.map((l, i) => (
             <button type="button" class="locale-tab" data-locale-tab={l.value} aria-selected={i === 0}>
@@ -370,14 +400,19 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
         })}
       </section>
 
-      <div class="save-row">
-        <button type="submit" class="btn">Mentés</button>
-      </div>
+      {editable && (
+        <div class="savebar" id="savebar" data-state="clean">
+          <div class="savebar-in">
+            <p class="savebar-msg" role="status"><span class="dot"></span><span class="txt" id="savebar-txt">Minden módosítás mentve</span></p>
+            <button type="submit" class="btn" id="save-btn">Mentés <kbd>⌘S</kbd></button>
+          </div>
+        </div>
+      )}
     </fieldset>
   </form>
 
   {awaitingPayment && order && (
-    <section class="pay">
+    <section class="pay ed-card" id="pay">
       <h2>Fizetendő díj</h2>
       <p class="hint">
         Hirdetését jóváhagytuk. A fizetés beérkezése után azonnal megjelenik a {SITE_HOST} oldalon.
@@ -429,15 +464,15 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
     </section>
   )}
 
-  <section class="workflow">
+  <section class="workflow ed-card">
     {OWNER_EDITABLE.includes(property.status) && (
       <>
-        {blockers.length > 0 && (
-          <div class="checklist">
-            <p class="checklist-head">Beküldés előtt még hiányzik:</p>
-            <ul>{blockers.map((b) => <li>{b}</li>)}</ul>
-          </div>
-        )}
+        <p class="wf-title">Beküldés elbírálásra</p>
+        <ul class="steps">
+          {checks.map((check) => (
+            <li data-done={check.done}><span class="tick" aria-hidden="true"></span>{check.label}</li>
+          ))}
+        </ul>
         <button type="button" class="btn" id="submit-btn" disabled={blockers.length > 0}>
           Beküldés elbírálásra
         </button>
@@ -455,8 +490,8 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
     <p class="workflow-status" id="workflow-status" role="status"></p>
   </section>
 
-  <section id="media" class="media-section">
-    <h2>Fényképek</h2>
+  <section id="media" class="media-section ed-card">
+    <header class="card-head"><div><h2>Fényképek</h2><p>Az első kép a címlapkép — a többit húzás nélkül, a „Címlapképnek” gombbal cserélheti.</p></div></header>
     <p class="hint">
       Húzza ide a képeket, vagy kattintson a tallózáshoz. Formátum: JPG, PNG vagy WebP ·
       legfeljebb {MAX_UPLOAD_MB} MB képenként (a nagy fájlokat a böngésző feltöltés előtt
@@ -515,14 +550,14 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
 
     <label class="dropzone" id="dropzone">
       <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp" multiple hidden />
-      <span>+ Fotók hozzáadása</span>
+      <span class="dz-ic" aria-hidden="true">+</span><span class="dz-t">Fotók hozzáadása</span><span class="dz-s">Húzza ide a képeket, vagy kattintson</span>
     </label>
     <p class="upload-status" id="upload-status" role="status"></p>
   </section>
 
   {servicesAvailable && (openService || canRequestService) && (
-    <section id="service" class="service-section">
-      <h2>Helyszíni szolgáltatás</h2>
+    <section id="service" class="service-section ed-card">
+      <header class="card-head"><div><h2>Helyszíni szolgáltatás</h2><p>Nem kötelező: szakember fotózza le az ingatlant Ön helyett.</p></div></header>
       {openService ? (
         <div class="service-status">
           <p>
@@ -566,6 +601,8 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
       <p class="workflow-status" id="service-status" role="status"></p>
     </section>
   )}
+  </div>
+  </div>
 </Portal>
 
 <script define:vars={{ servicePropertyId: property.id }}>
@@ -596,14 +633,76 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
     if (serviceStatus) serviceStatus.textContent = 'Küldés…';
     serviceCall({ action: 'request', serviceId: chosen.value, note: form.note.value });
   });
-  document.getElementById('service-cancel')?.addEventListener('click', () => {
-    if (confirm('Visszavonja a helyszíni szolgáltatás iránti igényét?')) serviceCall({ action: 'cancel' });
+  document.getElementById('service-cancel')?.addEventListener('click', async () => {
+    if (await window.pf.confirm({ title: 'Visszavonja az igényt?', body: 'A helyszíni szolgáltatás iránti kérést visszavonja; munkatársunk nem keresi Önt időpont miatt.', confirmLabel: 'Igény visszavonása', danger: true })) serviceCall({ action: 'cancel' });
   });
 </script>
 
 <script>
   import { exposeShrinkImage } from '~/scripts/shrink-image';
   exposeShrinkImage();
+</script>
+
+<script>
+  /* ── Section rail: the section being read lights up ─────────────────── */
+  const links = [...document.querySelectorAll<HTMLAnchorElement>('[data-rail]')];
+  const targets = links.map((link) => document.getElementById(link.dataset.rail!)).filter((el): el is HTMLElement => Boolean(el));
+  if (links.length && 'IntersectionObserver' in window) {
+    const visible = new Set<string>();
+    const mark = () => {
+      // The first visible section in page order is the one being read.
+      const current = targets.find((el) => visible.has(el.id))?.id ?? links[0].dataset.rail;
+      links.forEach((link) => link.setAttribute('aria-current', String(link.dataset.rail === current)));
+    };
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => (entry.isIntersecting ? visible.add(entry.target.id) : visible.delete(entry.target.id)));
+        mark();
+      },
+      { rootMargin: '-15% 0px -55% 0px' }
+    );
+    targets.forEach((el) => observer.observe(el));
+    mark();
+  }
+  links.forEach((link) =>
+    link.addEventListener('click', (event) => {
+      const el = document.getElementById(link.dataset.rail!);
+      if (!el) return;
+      event.preventDefault();
+      el.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+      history.replaceState(null, '', `#${el.id}`);
+    })
+  );
+
+  /* ── Save bar: says plainly whether anything is unsaved ──────────────── */
+  const form = document.getElementById('editor-form') as HTMLFormElement | null;
+  const bar = document.getElementById('savebar');
+  const text = document.getElementById('savebar-txt');
+  if (form && bar && text) {
+    let dirty = false;
+    let saving = false;
+    const set = (state: 'clean' | 'dirty' | 'saving') => {
+      bar.dataset.state = state;
+      text.textContent = state === 'dirty' ? 'Nem mentett módosítások' : state === 'saving' ? 'Mentés…' : 'Minden módosítás mentve';
+    };
+    form.addEventListener('input', () => {
+      dirty = true;
+      set('dirty');
+    });
+    form.addEventListener('submit', () => {
+      saving = true;
+      set('saving');
+    });
+    window.addEventListener('beforeunload', (event) => {
+      if (dirty && !saving) event.preventDefault();
+    });
+    document.addEventListener('keydown', (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        if (!saving) form.requestSubmit();
+      }
+    });
+  }
 </script>
 
 <script define:vars={{ propertyId: property.id }}>
@@ -754,11 +853,11 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
     location.reload();
   }
 
-  document.getElementById('submit-btn')?.addEventListener('click', () => {
-    if (confirm('Biztosan beküldi ezt a hirdetést elbírálásra?')) doAction('submit');
+  document.getElementById('submit-btn')?.addEventListener('click', async () => {
+    if (await window.pf.confirm({ title: 'Beküldi elbírálásra?', body: 'Munkatársunk átnézi a hirdetést. Amíg az elbírálás tart, a mezők nem szerkeszthetők.', confirmLabel: 'Beküldés' })) doAction('submit');
   });
-  document.getElementById('sold-btn')?.addEventListener('click', () => {
-    if (confirm('Megjelöli ezt a hirdetést eladottként? A hirdetés lekerül az élő listáról.')) doAction('mark_sold');
+  document.getElementById('sold-btn')?.addEventListener('click', async () => {
+    if (await window.pf.confirm({ title: 'Megjelöli eladottként?', body: 'A hirdetés lekerül az élő listáról, és az eladott ingatlanok közé kerül.', confirmLabel: 'Megjelölés eladottként' })) doAction('mark_sold');
   });
 
   // Captions save on blur rather than behind a button: they are a dozen small
@@ -814,7 +913,7 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
 
     const removeId = target.getAttribute('data-remove-media');
     if (removeId) {
-      if (!confirm('Biztosan törli ezt a képet?')) return;
+      if (!(await window.pf.confirm({ title: 'Törli a képet?', body: 'A kép véglegesen eltűnik a hirdetésből.', confirmLabel: 'Törlés', danger: true }))) return;
       await fetch(`/api/portal/properties/${propertyId}/media/${removeId}`, { method: 'DELETE' });
       location.reload();
       return;
@@ -833,126 +932,198 @@ const missingCaptions = property.media.filter((m) => !captionOf(m).trim()).lengt
 </script>
 
 <style>
-  .head { margin-bottom: 20px; }
-  .eyebrow { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--taupe); margin-bottom: 8px; }
-  .status { color: var(--ink); font-weight: 500; }
-  h1 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 28px; color: var(--ink); }
-  .review-link { display: inline-block; margin-top: 10px; font-size: var(--fs-small); text-decoration: underline; }
+  /* ── Page head ───────────────────────────────────────────────────────── */
+  .hero { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; margin-bottom: 28px; }
+  .hero-main { min-width: 0; }
+  .crumbs { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; font-size: 14px; color: var(--ink-quiet); }
+  .crumbs a { text-decoration: none; transition: color 0.2s var(--ease-out); }
+  .crumbs a:hover { color: var(--ink); }
+  .crumbs span { padding: 2px 10px; border-radius: var(--r-pill); background: var(--linen); font-size: 12.5px; letter-spacing: 0.04em; }
+  h1 { font-family: var(--serif); font-weight: var(--fw-display); font-size: clamp(28px, 3.4vw, 40px); letter-spacing: var(--ls-heading); line-height: 1.12; color: var(--ink); text-wrap: balance; }
+  .hero-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-top: 14px; font-size: 15px; color: var(--ink-quiet); }
+  .status-pill { display: inline-flex; align-items: center; gap: 8px; padding: 5px 14px 5px 12px; border-radius: var(--r-pill); background: var(--linen); color: var(--ink); font-size: 13.5px; font-weight: var(--fw-medium); }
+  .status-pill::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: currentColor; opacity: 0.55; }
+  .status-pill[data-status='published'] { background: var(--pt-green-bg); color: var(--pt-green); }
+  .status-pill[data-status='published']::before { opacity: 1; }
+  .status-pill[data-status='submitted'], .status-pill[data-status='awaiting_payment'] { background: var(--pt-amber-bg); color: var(--pt-amber); }
+  .status-pill[data-status='changes_requested'], .status-pill[data-status='rejected'] { background: var(--pt-red-bg); color: var(--pt-red); }
+  .review-link { margin-top: 18px; display: inline-flex; }
 
-  .notice { padding: 12px 16px; font-size: var(--fs-small); margin-bottom: 20px; }
-  .notice.ok { background: rgba(16, 42, 67, 0.06); border-left: 2px solid var(--ink); }
-  .notice.error { background: rgba(179, 38, 30, 0.06); border-left: 2px solid #b3261e; color: #b3261e; }
-  .notice.warn { background: rgba(200, 150, 0, 0.08); border-left: 2px solid #96700b; color: #6b4f08; }
+  .ring { position: relative; flex: none; width: 92px; height: 92px; display: grid; place-items: center; align-content: center; border-radius: 50%; background: var(--white); box-shadow: var(--shadow-md); }
+  .ring svg { position: absolute; inset: 8px; width: calc(100% - 16px); height: calc(100% - 16px); transform: rotate(-90deg); }
+  .ring circle { fill: none; stroke-width: 5; }
+  .ring-bg { stroke: var(--linen); }
+  .ring-fg { stroke: var(--ink); stroke-linecap: round; transition: stroke-dashoffset 1s var(--ease-out); }
+  .ring-n { position: relative; font-family: var(--serif); font-weight: var(--fw-display); font-size: 24px; line-height: 1; color: var(--ink); }
+  .ring-n small { font-size: 13px; color: var(--ink-quiet); font-weight: var(--fw-regular); }
+  .ring-l { position: relative; margin-top: 2px; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-quiet); }
 
-  fieldset { border: none; padding: 0; margin: 0; }
-  fieldset:disabled { opacity: 0.6; }
+  /* ── Layout: a quiet section rail beside the form ─────────────────────── */
+  .ed-layout { display: grid; grid-template-columns: 188px minmax(0, 1fr); gap: clamp(28px, 3.5vw, 56px); align-items: start; }
+  .ed-rail { position: sticky; top: 28px; }
+  .ed-rail ul { list-style: none; display: grid; gap: 2px; }
+  .ed-rail a { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: var(--r-pill); font-size: 14.5px; color: var(--ink-quiet); text-decoration: none; transition: background-color 0.25s var(--ease-out), color 0.25s var(--ease-out); }
+  .ed-rail a:hover { background: var(--linen); color: var(--ink); }
+  .ed-rail .n { display: grid; place-items: center; flex: none; width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--pt-hair); background: var(--white); font-size: 12px; transition: background-color 0.25s var(--ease-out), color 0.25s var(--ease-out), border-color 0.25s var(--ease-out); }
+  .ed-rail a[aria-current='true'] { background: var(--white); color: var(--ink); font-weight: var(--fw-medium); box-shadow: var(--shadow-xs), 0 0 0 1px var(--pt-hair); }
+  .ed-rail a[aria-current='true'] .n { background: var(--ink); border-color: var(--ink); color: var(--cream); }
+  .ed-body { display: grid; gap: 20px; min-width: 0; }
+  .ed-body > form, fieldset { display: grid; gap: 20px; border: 0; padding: 0; margin: 0; min-width: 0; }
+  fieldset:disabled .ed-card { opacity: 0.72; }
 
-  section { padding: 28px 0; border-top: 1px solid var(--border); }
-  section:first-of-type { border-top: none; }
-  h2 { font-family: var(--serif); font-size: 19px; color: var(--ink); margin-bottom: 18px; }
+  /* ── Cards ───────────────────────────────────────────────────────────── */
+  .ed-card { padding: clamp(22px, 3vw, 36px); border-radius: var(--r-xl); background: var(--white); box-shadow: var(--shadow-xs), 0 0 0 1px var(--pt-hair); scroll-margin-top: 24px; transition: box-shadow 0.4s var(--ease-out); }
+  .ed-card:focus-within { box-shadow: var(--shadow-md), 0 0 0 1px rgba(16, 42, 67, 0.14); }
+  .card-head { margin-bottom: 26px; }
+  .ed-card h2 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 22px; letter-spacing: var(--ls-heading); color: var(--ink); }
+  .card-head p { margin-top: 6px; font-size: 14.5px; line-height: 1.6; color: var(--ink-quiet); max-width: 62ch; }
+  .ed-card h3 { margin: 28px 0 12px; font-size: 12.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-quiet); font-weight: var(--fw-medium); }
 
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }
-  .field { display: flex; flex-direction: column; margin-bottom: 22px; }
-  .field label { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--taupe); margin-bottom: 9px; }
-  .readonly { font-size: var(--fs-body); color: var(--ink); padding: 13px 0; }
+  /* Fields default to full width; inside a two-column grid they share the row. */
+  .grid-2 :global(.field.span-full) { grid-column: auto; }
+  .field { display: flex; flex-direction: column; margin-bottom: 18px; }
+  .field label { font-size: var(--fs-small); font-weight: var(--fw-medium); color: var(--ink); margin-bottom: 9px; }
+  .readonly { display: flex; align-items: center; min-height: 54px; padding: 0 18px; border-radius: var(--r-sm); background: var(--paper); font-size: var(--fs-body); color: var(--ink-quiet); }
+  .hint { font-size: 14px; line-height: 1.65; color: var(--ink-quiet); margin-bottom: 14px; max-width: 70ch; }
+  .hint a, .hint-link { text-decoration: underline; text-underline-offset: 3px; }
 
-  .ai-box { margin-top: 8px; padding: 16px; background: var(--linen); }
-  .ai-label { font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; color: var(--taupe); margin-bottom: 10px; }
-  .diff { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 12px; }
-  .diff-label { font-size: var(--fs-micro); color: var(--taupe); margin-bottom: 4px; }
-  .diff-text { font-size: var(--fs-small); line-height: 1.6; color: var(--ink); background: #fff; padding: 10px; border: 1px solid var(--border); }
-  .ai-issues { font-size: var(--fs-micro); color: var(--taupe); margin: 0 0 12px 18px; }
-  .btn.small { padding: 7px 14px; font-size: 11px; margin-right: 8px; margin-bottom: 8px; }
-  .ai-status { font-size: var(--fs-micro); color: var(--taupe); margin-top: 6px; min-height: 1.4em; }
+  .checkbox { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; font-size: var(--fs-small); color: var(--ink); cursor: pointer; line-height: 1.45; }
+  .checkbox-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px 20px; }
+  .checkbox-grid .checkbox { padding: 10px 14px; margin: 0; border-radius: var(--r-md); background: var(--paper); transition: background-color 0.2s var(--ease-out); }
+  .checkbox-grid .checkbox:hover { background: var(--linen); }
+  .checkbox-grid .checkbox:has(input:checked) { background: rgba(16, 42, 67, 0.07); }
 
-  .hint { font-size: var(--fs-small); color: var(--taupe); line-height: 1.7; margin-bottom: 14px; }
+  /* ── Language tabs ───────────────────────────────────────────────────── */
+  .locale-tabs { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; margin-bottom: 24px; border-radius: var(--r-pill); background: var(--linen); }
+  .locale-tab { padding: 8px 18px; border-radius: var(--r-pill); font-size: 14px; color: var(--ink-quiet); background: transparent; transition: background-color 0.25s var(--ease-out), color 0.25s var(--ease-out), box-shadow 0.25s var(--ease-out); }
+  .locale-tab:hover { color: var(--ink); }
+  .locale-tab[aria-selected='true'] { background: var(--white); color: var(--ink); font-weight: var(--fw-medium); box-shadow: var(--shadow-xs); }
 
-  .checkbox { display: flex; align-items: center; gap: 8px; font-size: var(--fs-small); color: var(--ink); margin-bottom: 10px; }
-  .checkbox-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 16px; }
+  .ai-box { margin-top: 8px; padding: 18px; border-radius: var(--r-lg); background: var(--paper); box-shadow: 0 0 0 1px var(--pt-hair); }
+  .ai-label { margin-bottom: 12px; font-size: 12.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-quiet); }
+  .diff { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+  .diff-label { margin-bottom: 6px; font-size: 13px; color: var(--ink-quiet); }
+  .diff-text { padding: 12px 14px; border-radius: var(--r-md); background: var(--white); box-shadow: 0 0 0 1px var(--pt-hair); font-size: var(--fs-small); line-height: 1.65; color: var(--ink); }
+  .ai-issues { margin: 0 0 14px 18px; font-size: 13.5px; color: var(--ink-quiet); }
+  .btn.small { margin: 0 8px 8px 0; }
+  .ai-status { min-height: 1.4em; margin-top: 6px; font-size: 13.5px; color: var(--ink-quiet); }
 
-  .locale-tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
-  .locale-tab { padding: 8px 16px; font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; border: 1px solid var(--border); background: transparent; color: var(--taupe); }
-  .locale-tab[aria-selected='true'] { background: var(--ink); color: var(--cream); border-color: var(--ink); }
+  /* ── Floating save bar ───────────────────────────────────────────────── */
+  .savebar { position: sticky; bottom: 18px; z-index: 20; height: 0; pointer-events: none; }
+  .savebar-in { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); white-space: nowrap; pointer-events: auto; display: flex; align-items: center; gap: 20px; padding: 8px 8px 8px 22px; border-radius: var(--r-pill); background: rgba(250, 250, 248, 0.9); backdrop-filter: blur(16px) saturate(1.5); -webkit-backdrop-filter: blur(16px) saturate(1.5); box-shadow: var(--shadow-lg), 0 0 0 1px var(--pt-hair); transition: transform 0.4s var(--ease-out), box-shadow 0.4s var(--ease-out); }
+  .savebar[data-state='dirty'] .savebar-in { box-shadow: var(--shadow-lg), 0 0 0 1px rgba(138, 100, 8, 0.35); }
+  .savebar-msg { display: flex; align-items: center; gap: 10px; font-size: 14.5px; color: var(--ink-quiet); }
+  .savebar .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--pt-green); transition: background-color 0.3s var(--ease-out); }
+  .savebar[data-state='dirty'] .dot { background: #c99a1b; }
+  .savebar[data-state='dirty'] .savebar-msg { color: var(--ink); }
+  .savebar kbd { margin-left: 8px; padding: 1px 7px; border-radius: 6px; background: rgba(244, 244, 242, 0.16); font-family: inherit; font-size: 12px; letter-spacing: 0.02em; }
+  .btn { margin: 0; }
 
-  .save-row { padding: 28px 0; }
-  .btn { padding: 13px 32px; background: var(--ink); color: var(--cream); font-size: var(--fs-micro); letter-spacing: var(--ls-button); text-transform: uppercase; margin-right: 12px; }
-  .btn:hover { opacity: 0.9; }
-  .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--ink); }
+  /* ── Workflow: what stands between this draft and review ─────────────── */
+  .wf-title { margin-bottom: 14px; font-family: var(--serif); font-weight: var(--fw-display); font-size: 20px; color: var(--ink); }
+  .steps { list-style: none; display: grid; gap: 4px 28px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); margin-bottom: 22px; }
+  .steps li { display: flex; align-items: center; gap: 12px; padding: 8px 0; font-size: var(--fs-small); color: var(--ink-quiet); }
+  .steps .tick { position: relative; flex: none; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid rgba(16, 42, 67, 0.22); transition: background-color 0.4s var(--ease-out), border-color 0.4s var(--ease-out); }
+  .steps .tick::after { content: ''; position: absolute; left: 7px; top: 3.5px; width: 5px; height: 10px; border: solid var(--white); border-width: 0 2px 2px 0; transform: rotate(45deg) scale(0); transition: transform 0.35s var(--ease-out) 0.1s; }
+  .steps li[data-done='true'] { color: var(--ink); }
+  .steps li[data-done='true'] .tick { background: var(--pt-green); border-color: var(--pt-green); }
+  .steps li[data-done='true'] .tick::after { transform: rotate(45deg) scale(1); }
+  .workflow:not(:has(button, ul)) { display: none; }
+  .workflow-status { min-height: 1.4em; margin-top: 12px; font-size: 14px; color: var(--ink-quiet); }
+  .soft-warn { max-width: 68ch; margin-top: 16px; padding: 12px 16px; border-radius: var(--r-md); background: var(--pt-amber-bg); font-size: 14px; line-height: 1.65; color: var(--pt-amber); }
 
-  .workflow { padding: 24px 0; border-top: 1px solid var(--border); }
-  .workflow-status { font-size: var(--fs-small); color: var(--taupe); margin-top: 12px; min-height: 1.4em; }
+  /* ── Banners ─────────────────────────────────────────────────────────── */
+  .review-note { padding: 22px 26px; margin-bottom: 4px; border-radius: var(--r-lg); background: var(--pt-red-bg); }
+  .review-note .eyebrow { margin-bottom: 12px; color: var(--pt-red); }
+  .review-note blockquote { margin: 0 0 12px; font-size: var(--fs-body); line-height: var(--lh-body); color: var(--ink); white-space: pre-line; }
+  .review-note-foot { font-size: 14.5px; line-height: 1.7; color: var(--ink-quiet); }
+  .notice { margin-bottom: 16px; }
 
-  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
-
-  .checklist { padding: 14px 18px; background: var(--linen); border-left: 2px solid var(--taupe); margin-bottom: 18px; max-width: 68ch; }
-  .checklist-head { font-size: var(--fs-small); color: var(--ink); margin-bottom: 8px; }
-  .checklist ul { margin: 0; padding-left: 20px; }
-  .checklist li { font-size: var(--fs-small); line-height: 1.7; color: var(--taupe); }
-  .soft-warn { font-size: var(--fs-small); line-height: 1.7; color: #6b4f08; margin-top: 14px; max-width: 68ch; }
-
-  .review-note { padding: 20px 22px; background: rgba(179, 38, 30, 0.05); border-left: 2px solid #b3261e; margin-bottom: 24px; }
-  .review-note .eyebrow { color: #b3261e; margin-bottom: 10px; }
-  .review-note blockquote { font-size: var(--fs-body); line-height: var(--lh-body); color: var(--ink); margin: 0 0 12px; white-space: pre-line; }
-  .review-note-foot { font-size: var(--fs-small); line-height: 1.7; color: var(--taupe); }
-
-
-  .pay { padding: 28px 0; border-top: 1px solid var(--border); }
-  .pay h2 { font-family: var(--serif); font-size: 19px; color: var(--ink); margin-bottom: 10px; }
-  .pay h3 { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--taupe); margin: 28px 0 12px; }
-
-  .order-table { width: 100%; max-width: 460px; border-collapse: collapse; margin-bottom: 6px; }
-  .order-table td { padding: 11px 0; font-size: var(--fs-body); color: var(--ink); border-bottom: 1px solid var(--border); }
+  /* ── Payment ─────────────────────────────────────────────────────────── */
+  .pay h3 { margin: 30px 0 12px; }
+  .order-table { width: 100%; max-width: 480px; border-collapse: collapse; margin-bottom: 6px; }
+  .order-table td { padding: 12px 0; font-size: var(--fs-body); color: var(--ink); border-bottom: 1px solid var(--pt-hair); }
   .order-table .amount { text-align: right; white-space: nowrap; }
-  .order-table tfoot td { border-bottom: none; padding-top: 14px; }
-  .order-table .total { font-family: var(--serif); font-size: 20px; font-weight: var(--fw-medium); }
-  .vat-note { font-size: var(--fs-micro); color: var(--taupe); margin-bottom: 22px; }
-
-  .bank { display: grid; grid-template-columns: max-content 1fr; gap: 8px 20px; max-width: 460px; margin-bottom: 16px; }
+  .order-table tfoot td { border-bottom: none; padding-top: 16px; }
+  .order-table .total { font-family: var(--serif); font-size: 24px; font-weight: var(--fw-display); }
+  .vat-note { margin-bottom: 22px; font-size: 13.5px; color: var(--ink-quiet); }
+  .bank { display: grid; grid-template-columns: max-content 1fr; gap: 10px 24px; max-width: 480px; padding: 18px 22px; margin-bottom: 16px; border-radius: var(--r-lg); background: var(--paper); }
   .bank > div { display: contents; }
-  .bank dt { font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; color: var(--taupe); }
-  .bank dd { font-size: var(--fs-small); color: var(--ink); }
+  .bank dt { font-size: 13px; color: var(--ink-quiet); }
+  .bank dd { font-size: var(--fs-small); color: var(--ink); word-break: break-all; }
 
-  .media-section { padding-top: 28px; border-top: 1px solid var(--border); margin-top: 8px; }
-
-  .photo-flags { position: absolute; left: 6px; bottom: 6px; display: flex; gap: 4px; flex-wrap: wrap; pointer-events: none; }
-  .photo-flags span { font-size: 11px; padding: 2px 7px; border-radius: 999px; background: #fff7e0; color: #6b4f08; border: 1px solid #96700b; }
-  .service-section { padding: 28px 0; border-top: 1px solid var(--border); margin-top: 20px; }
-  .service-section h2 { font-family: var(--serif); font-size: 19px; color: var(--ink); margin-bottom: 10px; }
-  .service-status p { font-size: var(--fs-small); color: var(--ink); line-height: 1.7; }
-  .service-options { display: grid; gap: 10px; margin: 14px 0; max-width: 640px; }
-  .service-option { display: grid; grid-template-columns: 20px 1fr; gap: 12px; align-items: start; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: #fff; cursor: pointer; }
-  .service-option:has(input:checked) { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
-  .service-option input { margin-top: 4px; }
-  .service-option > span { display: flex; flex-direction: column; gap: 3px; font-size: var(--fs-small); color: var(--taupe); line-height: 1.5; }
-  .service-option strong { color: var(--ink); font-weight: 500; }
-  .service-price { color: var(--ink); }
-  .service-note { display: flex; flex-direction: column; gap: 6px; max-width: 640px; margin-bottom: 14px; font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; color: var(--taupe); }
-  .service-note textarea { border: 1px solid var(--border); background: #fff; padding: 10px; font-size: var(--fs-small); color: var(--ink); text-transform: none; letter-spacing: 0; font-family: inherit; }
-  .hint-link { font-size: var(--fs-small); text-decoration: underline; text-underline-offset: 2px; }
-  .media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 18px 14px; margin: 18px 0; }
-  .media-item { display: flex; flex-direction: column; gap: 8px; }
-  .media-thumb { position: relative; aspect-ratio: 4/3; background: var(--mist); overflow: hidden; }
-  .media-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
-
-  .caption { width: 100%; border: 1px solid var(--border); background: #fff; padding: 8px 10px; font-size: var(--fs-small); color: var(--ink); }
-  .caption:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
-  .caption:disabled { background: var(--linen); color: var(--taupe); }
-  /* A brief confirmation on the field itself — a photo grid full of toasts is
-     unreadable, and the field is where the eye already is. */
-  .caption.saved { border-color: var(--ink); }
-  .caption.failed { border-color: #b3261e; }
-
+  /* ── Photos ──────────────────────────────────────────────────────────── */
+  .media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 20px 16px; margin: 22px 0; }
+  .media-item { display: flex; flex-direction: column; gap: 10px; }
+  .media-thumb { position: relative; aspect-ratio: 4 / 3; overflow: hidden; border-radius: var(--r-lg); background: var(--linen); box-shadow: 0 0 0 1px var(--pt-hair); }
+  .media-item img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.7s var(--ease-out); }
+  .media-item:hover img { transform: scale(1.04); }
+  .media-item[data-hero='true'] .media-thumb { box-shadow: 0 0 0 2px var(--ink); }
+  .hero-badge { position: absolute; top: 10px; left: 10px; padding: 4px 11px; border-radius: var(--r-pill); background: var(--ink); color: var(--cream); font-size: 12px; letter-spacing: 0.04em; }
+  .set-hero { position: absolute; left: 10px; bottom: 10px; padding: 6px 12px; border-radius: var(--r-pill); background: rgba(250, 250, 248, 0.94); color: var(--ink); font-size: 12.5px; box-shadow: var(--shadow-sm); opacity: 0; transform: translateY(4px); transition: opacity 0.25s var(--ease-out), transform 0.25s var(--ease-out); }
+  .media-thumb:hover .set-hero, .set-hero:focus-visible { opacity: 1; transform: none; }
+  @media (hover: none) { .set-hero { opacity: 1; transform: none; } }
+  .remove { position: absolute; top: 8px; right: 8px; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: rgba(16, 42, 67, 0.82); color: var(--cream); font-size: 17px; line-height: 1; backdrop-filter: blur(6px); transition: background-color 0.2s var(--ease-out), transform 0.2s var(--ease-out); }
+  .remove:hover { background: var(--pt-red); transform: scale(1.08); }
+  .photo-flags { position: absolute; right: 10px; bottom: 10px; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; pointer-events: none; }
+  .photo-flags span { padding: 3px 9px; border-radius: var(--r-pill); background: rgba(255, 247, 224, 0.96); color: var(--pt-amber); font-size: 11.5px; }
+  .caption { width: 100%; min-height: 42px; padding: 9px 14px; border: 1px solid transparent; border-radius: var(--r-sm); background: var(--paper); font-size: 14px; color: var(--ink); transition: border-color 0.25s var(--ease-out), background-color 0.25s var(--ease-out), box-shadow 0.25s var(--ease-out); }
+  .caption:hover { background: var(--linen); }
+  .caption:focus { outline: none; background: var(--white); border-color: var(--ink); box-shadow: 0 0 0 4px rgba(16, 42, 67, 0.08); }
+  .caption:disabled { background: var(--paper); color: var(--ink-quiet); }
+  /* A brief confirmation on the field itself — a photo grid full of toasts is unreadable. */
+  .caption.saved { border-color: var(--pt-green); }
+  .caption.failed { border-color: var(--pt-red); }
   .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
-  .hero-badge { position: absolute; top: 6px; left: 6px; background: var(--ink); color: var(--cream); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 8px; }
-  .set-hero { position: absolute; bottom: 6px; left: 6px; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; background: rgba(244,244,242,0.92); color: var(--ink); padding: 4px 8px; }
-  .remove { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; background: rgba(16,42,67,0.85); color: var(--cream); border-radius: 50%; line-height: 1; }
 
-  .dropzone { display: flex; align-items: center; justify-content: center; padding: 32px; border: 1px dashed var(--border); cursor: pointer; font-size: var(--fs-small); color: var(--taupe); }
-  .dropzone.drag { border-color: var(--ink); color: var(--ink); background: var(--linen); }
-  .upload-status { font-size: var(--fs-small); color: var(--taupe); margin-top: 10px; min-height: 1.5em; }
+  .dropzone { display: grid; justify-items: center; gap: 4px; padding: 36px 24px; border: 1.5px dashed rgba(16, 42, 67, 0.22); border-radius: var(--r-lg); background: var(--paper); cursor: pointer; text-align: center; transition: border-color 0.3s var(--ease-out), background-color 0.3s var(--ease-out), transform 0.3s var(--ease-out); }
+  .dropzone:hover { border-color: var(--ink); background: var(--linen); }
+  .dropzone.drag { border-color: var(--ink); background: rgba(16, 42, 67, 0.08); transform: scale(1.01); }
+  .dz-ic { display: grid; place-items: center; width: 44px; height: 44px; margin-bottom: 8px; border-radius: 50%; background: var(--ink); color: var(--cream); font-size: 24px; line-height: 1; transition: transform 0.4s var(--ease-out); }
+  .dropzone:hover .dz-ic { transform: rotate(90deg) scale(1.06); }
+  .dz-t { font-size: var(--fs-body); font-weight: var(--fw-medium); color: var(--ink); }
+  .dz-s { font-size: 14px; color: var(--ink-quiet); }
+  .upload-status { min-height: 1.5em; margin-top: 12px; font-size: 14px; color: var(--ink-quiet); }
 
+  /* ── On-site service ─────────────────────────────────────────────────── */
+  .service-status p { font-size: var(--fs-small); color: var(--ink); line-height: 1.7; }
+  .service-options { display: grid; gap: 12px; margin: 16px 0; max-width: 680px; }
+  .service-option { display: grid; grid-template-columns: 22px 1fr; gap: 14px; align-items: start; padding: 18px 20px; border-radius: var(--r-lg); background: var(--white); box-shadow: 0 0 0 1px var(--pt-hair); cursor: pointer; transition: box-shadow 0.3s var(--ease-out), background-color 0.3s var(--ease-out); }
+  .service-option:hover { box-shadow: 0 0 0 1px rgba(16, 42, 67, 0.3); }
+  .service-option:has(input:checked) { background: var(--paper); box-shadow: 0 0 0 2px var(--ink); }
+  .service-option input { margin-top: 2px; }
+  .service-option > span { display: flex; flex-direction: column; gap: 4px; font-size: 14.5px; color: var(--ink-quiet); line-height: 1.55; }
+  .service-option strong { color: var(--ink); font-weight: var(--fw-medium); font-size: var(--fs-small); }
+  .service-price { color: var(--ink); font-weight: var(--fw-medium); }
+  .service-note { display: flex; flex-direction: column; gap: 8px; max-width: 680px; margin-bottom: 18px; font-size: var(--fs-small); font-weight: var(--fw-medium); color: var(--ink); }
+  .service-note textarea { min-height: 84px; padding: 14px 18px; border: 1px solid rgba(16, 42, 67, 0.16); border-radius: var(--r-sm); background: var(--white); font: inherit; font-weight: var(--fw-body); color: var(--ink); resize: vertical; }
+  .service-note textarea:focus { outline: none; border-color: var(--ink); box-shadow: 0 0 0 4px rgba(16, 42, 67, 0.08); }
+
+  @media (max-width: 1100px) {
+    .ed-layout { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+    /* The rail becomes a strip you can swipe, pinned under the mobile bar. */
+    .ed-rail { position: sticky; top: 68px; z-index: 25; margin: 0 -18px; padding: 8px 18px; background: linear-gradient(var(--cream) 70%, transparent); overflow-x: auto; scrollbar-width: none; }
+    .ed-rail::-webkit-scrollbar { display: none; }
+    .ed-rail ul { display: flex; gap: 6px; width: max-content; }
+    .ed-rail a { white-space: nowrap; background: var(--white); box-shadow: 0 0 0 1px var(--pt-hair); }
+  }
   @media (max-width: 720px) {
-    .grid-2 { grid-template-columns: 1fr; }
+    .hero { flex-direction: column-reverse; align-items: stretch; }
+    .ring { width: 76px; height: 76px; align-self: flex-start; }
+    .ring-n { font-size: 20px; }
+    .ring-l { display: none; }
+    .grid-2, .diff { grid-template-columns: 1fr; }
     .checkbox-grid { grid-template-columns: 1fr 1fr; }
+    .media-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; }
+    .savebar { bottom: 10px; }
+    .savebar-in { left: 0; right: 0; transform: none; justify-content: space-between; padding-left: 18px; gap: 12px; }
+    .savebar kbd { display: none; }
+  }
+  @media (max-width: 480px) {
+    .checkbox-grid { grid-template-columns: 1fr; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .media-item img, .dz-ic, .ring-fg { transition: none; }
   }
 </style>

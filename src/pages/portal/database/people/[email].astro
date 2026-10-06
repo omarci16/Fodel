@@ -68,13 +68,22 @@ const mailtoHref = `mailto:${email}${mailtoBody ? `?subject=${encodeURIComponent
 ---
 
 <Portal title={email}>
-  <header class="head">
-    <p class="eyebrow"><a href="/portal/database">← Adatbázis</a></p>
-    <h1>{email}</h1>
+  <header class="ph">
+    <div class="who">
+      <span class="avatar" aria-hidden="true">{email.slice(0, 2).toUpperCase()}</span>
+      <div>
+        <p class="eyebrow"><a href="/portal/database">← Adatbázis</a></p>
+        <h1>{email}</h1>
+        <p class="facts">{enquiries?.length ?? 0} érdeklődés · {events?.length ?? 0} esemény</p>
+      </div>
+    </div>
+    <a class="btn ghost" href={mailtoHref}>Levél írása</a>
   </header>
 
+  <div class="set-stack wide-stack">
+
   {enquiries && enquiries.length > 0 && (
-    <section class="block">
+    <section class="set-card">
       <h2>Érdeklődések ({enquiries.length})</h2>
       <table class="list">
         <thead><tr><th>Dátum</th><th>Hirdetés</th><th>Üzenet</th><th>Kezelve</th></tr></thead>
@@ -96,7 +105,7 @@ const mailtoHref = `mailto:${email}${mailtoBody ? `?subject=${encodeURIComponent
   )}
 
   {suggestions.length > 0 && (
-    <section class="block">
+    <section class="set-card">
       <h2>Hasonló ingatlanok</h2>
       <ul class="suggestions">
         {suggestions.map((p) => (
@@ -111,7 +120,7 @@ const mailtoHref = `mailto:${email}${mailtoBody ? `?subject=${encodeURIComponent
     </section>
   )}
 
-  <section class="block">
+  <section class="set-card">
     <h2>Minden esemény ({events?.length ?? 0})</h2>
     {events && events.length > 0 ? (
       <table class="list">
@@ -130,34 +139,26 @@ const mailtoHref = `mailto:${email}${mailtoBody ? `?subject=${encodeURIComponent
       <p class="empty">Nincs rögzített esemény ehhez a címhez.</p>
     )}
   </section>
+  </div>
 </Portal>
 
 <style>
-  .head { margin-bottom: 24px; }
-  .eyebrow { font-size: var(--fs-eyebrow); letter-spacing: var(--ls-eyebrow); text-transform: uppercase; color: var(--taupe); margin-bottom: 8px; }
-  .eyebrow a { text-decoration: underline; text-underline-offset: 2px; }
-  h1 { font-family: var(--serif); font-weight: var(--fw-display); font-size: 26px; color: var(--ink); word-break: break-all; }
-  h2 { font-family: var(--serif); font-size: 18px; color: var(--ink); margin-bottom: 14px; }
-
-  .block { padding: 24px 0; border-top: 1px solid var(--border); }
-
-  .list { width: 100%; border-collapse: collapse; font-size: var(--fs-small); }
-  .list th { text-align: left; font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; color: var(--taupe); padding: 10px 12px; border-bottom: 1px solid var(--border); }
-  .list td { padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--ink); vertical-align: top; }
-  .list a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+  .who { display: flex; align-items: center; gap: 20px; min-width: 0; }
+  .avatar { display: grid; place-items: center; flex: none; width: 64px; height: 64px; border-radius: 50%; background: var(--ink); color: var(--cream); font-family: var(--serif); font-weight: var(--fw-display); font-size: 21px; letter-spacing: 0.04em; }
+  .who h1 { word-break: break-all; font-size: clamp(24px, 3vw, 34px); }
+  .who .eyebrow { margin-bottom: 8px; }
+  .facts { margin-top: 8px; font-size: 14.5px; color: var(--ink-quiet); }
+  .wide-stack { max-width: none; }
+  .set-card h2 { margin-bottom: 16px; }
+  .list { width: 100%; font-size: var(--fs-small); }
+  .list a { text-decoration: underline; text-underline-offset: 3px; }
   .nowrap { white-space: nowrap; }
   .msg { max-width: 40ch; }
-  .sub { font-size: var(--fs-micro); color: var(--taupe); }
-  .pill { display: inline-block; font-size: var(--fs-micro); padding: 3px 10px; border: 1px solid var(--border); white-space: nowrap; background: rgba(16, 42, 67, 0.05); }
-
-  .suggestions { list-style: none; margin-bottom: 16px; }
-  .suggestions li { padding: 8px 0; border-bottom: 1px solid var(--border); font-size: var(--fs-small); }
-  .suggestions a { color: var(--ink); }
-
-  .btn { display: inline-block; padding: 10px 20px; background: var(--ink); color: var(--cream); font-size: var(--fs-micro); letter-spacing: var(--ls-button); text-transform: uppercase; }
-  .empty { color: var(--taupe); font-size: var(--fs-small); }
-
-  @media (max-width: 860px) {
-    .list { display: block; overflow-x: auto; }
-  }
+  .sub { font-size: 13px; color: var(--ink-quiet); }
+  .suggestions { list-style: none; display: grid; gap: 8px; margin-bottom: 18px; }
+  .suggestions li { padding: 12px 16px; border-radius: var(--r-md); background: var(--paper); font-size: var(--fs-small); }
+  .suggestions a { color: var(--ink); text-decoration: none; }
+  .suggestions a:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .empty { padding: 18px; border-radius: var(--r-md); background: var(--paper); color: var(--ink-quiet); font-size: var(--fs-small); }
+  @media (max-width: 860px) { .list { display: block; overflow-x: auto; } }
 </style>

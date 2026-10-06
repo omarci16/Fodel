@@ -28,10 +28,10 @@ function counts(term: any) {
 }
 ---
 <Portal title="Szótár">
-  <header><p class="eyebrow">Admin</p><h1>Szótár</h1><p>Az új kategóriák mentés után, a gyorsítótár miatt legfeljebb 1 percen belül jelennek meg a nyilvános oldalon.</p>
-    <p class="scope"><strong>Mire hat a szótár?</strong> Az itt megadott szavak a típusok, jellemzők, megyék és blogkategóriák <em>megjelenített nevei</em> az egyes nyelveken (szűrők, kártyák, adatlapok). A hirdetések és cikkek szövegének fordítását nem befolyásolják: a rendszerben jelenleg nincs gépi fordítás, amely ezeket a kifejezéseket használná. Egységes szakmai szóhasználatot a fordításban ez a lista ma nem biztosít — ennek kívánt működését Marcival kell tisztázni.</p></header>
-  <nav class="tabs">{groups.map((group) => <a href={`#${group}`}>{GROUP_LABEL[group] ?? group}</a>)}</nav>
-  {groups.map((group) => <section id={group}>
+  <header class="ph"><div><p class="eyebrow"><a href="/portal/settings">← Beállítások</a></p><h1>Szó<em>tár</em></h1><p>Az új kategóriák mentés után, a gyorsítótár miatt legfeljebb 1 percen belül jelennek meg a nyilvános oldalon.</p>
+    <p class="scope lede"><strong>Mire hat a szótár?</strong> Az itt megadott szavak a típusok, jellemzők, megyék és blogkategóriák <em>megjelenített nevei</em> az egyes nyelveken (szűrők, kártyák, adatlapok). A hirdetések és cikkek szövegének fordítását nem befolyásolják: a rendszerben jelenleg nincs gépi fordítás, amely ezeket a kifejezéseket használná. Egységes szakmai szóhasználatot a fordításban ez a lista ma nem biztosít — ennek kívánt működését Marcival kell tisztázni.</p></div></header>
+  <nav class="tabs" aria-label="Szótár csoportok">{groups.map((group) => <a href={`#${group}`}>{GROUP_LABEL[group] ?? group}</a>)}</nav>
+  {groups.map((group) => <section id={group} class="set-card">
     <h2>{GROUP_LABEL[group] ?? group}</h2>
     <div class="rows">
       {(terms ?? []).filter((term: any) => term.group_key === group).map((term: any) => {
@@ -57,7 +57,27 @@ function counts(term: any) {
   async function send(body){const response=await fetch('/api/portal/taxonomy',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});return {ok:response.ok,json:await response.json().catch(()=>({}))};}
   function labels(data){return Object.fromEntries(['hu','nl','de','en','fr'].map((locale)=>[locale,data.get(locale)]).filter(([,value])=>value));}
   document.querySelectorAll('.term').forEach((form)=>form.addEventListener('submit',async(event)=>{event.preventDefault();const f=event.currentTarget;const data=new FormData(f);if(!data.has('enabled')&&Number(f.dataset.live)>0&&!confirm(`A kifejezést ${f.dataset.live} élő hirdetés használja. Biztosan kikapcsolja?`))return;const result=await send({action:'save',id:f.dataset.id,labels:labels(data),slugs:{hu:data.get('slugHu'),nl:data.get('slugNl')},schemaType:data.get('schemaType'),sortOrder:data.get('sortOrder'),enabled:data.has('enabled')});f.querySelector('output').textContent=result.ok?'Mentve — a nyilvános oldalon 1 percen belül frissül':(result.json.error||'Nem sikerült.');}));
-  document.querySelectorAll('[data-delete]').forEach((button)=>button.addEventListener('click',async()=>{const f=button.closest('.term');if(!confirm('Biztosan törli?'))return;const result=await send({action:'delete',id:f.dataset.id});if(result.ok)location.reload();else f.querySelector('output').textContent=result.json.error||'Nem sikerült.';}));
+  document.querySelectorAll('[data-delete]').forEach((button)=>button.addEventListener('click',async()=>{const f=button.closest('.term');if(!(await window.pf.confirm({title:'Törli a szótári elemet?',body:'Az elem eltűnik a szűrőkből és a választólistákról. Használatban lévő elem törlését a rendszer megtagadhatja.',confirmLabel:'Törlés',danger:true})))return;const result=await send({action:'delete',id:f.dataset.id});if(result.ok)location.reload();else f.querySelector('output').textContent=result.json.error||'Nem sikerült.';}));
   document.querySelectorAll('.create').forEach((form)=>form.addEventListener('submit',async(event)=>{event.preventDefault();const f=event.currentTarget;const data=new FormData(f);const result=await send({action:'create',groupKey:f.dataset.group,key:data.get('key'),labels:labels(data),slugs:{hu:data.get('slugHu'),nl:data.get('slugNl')},schemaType:data.get('schemaType')});if(result.ok)location.reload();else f.querySelector('output').textContent=result.json.error||'Nem sikerült.';}));
 </script>
-<style>header{margin-bottom:28px}.scope{max-width:760px;margin-top:14px;padding:14px 18px;background:rgba(16,42,67,.05);border-left:2px solid var(--ink);font-size:var(--fs-small);line-height:1.65}.tabs{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:36px}.tabs a{text-decoration:underline}section{margin-bottom:56px;scroll-margin-top:90px}.rows{display:grid;gap:8px}.term,.create{display:grid;grid-template-columns:120px repeat(5,minmax(95px,1fr)) repeat(3,minmax(100px,1fr)) 80px 130px auto auto auto;gap:8px;align-items:center;padding:10px;border:1px solid var(--border);overflow-x:auto}input{min-width:0;padding:8px;border:1px solid var(--border)}button{padding:8px 12px}.create{margin-top:12px}@media(max-width:1000px){.term,.create{grid-template-columns:1fr 1fr}}</style>
+<style>
+  .scope { max-width: 760px; margin-top: 18px; padding: 16px 20px; border-radius: var(--r-lg); background: var(--paper); box-shadow: 0 0 0 1px var(--pt-hair); font-size: var(--fs-small); line-height: 1.7; color: var(--ink-quiet); }
+  .scope strong { color: var(--ink); }
+  .tabs { position: sticky; top: 12px; z-index: 15; display: flex; gap: 6px; flex-wrap: wrap; width: fit-content; max-width: 100%; padding: 6px; margin-bottom: 28px; border-radius: var(--r-pill); background: rgba(250, 250, 248, 0.9); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); box-shadow: var(--shadow-md), 0 0 0 1px var(--pt-hair); }
+  .tabs a { padding: 8px 16px; border-radius: var(--r-pill); font-size: 14px; color: var(--ink-quiet); text-decoration: none; transition: background-color 0.25s var(--ease-out), color 0.25s var(--ease-out); }
+  .tabs a:hover { background: var(--linen); color: var(--ink); }
+  section { margin-bottom: 20px; max-width: none; }
+  section h2 { margin-bottom: 18px; }
+  .rows { display: grid; gap: 8px; }
+  .term, .create { display: grid; grid-template-columns: 130px repeat(5, minmax(100px, 1fr)) repeat(3, minmax(100px, 1fr)) 80px 130px auto auto auto; gap: 8px; align-items: center; padding: 10px 12px; border-radius: var(--r-md); background: var(--paper); overflow-x: auto; }
+  .term:focus-within { background: var(--white); box-shadow: 0 0 0 1px rgba(16, 42, 67, 0.2); }
+  .term code { font-size: 13px; color: var(--ink-quiet); overflow: hidden; text-overflow: ellipsis; }
+  .term input:not([type='checkbox']), .create input { min-width: 0; min-height: 42px; padding: 8px 12px; font-size: 14.5px; }
+  .term label { display: flex; align-items: center; gap: 8px; font-size: 14px; white-space: nowrap; }
+  .term button, .create button { padding: 9px 16px; border-radius: var(--r-pill); background: var(--white); box-shadow: 0 0 0 1px var(--pt-hair); font-size: 14px; color: var(--ink); transition: box-shadow 0.2s var(--ease-out), background-color 0.2s var(--ease-out); }
+  .term button:hover, .create button:hover { box-shadow: 0 0 0 1px var(--ink); }
+  .term button[data-delete]:hover { background: var(--pt-red-bg); color: var(--pt-red); box-shadow: 0 0 0 1px var(--pt-red); }
+  .term output { font-size: 13px; color: var(--pt-green); }
+  .create { margin-top: 14px; background: transparent; box-shadow: inset 0 0 0 1.5px rgba(16, 42, 67, 0.16); }
+  @media (max-width: 1000px) { .term, .create { grid-template-columns: 1fr 1fr; } }
+</style>
